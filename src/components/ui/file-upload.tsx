@@ -3,7 +3,7 @@ import { FileIcon, XIcon } from 'lucide-solid'
 import { type ComponentProps, createMemo, For, Show, splitProps } from 'solid-js'
 import { createStyleContext, type HTMLStyledProps, Stack } from 'styled-system/jsx'
 import { fileUpload } from 'styled-system/recipes'
-import { Span } from '@/components/ui'
+import { Span } from '~/components/ui'
 
 const { withProvider, withContext } = createStyleContext(fileUpload)
 
@@ -37,7 +37,7 @@ interface ItemsBaseProps {
   files?: File[] | undefined
 }
 
-interface ItemsProps extends Omit<ItemProps, 'file'>, ItemsBaseProps {}
+interface ItemsProps extends Omit<ItemProps, 'file'>, ItemsBaseProps { }
 
 export const Items = (props: ItemsProps) => {
   const [local, rest] = splitProps(props, ['showSize', 'clearable', 'files'])
@@ -65,7 +65,7 @@ export const Items = (props: ItemsProps) => {
   )
 }
 
-interface FileUploadListProps extends ItemsBaseProps {}
+interface FileUploadListProps extends ItemsBaseProps { }
 
 export const List = (props: FileUploadListProps) => {
   const [local, rest] = splitProps(props, ['showSize', 'clearable', 'files'])

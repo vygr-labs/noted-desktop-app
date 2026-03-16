@@ -1,15 +1,14 @@
-productName: Crater Bible Project
+productName: Astro Electron App
 artifactName: ${productName}-${os}-${arch}.${ext}
 win:
   target: nsis
 linux:
   target: AppImage
-  synopsis: Free Alternative to Easyworship
-  category: Presentation
+  category: Utility
 mac:
   target: dmg
-  category: public.app-category.social-networking
-files: ['src/backend/build/**/*', 'build/**/*']
+  category: public.app-category.developer-tools
+files: ['src/backend/build/**/*', 'dist/**/*']
 extraResources: ['./assets/**']
 directories:
   buildResources: 'assets'
