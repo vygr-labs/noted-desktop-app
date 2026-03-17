@@ -33,11 +33,11 @@ export function NoteList() {
 	// Load list-specific notes or trashed notes
 	createEffect(
 		on(
-			() => store.currentView(),
-			async (view) => {
+			() => ({ view: store.currentView(), sort: store.noteSort() }),
+			async ({ view, sort }) => {
 				if (typeof view === 'object' && view.type === 'list') {
 					const notes = await window.electronAPI.fetchNotesByList(
-						view.listId
+						view.listId, sort
 					)
 					setListNotes(notes)
 				} else if (view === 'trash') {
@@ -80,7 +80,7 @@ export function NoteList() {
 		store.setSelectedNoteId(note.id)
 		// If in a list view, reload list notes
 		if (typeof view === 'object') {
-			const notes = await window.electronAPI.fetchNotesByList(view.listId)
+			const notes = await window.electronAPI.fetchNotesByList(view.listId, store.noteSort())
 			setListNotes(notes)
 		}
 	}

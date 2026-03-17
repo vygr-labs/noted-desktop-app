@@ -13,10 +13,10 @@ import {
 } from '../database/note-operations.js'
 
 export function registerNotesHandlers() {
-	ipcMain.handle('notes:fetch-all', () => fetchAllNotes())
+	ipcMain.handle('notes:fetch-all', (_, sort?: string) => fetchAllNotes(sort as any))
 	ipcMain.handle('notes:fetch', (_, id: string) => fetchNoteById(id))
-	ipcMain.handle('notes:fetch-by-list', (_, listId: string) =>
-		fetchNotesByList(listId)
+	ipcMain.handle('notes:fetch-by-list', (_, listId: string, sort?: string) =>
+		fetchNotesByList(listId, sort as any)
 	)
 	ipcMain.handle('notes:fetch-trashed', () => fetchTrashedNotes())
 	ipcMain.handle('notes:fetch-daily', (_, date: string) =>

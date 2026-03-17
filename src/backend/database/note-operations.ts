@@ -15,10 +15,13 @@ export interface Note {
 	updated_at: string
 }
 
-export function fetchAllNotes(): Note[] {
+export type NoteSortOrder = 'updated_at' | 'created_at' | 'title'
+
+export function fetchAllNotes(sort: NoteSortOrder = 'created_at'): Note[] {
+	const orderCol = sort === 'title' ? 'title ASC' : `${sort} DESC`
 	return db
 		.prepare(
-			'SELECT * FROM notes WHERE is_trashed = 0 ORDER BY is_pinned DESC, updated_at DESC'
+			`SELECT * FROM notes WHERE is_trashed = 0 ORDER BY is_pinned DESC, ${orderCol}`
 		)
 		.all() as Note[]
 }
@@ -29,10 +32,11 @@ export function fetchNoteById(id: string): Note | undefined {
 		| undefined
 }
 
-export function fetchNotesByList(listId: string): Note[] {
+export function fetchNotesByList(listId: string, sort: NoteSortOrder = 'created_at'): Note[] {
+	const orderCol = sort === 'title' ? 'title ASC' : `${sort} DESC`
 	return db
 		.prepare(
-			'SELECT * FROM notes WHERE list_id = ? AND is_trashed = 0 ORDER BY is_pinned DESC, updated_at DESC'
+			`SELECT * FROM notes WHERE list_id = ? AND is_trashed = 0 ORDER BY is_pinned DESC, ${orderCol}`
 		)
 		.all(listId) as Note[]
 }

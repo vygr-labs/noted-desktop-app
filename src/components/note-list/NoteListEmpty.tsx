@@ -7,54 +7,48 @@ const emptyStyle = css({
 	flexDirection: 'column',
 	alignItems: 'center',
 	justifyContent: 'center',
-	py: '12',
-	px: '4',
+	py: '16',
+	px: '6',
 	textAlign: 'center',
-	animation: 'slide-up-fade 0.3s ease-out',
+	animation: 'fade-in 0.3s ease-out',
 })
 
 const iconStyle = css({
-	width: '12',
-	height: '12',
-	color: 'gray.a5',
+	width: '10',
+	height: '10',
+	color: 'gray.a4',
 	mb: '4',
 	strokeWidth: '1.25',
 })
 
 const titleStyle = css({
-	fontSize: 'md',
-	fontWeight: '500',
+	fontSize: 'sm',
+	fontWeight: '600',
 	color: 'fg.subtle',
-	mb: '1.5',
+	mb: '1',
 	letterSpacing: '-0.01em',
 })
 
 const descStyle = css({
-	fontSize: 'sm',
+	fontSize: 'xs',
 	color: 'fg.muted',
 	mb: '5',
 	lineHeight: '1.5',
+	maxWidth: '200px',
 })
 
 const createBtn = css({
 	px: '4',
 	py: '2',
-	borderRadius: 'lg',
-	fontSize: 'sm',
+	borderRadius: 'md',
+	fontSize: 'xs',
 	fontWeight: '500',
 	cursor: 'pointer',
 	bg: 'indigo.9',
 	color: 'white',
 	transition: 'all 0.15s',
-	_hover: { bg: 'indigo.10', transform: 'translateY(-1px)', boxShadow: '0 4px 12px {colors.indigo.a5}' },
-	_active: { transform: 'translateY(0)' },
-})
-
-const kbdHint = css({
-	fontSize: 'xs',
-	color: 'fg.muted',
-	mt: '3',
-	fontFamily: 'mono',
+	_hover: { bg: 'indigo.10' },
+	_active: { transform: 'scale(0.98)' },
 })
 
 export function NoteListEmpty(props: {
@@ -79,7 +73,6 @@ export function NoteListEmpty(props: {
 				<button class={createBtn} onClick={props.onCreateNote}>
 					Create Note
 				</button>
-				<span class={kbdHint}>or press Ctrl+K to search</span>
 			</Show>
 		</div>
 	)

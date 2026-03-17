@@ -75,7 +75,7 @@ export function AppShell() {
 	const [isDragging, setIsDragging] = createSignal(false)
 
 	const isTodoView = () => store.currentView() === 'todos'
-	const sidebarWidth = () => (store.sidebarCollapsed() ? 56 : 220)
+	const sidebarWidth = () => (store.sidebarCollapsed() ? 60 : 220)
 
 	// Keyboard shortcuts
 	onMount(() => {

@@ -67,6 +67,8 @@ type SidebarView =
 	| 'search'
 	| { type: 'list'; listId: string }
 
+type NoteSortOrder = 'updated_at' | 'created_at' | 'title'
+
 interface NoteWithTags extends Note {
 	tags: Tag[]
 }
@@ -80,9 +82,9 @@ interface ElectronAPI {
 	darkModeSystem: () => void
 
 	// Notes
-	fetchAllNotes: () => Promise<Note[]>
+	fetchAllNotes: (sort?: NoteSortOrder) => Promise<Note[]>
 	fetchNote: (id: string) => Promise<Note | undefined>
-	fetchNotesByList: (listId: string) => Promise<Note[]>
+	fetchNotesByList: (listId: string, sort?: NoteSortOrder) => Promise<Note[]>
 	fetchTrashedNotes: () => Promise<Note[]>
 	fetchDailyNote: (date: string) => Promise<Note | undefined>
 	createNote: (data: {

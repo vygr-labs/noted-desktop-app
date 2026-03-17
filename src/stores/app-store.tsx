@@ -28,6 +28,8 @@ interface AppStore {
 	setFocusMode: (v: boolean) => void
 	commandPaletteOpen: () => boolean
 	setCommandPaletteOpen: (v: boolean) => void
+	noteSort: () => NoteSortOrder
+	setNoteSort: (sort: NoteSortOrder) => void
 
 	// Data
 	notes: () => Note[] | undefined
@@ -44,10 +46,6 @@ interface AppStore {
 }
 
 const AppStoreContext = createContext<AppStore>()
-
-async function loadNotes(): Promise<Note[]> {
-	return window.electronAPI.fetchAllNotes()
-}
 
 async function loadLists(): Promise<NoteList[]> {
 	return window.electronAPI.fetchAllLists()
@@ -68,8 +66,14 @@ export function AppStoreProvider(props: ParentProps) {
 	const [sidebarCollapsed, setSidebarCollapsed] = createSignal(false)
 	const [focusMode, setFocusMode] = createSignal(false)
 	const [commandPaletteOpen, setCommandPaletteOpen] = createSignal(false)
+	const [noteSort, setNoteSort] = createSignal<NoteSortOrder>('created_at')
 
-	const [notes, { refetch: refetchNotes }] = createResource(loadNotes)
+	const [notes, { refetch: refetchNotes }] = createResource(
+		noteSort,
+		async (sort: NoteSortOrder) => {
+			return window.electronAPI.fetchAllNotes(sort)
+		}
+	)
 	const [lists, { refetch: refetchLists }] = createResource(loadLists)
 	const [tags, { refetch: refetchTags }] = createResource(loadTags)
 	const [todos, { refetch: refetchTodos }] = createResource(loadTodos)
@@ -95,6 +99,8 @@ export function AppStoreProvider(props: ParentProps) {
 		setFocusMode,
 		commandPaletteOpen,
 		setCommandPaletteOpen,
+		noteSort,
+		setNoteSort,
 
 		notes: () => notes(),
 		lists: () => lists(),

@@ -11,10 +11,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	darkModeSystem: () => ipcRenderer.send('dark-mode:system'),
 
 	// Notes
-	fetchAllNotes: () => ipcRenderer.invoke('notes:fetch-all'),
+	fetchAllNotes: (sort?: string) => ipcRenderer.invoke('notes:fetch-all', sort),
 	fetchNote: (id: string) => ipcRenderer.invoke('notes:fetch', id),
-	fetchNotesByList: (listId: string) =>
-		ipcRenderer.invoke('notes:fetch-by-list', listId),
+	fetchNotesByList: (listId: string, sort?: string) =>
+		ipcRenderer.invoke('notes:fetch-by-list', listId, sort),
 	fetchTrashedNotes: () => ipcRenderer.invoke('notes:fetch-trashed'),
 	fetchDailyNote: (date: string) =>
 		ipcRenderer.invoke('notes:fetch-daily', date),

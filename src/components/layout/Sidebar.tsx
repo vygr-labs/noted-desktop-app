@@ -15,108 +15,102 @@ import {
 	PanelLeftCloseIcon,
 	PanelLeftOpenIcon,
 	SunIcon,
-	MoonIcon,
-	PenLineIcon,
 } from 'lucide-solid'
 import { CreateListDialog } from '../sidebar/CreateListDialog'
 
-const sidebarContainer = css({
+// ─── Styles ───────────────────────────────────────────────
+
+const container = css({
 	display: 'flex',
 	flexDirection: 'column',
 	height: '100%',
-	py: '2',
 	userSelect: 'none',
 })
 
-const brandRow = css({
-	display: 'flex',
-	alignItems: 'center',
-	justifyContent: 'space-between',
-	px: '4',
-	py: '3',
-	mb: '1',
+const topArea = css({
+	px: '3',
+	pt: '3',
+	pb: '2',
 })
 
-const brandName = css({
+const searchBtn = css({
 	display: 'flex',
 	alignItems: 'center',
-	gap: '2',
-	fontSize: 'md',
-	fontWeight: 'bold',
-	color: 'fg.default',
-	letterSpacing: '-0.02em',
-})
-
-const brandIcon = css({
-	width: '5',
-	height: '5',
-	color: 'indigo.9',
-})
-
-const collapseBtn = css({
-	display: 'flex',
-	alignItems: 'center',
-	justifyContent: 'center',
-	width: '6',
-	height: '6',
+	gap: '2.5',
+	width: '100%',
+	height: '36px',
+	px: '2.5',
 	borderRadius: 'md',
+	fontSize: '13px',
 	cursor: 'pointer',
-	color: 'fg.subtle',
+	color: 'fg.muted',
+	bg: 'gray.a2',
 	transition: 'all 0.15s',
-	_hover: { bg: 'bg.muted', color: 'fg.default' },
+	_hover: { bg: 'gray.a3', color: 'fg.default' },
 })
 
-const sectionLabel = css({
-	px: '4',
-	py: '1.5',
+const searchKbd = css({
+	ml: 'auto',
 	fontSize: '10px',
-	fontWeight: 'bold',
 	color: 'fg.subtle',
-	textTransform: 'uppercase',
-	letterSpacing: '0.08em',
+	fontFamily: 'mono',
+	bg: 'gray.a3',
+	borderRadius: 'sm',
+	px: '1',
+	py: '0.5',
+	lineHeight: 1,
+})
+
+// ─── Navigation ───────────────────────────────────────────
+
+const navSection = css({
+	display: 'flex',
+	flexDirection: 'column',
+	gap: '0.5',
+	px: '3',
+	py: '1',
 })
 
 const navItem = css({
 	display: 'flex',
 	alignItems: 'center',
 	gap: '2.5',
-	px: '3',
-	py: '1.5',
-	mx: '2',
-	borderRadius: 'lg',
-	fontSize: 'sm',
+	height: '38px',
+	px: '2.5',
+	borderRadius: 'md',
+	fontSize: '13.5px',
 	cursor: 'pointer',
 	color: 'fg.muted',
 	transition: 'all 0.15s ease',
 	position: 'relative',
 	_hover: { bg: 'gray.a3', color: 'fg.default' },
 	'&[data-active="true"]': {
-		bg: 'indigo.a3',
+		bg: 'indigo.a2',
 		color: 'indigo.11',
 		fontWeight: '500',
+		'& .nav-indicator': {
+			opacity: 1,
+			transform: 'scaleY(1)',
+		},
 	},
 })
 
-const navItemCollapsed = css({
-	display: 'flex',
-	alignItems: 'center',
-	justifyContent: 'center',
-	py: '2',
-	mx: '1',
-	borderRadius: 'lg',
-	cursor: 'pointer',
-	color: 'fg.muted',
-	transition: 'all 0.15s ease',
-	_hover: { bg: 'gray.a3', color: 'fg.default' },
-	'&[data-active="true"]': {
-		bg: 'indigo.a3',
-		color: 'indigo.11',
-	},
+const navIndicator = css({
+	position: 'absolute',
+	left: 0,
+	top: '25%',
+	bottom: '25%',
+	width: '3px',
+	borderRadius: 'full',
+	bg: 'indigo.9',
+	opacity: 0,
+	transform: 'scaleY(0)',
+	transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
 })
 
 const iconStyle = css({
-	width: '4',
-	height: '4',
+	width: '4.5',
+	height: '4.5',
 	flexShrink: 0,
 })
 
@@ -139,70 +133,110 @@ const badge = css({
 	},
 })
 
-const listSection = css({
-	flex: 1,
-	overflowY: 'auto',
-	overflowX: 'hidden',
+// ─── Divider ──────────────────────────────────────────────
+
+const divider = css({
+	height: '1px',
+	bg: 'gray.a3',
+	mx: '3',
+	my: '1.5',
 })
 
-const bottomSection = css({
-	borderTop: '1px solid',
-	borderTopColor: 'gray.a3',
-	pt: '2',
-	mt: '2',
-})
+// ─── Lists section ────────────────────────────────────────
 
-const addListBtn = css({
+const sectionHeader = css({
 	display: 'flex',
 	alignItems: 'center',
-	gap: '2.5',
+	justifyContent: 'space-between',
 	px: '3',
-	py: '1.5',
-	mx: '2',
-	borderRadius: 'lg',
-	fontSize: 'sm',
+	pt: '1',
+	pb: '0.5',
+})
+
+const sectionLabel = css({
+	fontSize: '11.5px',
+	fontWeight: '600',
+	color: 'fg.subtle',
+	textTransform: 'uppercase',
+	letterSpacing: '0.06em',
+})
+
+const sectionAddBtn = css({
+	display: 'flex',
+	alignItems: 'center',
+	justifyContent: 'center',
+	width: '5',
+	height: '5',
+	borderRadius: 'sm',
 	cursor: 'pointer',
 	color: 'fg.subtle',
 	transition: 'all 0.15s',
 	_hover: { bg: 'gray.a3', color: 'fg.default' },
 })
 
-const listItemContainer = css({
+const listScroll = css({
+	flex: 1,
+	overflowY: 'auto',
+	overflowX: 'hidden',
+	display: 'flex',
+	flexDirection: 'column',
+	gap: '0.5',
+	px: '3',
+	py: '0.5',
+})
+
+const listItemRow = css({
 	display: 'flex',
 	alignItems: 'center',
-	justifyContent: 'space-between',
 	gap: '1',
-	pr: '2',
-	'&:hover .list-actions': {
-		opacity: 1,
-	},
+	'&:hover .list-actions': { opacity: 1 },
 })
 
 const listActions = css({
 	opacity: 0,
-	transition: 'opacity 0.15s',
+	display: 'flex',
+	alignItems: 'center',
+	justifyContent: 'center',
+	width: '5',
+	height: '5',
+	borderRadius: 'sm',
 	cursor: 'pointer',
 	color: 'fg.subtle',
-	_hover: { color: 'fg.default' },
-	padding: '1',
-	borderRadius: 'sm',
+	flexShrink: 0,
+	transition: 'all 0.15s',
+	_hover: { bg: 'gray.a3', color: 'fg.default' },
 })
 
-const bottomRow = css({
+const listName = css({
+	overflow: 'hidden',
+	textOverflow: 'ellipsis',
+	whiteSpace: 'nowrap',
+})
+
+// ─── Bottom ───────────────────────────────────────────────
+
+const bottomArea = css({
+	px: '3',
+	pb: '2',
+	pt: '1',
 	display: 'flex',
-	alignItems: 'center',
-	justifyContent: 'center',
+	flexDirection: 'column',
 	gap: '0.5',
-	px: '2',
-	py: '1',
 })
 
-const bottomBtn = css({
+const bottomToolbar = css({
+	display: 'flex',
+	alignItems: 'center',
+	gap: '0.5',
+	pt: '1',
+})
+
+const toolbarBtn = css({
 	display: 'flex',
 	alignItems: 'center',
 	justifyContent: 'center',
-	width: '7',
-	height: '7',
+	width: '9',
+	height: '9',
 	borderRadius: 'md',
 	cursor: 'pointer',
 	color: 'fg.subtle',
@@ -210,12 +244,68 @@ const bottomBtn = css({
 	_hover: { bg: 'gray.a3', color: 'fg.default' },
 })
 
+const smallIcon = css({ width: '4', height: '4' })
+
+// ─── Collapsed ────────────────────────────────────────────
+
+const collapsedContainer = css({
+	display: 'flex',
+	flexDirection: 'column',
+	alignItems: 'center',
+	height: '100%',
+	py: '2',
+	gap: '0.5',
+	userSelect: 'none',
+})
+
+const collapsedItem = css({
+	display: 'flex',
+	alignItems: 'center',
+	justifyContent: 'center',
+	width: '40px',
+	height: '40px',
+	borderRadius: 'md',
+	cursor: 'pointer',
+	color: 'fg.muted',
+	position: 'relative',
+	transition: 'all 0.15s ease',
+	_hover: { bg: 'gray.a3', color: 'fg.default' },
+	'&[data-active="true"]': {
+		bg: 'indigo.a2',
+		color: 'indigo.11',
+		'& .nav-indicator': {
+			opacity: 1,
+			transform: 'scaleY(1)',
+		},
+	},
+})
+
+const collapsedIndicator = css({
+	position: 'absolute',
+	left: '-2px',
+	top: '25%',
+	bottom: '25%',
+	width: '3px',
+	borderRadius: 'full',
+	bg: 'indigo.9',
+	opacity: 0,
+	transform: 'scaleY(0)',
+	transition: 'all 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+})
+
+const collapsedDivider = css({
+	width: '28px',
+	height: '1px',
+	bg: 'gray.a3',
+	my: '1',
+})
+
+// ─── Component ────────────────────────────────────────────
+
 export function Sidebar() {
 	const store = useAppStore()
 	const settingsStore = useSettingsStore()
 	const [showCreateList, setShowCreateList] = createSignal(false)
-
-	const collapsed = () => store.sidebarCollapsed()
 
 	const isActive = (view: string) => {
 		const current = store.currentView()
@@ -258,212 +348,236 @@ export function Sidebar() {
 		}
 	}
 
-	// Collapsed sidebar
-	if (collapsed()) {
-		return (
-			<div class={sidebarContainer}>
-				<div class={css({ display: 'flex', justifyContent: 'center', py: '3', mb: '1' })}>
-					<button
-						class={collapseBtn}
-						onClick={() => store.setSidebarCollapsed(false)}
-						title="Expand sidebar"
-					>
-						<PanelLeftOpenIcon class={iconStyle} />
-					</button>
-				</div>
+	async function handleNewNote() {
+		const view = store.currentView()
+		const listId = typeof view === 'object' ? view.listId : null
+		const note = await window.electronAPI.createNote({
+			title: 'Untitled',
+			list_id: listId,
+		})
+		store.refetchNotes()
+		store.setSelectedNoteId(note.id)
+	}
 
-				<div
-					class={navItemCollapsed}
-					data-active={isActive('search')}
-					onClick={() => store.setCommandPaletteOpen(true)}
-					title="Search"
-				>
-					<SearchIcon class={iconStyle} />
-				</div>
-				<div
-					class={navItemCollapsed}
-					data-active={isActive('today')}
-					onClick={() => handleNavClick('today')}
-					title="Today"
-				>
-					<CalendarIcon class={iconStyle} />
-				</div>
-				<div
-					class={navItemCollapsed}
-					data-active={isActive('all')}
-					onClick={() => handleNavClick('all')}
-					title="All Notes"
-				>
-					<FileTextIcon class={iconStyle} />
-				</div>
-				<div
-					class={navItemCollapsed}
-					data-active={isActive('todos')}
-					onClick={() => handleNavClick('todos')}
-					title="To-dos"
-				>
-					<CheckSquareIcon class={iconStyle} />
-				</div>
-
-				<div class={css({ flex: 1 })} />
-
-				<div class={bottomSection}>
+	return (
+		<Show
+			when={!store.sidebarCollapsed()}
+			fallback={
+				/* ─── Collapsed sidebar ──────────────────── */
+				<div class={collapsedContainer}>
 					<div
-						class={navItemCollapsed}
+						class={collapsedItem}
+						data-active={isActive('search')}
+						onClick={() => store.setCommandPaletteOpen(true)}
+						title="Search (Ctrl+K)"
+					>
+						<div class={`nav-indicator ${collapsedIndicator}`} />
+						<SearchIcon class={iconStyle} />
+					</div>
+					<div
+						class={collapsedItem}
+						data-active={isActive('today')}
+						onClick={() => handleNavClick('today')}
+						title="Today"
+					>
+						<div class={`nav-indicator ${collapsedIndicator}`} />
+						<CalendarIcon class={iconStyle} />
+					</div>
+					<div
+						class={collapsedItem}
+						data-active={isActive('all')}
+						onClick={() => handleNavClick('all')}
+						title="All Notes"
+					>
+						<div class={`nav-indicator ${collapsedIndicator}`} />
+						<FileTextIcon class={iconStyle} />
+					</div>
+					<div
+						class={collapsedItem}
+						data-active={isActive('todos')}
+						onClick={() => handleNavClick('todos')}
+						title="To-dos"
+					>
+						<div class={`nav-indicator ${collapsedIndicator}`} />
+						<CheckSquareIcon class={iconStyle} />
+					</div>
+
+					<div class={css({ flex: 1 })} />
+
+					<div
+						class={collapsedItem}
 						data-active={isActive('trash')}
 						onClick={() => handleNavClick('trash')}
 						title="Trash"
 					>
+						<div class={`nav-indicator ${collapsedIndicator}`} />
 						<Trash2Icon class={iconStyle} />
 					</div>
+
+					<div class={collapsedDivider} />
+
 					<div
-						class={navItemCollapsed}
+						class={collapsedItem}
+						onClick={handleNewNote}
+						title="New Note"
+					>
+						<PlusIcon class={iconStyle} />
+					</div>
+					<div
+						class={collapsedItem}
 						onClick={() => settingsStore.setShowSettingsDialog(true)}
 						title="Settings"
 					>
 						<SettingsIcon class={iconStyle} />
 					</div>
+					<div
+						class={collapsedItem}
+						onClick={() => store.setSidebarCollapsed(false)}
+						title="Expand sidebar"
+					>
+						<PanelLeftOpenIcon class={iconStyle} />
+					</div>
 				</div>
-			</div>
-		)
-	}
-
-	return (
-		<div class={sidebarContainer}>
-			<div class={css({ display: 'flex', justifyContent: 'flex-end', px: '2', pt: '1', mb: '1' })}>
-				<button
-					class={collapseBtn}
-					onClick={() => store.setSidebarCollapsed(true)}
-					title="Collapse sidebar (Ctrl+B)"
-				>
-					<PanelLeftCloseIcon class={css({ width: '3.5', height: '3.5' })} />
-				</button>
-			</div>
-
-			{/* Search */}
-			<div
-				class={navItem}
-				data-active={isActive('search')}
-				onClick={() => store.setCommandPaletteOpen(true)}
-			>
-				<SearchIcon class={iconStyle} />
-				<span>Search</span>
-				<span class={css({ ml: 'auto', fontSize: '10px', color: 'fg.subtle', fontFamily: 'mono' })}>
-					Ctrl+K
-				</span>
-			</div>
-
-			{/* Main nav */}
-			<div class={css({ mb: '2', mt: '1' })}>
-				<div
-					class={navItem}
-					data-active={isActive('today')}
-					onClick={() => handleNavClick('today')}
-				>
-					<CalendarIcon class={iconStyle} />
-					<span>Today</span>
-					<Show when={todayCount() > 0}>
-						<span class={badge} data-accent="true">{todayCount()}</span>
-					</Show>
+			}
+		>
+			{/* ─── Expanded sidebar ──────────────────────── */}
+			<div class={container}>
+				{/* Top — Search */}
+				<div class={topArea}>
+					<div
+						class={searchBtn}
+						onClick={() => store.setCommandPaletteOpen(true)}
+					>
+						<SearchIcon class={css({ width: '3.5', height: '3.5', flexShrink: 0 })} />
+						<span>Search</span>
+						<span class={searchKbd}>Ctrl+K</span>
+					</div>
 				</div>
-				<div
-					class={navItem}
-					data-active={isActive('all')}
-					onClick={() => handleNavClick('all')}
-				>
-					<FileTextIcon class={iconStyle} />
-					<span>All Notes</span>
-					<Show when={(store.notes() || []).length > 0}>
-						<span class={badge}>{(store.notes() || []).length}</span>
-					</Show>
-				</div>
-				<div
-					class={navItem}
-					data-active={isActive('todos')}
-					onClick={() => handleNavClick('todos')}
-				>
-					<CheckSquareIcon class={iconStyle} />
-					<span>To-dos</span>
-					<Show when={todoCount() > 0}>
-						<span class={badge} data-accent="true">{todoCount()}</span>
-					</Show>
-				</div>
-			</div>
 
-			{/* Lists */}
-			<div class={listSection}>
-				<div class={sectionLabel}>Lists</div>
-				<For each={store.lists()}>
-					{(list) => (
-						<div class={listItemContainer}>
-							<div
-								class={navItem}
-								style={{ flex: 1 }}
-								data-active={isListActive(list.id)}
-								onClick={() => handleListClick(list.id)}
-							>
-								<FolderIcon class={iconStyle} />
-								<span
-									class={css({
-										overflow: 'hidden',
-										textOverflow: 'ellipsis',
-										whiteSpace: 'nowrap',
-									})}
+				{/* Main navigation */}
+				<div class={navSection}>
+					<div
+						class={navItem}
+						data-active={isActive('today')}
+						onClick={() => handleNavClick('today')}
+					>
+						<div class={`nav-indicator ${navIndicator}`} />
+						<CalendarIcon class={iconStyle} />
+						<span>Today</span>
+						<Show when={todayCount() > 0}>
+							<span class={badge} data-accent="true">{todayCount()}</span>
+						</Show>
+					</div>
+					<div
+						class={navItem}
+						data-active={isActive('all')}
+						onClick={() => handleNavClick('all')}
+					>
+						<div class={`nav-indicator ${navIndicator}`} />
+						<FileTextIcon class={iconStyle} />
+						<span>All Notes</span>
+						<Show when={(store.notes() || []).length > 0}>
+							<span class={badge}>{(store.notes() || []).length}</span>
+						</Show>
+					</div>
+					<div
+						class={navItem}
+						data-active={isActive('todos')}
+						onClick={() => handleNavClick('todos')}
+					>
+						<div class={`nav-indicator ${navIndicator}`} />
+						<CheckSquareIcon class={iconStyle} />
+						<span>To-dos</span>
+						<Show when={todoCount() > 0}>
+							<span class={badge} data-accent="true">{todoCount()}</span>
+						</Show>
+					</div>
+				</div>
+
+				<div class={divider} />
+
+				{/* Lists */}
+				<div class={sectionHeader}>
+					<span class={sectionLabel}>Lists</span>
+					<button
+						class={sectionAddBtn}
+						onClick={() => setShowCreateList(true)}
+						title="New list"
+					>
+						<PlusIcon class={css({ width: '3', height: '3' })} />
+					</button>
+				</div>
+				<div class={listScroll}>
+					<For each={store.lists()}>
+						{(list) => (
+							<div class={listItemRow}>
+								<div
+									class={navItem}
+									style={{ flex: 1 }}
+									data-active={isListActive(list.id)}
+									onClick={() => handleListClick(list.id)}
 								>
-									{list.name}
-								</span>
+									<div class={`nav-indicator ${navIndicator}`} />
+									<FolderIcon class={iconStyle} />
+									<span class={listName}>{list.name}</span>
+								</div>
+								<div
+									class={`list-actions ${listActions}`}
+									onClick={(e) => handleDeleteList(e, list.id)}
+									title="Delete list"
+								>
+									<MoreHorizontalIcon class={css({ width: '3.5', height: '3.5' })} />
+								</div>
 							</div>
-							<div
-								class={`list-actions ${listActions}`}
-								onClick={(e) => handleDeleteList(e, list.id)}
-							>
-								<MoreHorizontalIcon
-									class={css({ width: '3.5', height: '3.5' })}
-								/>
-							</div>
-						</div>
-					)}
-				</For>
-				<div
-					class={addListBtn}
-					onClick={() => setShowCreateList(true)}
-				>
-					<PlusIcon class={iconStyle} />
-					<span>New List</span>
+						)}
+					</For>
 				</div>
-			</div>
 
-			{/* Bottom */}
-			<div class={bottomSection}>
-				<div
-					class={navItem}
-					data-active={isActive('trash')}
-					onClick={() => handleNavClick('trash')}
-				>
-					<Trash2Icon class={iconStyle} />
-					<span>Trash</span>
-				</div>
-				<div class={bottomRow}>
-					<button
-						class={bottomBtn}
-						onClick={() => settingsStore.setShowSettingsDialog(true)}
-						title="Settings"
+				{/* Bottom */}
+				<div class={divider} />
+				<div class={bottomArea}>
+					<div
+						class={navItem}
+						data-active={isActive('trash')}
+						onClick={() => handleNavClick('trash')}
 					>
-						<SettingsIcon class={css({ width: '3.5', height: '3.5' })} />
-					</button>
-					<button
-						class={bottomBtn}
-						onClick={() => window.electronAPI.darkModeToggle()}
-						title="Toggle theme"
-					>
-						<SunIcon class={css({ width: '3.5', height: '3.5' })} />
-					</button>
+						<div class={`nav-indicator ${navIndicator}`} />
+						<Trash2Icon class={iconStyle} />
+						<span>Trash</span>
+					</div>
+					<div class={bottomToolbar}>
+						<button class={toolbarBtn} onClick={handleNewNote} title="New Note">
+							<PlusIcon class={smallIcon} />
+						</button>
+						<button
+							class={toolbarBtn}
+							onClick={() => settingsStore.setShowSettingsDialog(true)}
+							title="Settings"
+						>
+							<SettingsIcon class={smallIcon} />
+						</button>
+						<button
+							class={toolbarBtn}
+							onClick={() => window.electronAPI.darkModeToggle()}
+							title="Toggle theme"
+						>
+							<SunIcon class={smallIcon} />
+						</button>
+						<div class={css({ flex: 1 })} />
+						<button
+							class={toolbarBtn}
+							onClick={() => store.setSidebarCollapsed(true)}
+							title="Collapse sidebar (Ctrl+B)"
+						>
+							<PanelLeftCloseIcon class={smallIcon} />
+						</button>
+					</div>
 				</div>
-			</div>
 
-			<Show when={showCreateList()}>
-				<CreateListDialog onClose={() => setShowCreateList(false)} />
-			</Show>
-		</div>
+				<Show when={showCreateList()}>
+					<CreateListDialog onClose={() => setShowCreateList(false)} />
+				</Show>
+			</div>
+		</Show>
 	)
 }
