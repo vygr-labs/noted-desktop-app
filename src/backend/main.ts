@@ -45,7 +45,7 @@ const spawnAppWindow = async () => {
 		minHeight: 500,
 		center: true,
 		icon: getAssetPath('icon.png'),
-		title: electronIsDev ? 'Notes - Development' : 'Notes',
+		title: electronIsDev ? 'noted - Development' : 'noted',
 		show: false,
 		frame: false,
 		webPreferences: {

@@ -7,7 +7,6 @@ import {
 	MoonIcon,
 	MonitorIcon,
 	TypeIcon,
-	FileTextIcon,
 	PaletteIcon,
 	InfoIcon,
 	PenLineIcon,
@@ -255,7 +254,7 @@ export function SettingsDialog() {
 					<div class={dialogHeader}>
 						<div class={headerLeft}>
 							<span class={dialogTitle}>Settings</span>
-							<span class={dialogSubtitle}>Customize your Notes experience</span>
+							<span class={dialogSubtitle}>Customize your noted experience</span>
 						</div>
 						<button
 							class={closeBtn}
@@ -371,7 +370,7 @@ export function SettingsDialog() {
 							<div class={settingInfo}>
 								<div class={settingLabel}>Version</div>
 								<div class={settingDesc}>
-									Notes — a minimal, distraction-free note-taking app
+									noted — a minimal, distraction-free note-taking app
 								</div>
 							</div>
 							<span class={css({ fontSize: '13px', color: 'fg.muted', fontWeight: '500' })}>
@@ -382,7 +381,12 @@ export function SettingsDialog() {
 
 					{/* Footer */}
 					<div class={footer}>
-						<FileTextIcon class={css({ width: '3.5', height: '3.5' })} />
+						<img
+							src="/noted-logo.svg"
+							alt="noted"
+							style={{ height: '14px' }}
+							draggable={false}
+						/>
 						<span>Made with care by Eyetu Kingsley</span>
 					</div>
 				</div>

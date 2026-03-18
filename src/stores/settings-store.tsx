@@ -9,6 +9,7 @@ import {
 export type AppTheme = 'light' | 'dark' | 'warm' | 'slate' | 'system'
 
 const THEME_CYCLE: AppTheme[] = ['light', 'warm', 'slate', 'dark', 'system']
+const QUICK_CYCLE: AppTheme[] = ['light', 'warm', 'slate', 'dark']
 
 interface SettingsStore {
 	defaultNoteType: () => 'rich' | 'plain'
@@ -76,8 +77,11 @@ export function SettingsStoreProvider(props: ParentProps) {
 
 	function cycleTheme() {
 		const current = theme()
-		const idx = THEME_CYCLE.indexOf(current)
-		const next = THEME_CYCLE[(idx + 1) % THEME_CYCLE.length]
+		const idx = QUICK_CYCLE.indexOf(current)
+		// If current theme is 'system' or not in quick cycle, start from light
+		const next = idx === -1
+			? QUICK_CYCLE[0]
+			: QUICK_CYCLE[(idx + 1) % QUICK_CYCLE.length]
 		setTheme(next)
 	}
 

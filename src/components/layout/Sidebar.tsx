@@ -24,6 +24,7 @@ const container = css({
 	flexDirection: 'column',
 	height: '100%',
 	userSelect: 'none',
+	minWidth: '220px',
 })
 
 const topArea = css({
@@ -276,6 +277,7 @@ const collapsedContainer = css({
 	py: '2',
 	gap: '0.5',
 	userSelect: 'none',
+	minWidth: '60px',
 })
 
 const collapsedItem = css({

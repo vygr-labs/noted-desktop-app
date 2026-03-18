@@ -27,29 +27,9 @@ const titlebarStyle = css({
 const brandSection = css({
 	display: 'flex',
 	alignItems: 'center',
-	gap: '2.5',
 	height: '100%',
 	px: '4',
 	flexShrink: 0,
-})
-
-const brandIconWrap = css({
-	display: 'flex',
-	alignItems: 'center',
-	justifyContent: 'center',
-	width: '22px',
-	height: '22px',
-	borderRadius: 'md',
-	bg: 'indigo.a3',
-	color: 'indigo.9',
-	flexShrink: 0,
-})
-
-const brandText = css({
-	fontSize: '13px',
-	fontWeight: '600',
-	color: 'fg.default',
-	letterSpacing: '-0.02em',
 })
 
 const dragRegion = css({
@@ -113,12 +93,12 @@ export function Titlebar() {
 		<div class={titlebarStyle}>
 			{/* Brand */}
 			<div class={brandSection} style={{ '-webkit-app-region': 'drag' }}>
-				<div class={brandIconWrap}>
-					<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-						<path d="M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
-					</svg>
-				</div>
-				<span class={brandText}>Notes</span>
+				<img
+					src="/noted-logo.svg"
+					alt="noted"
+					style={{ height: '22px', 'pointer-events': 'none' }}
+					draggable={false}
+				/>
 			</div>
 
 			{/* Drag region */}
