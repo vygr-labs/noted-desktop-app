@@ -63,7 +63,7 @@ const spawnAppWindow = async () => {
 		minHeight: 500,
 		center: true,
 		icon: getAssetPath('icon.png'),
-		title: electronIsDev ? 'noted - Development' : 'noted',
+		title: electronIsDev ? 'noted. - Development' : 'noted.',
 		show: false,
 		frame: false,
 		webPreferences: {
@@ -169,7 +169,7 @@ function spawnPopoutWindow(opts: { view: string; listId?: string; title?: string
 		skipTaskbar,
 		show: false,
 		icon: getAssetPath('icon.png'),
-		title: opts.title || 'noted',
+		title: opts.title || 'noted.',
 		webPreferences: {
 			preload: PRELOAD_PATH,
 			webSecurity: !electronIsDev,

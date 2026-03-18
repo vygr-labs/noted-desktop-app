@@ -2,17 +2,40 @@ appId: com.voyagertech.noted
 productName: noted
 copyright: Copyright (c) 2026 Voyager Technologies Limited
 artifactName: ${productName}-${os}-${arch}.${ext}
+
 win:
   target: nsis
   icon: assets/icon.ico
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  installerIcon: assets/icon.ico
+  uninstallerIcon: assets/icon.ico
+  installerHeader: installer/header.bmp
+  installerSidebar: installer/sidebar.bmp
+  uninstallerSidebar: installer/sidebar.bmp
+  license: LICENSE
+  deleteAppDataOnUninstall: false
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: "noted."
+  include: installer/installer.nsh
+
 linux:
   target: AppImage
   category: Utility
   icon: assets/icon.png
+
 mac:
   target: dmg
   category: public.app-category.productivity
   icon: assets/icon.icns
+
+dmg:
+  title: "noted."
+  icon: assets/icon.icns
+
 files: ['src/backend/build/**/*', 'dist/**/*']
 extraResources: ['./assets/**']
 directories:

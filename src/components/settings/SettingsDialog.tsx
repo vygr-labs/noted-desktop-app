@@ -286,7 +286,7 @@ export function SettingsDialog() {
 					<div class={dialogHeader}>
 						<div class={headerLeft}>
 							<span class={dialogTitle}>Settings</span>
-							<span class={dialogSubtitle}>Customize your noted experience</span>
+							<span class={dialogSubtitle}>Customize your noted. experience</span>
 						</div>
 						<button
 							class={closeBtn}
@@ -426,7 +426,7 @@ export function SettingsDialog() {
 							<div class={settingInfo}>
 								<div class={settingLabel}>Version</div>
 								<div class={settingDesc}>
-									noted — a minimal, distraction-free note-taking app
+									noted. — a minimal, distraction-free note-taking app
 								</div>
 							</div>
 							<span class={css({ fontSize: '13px', color: 'fg.muted', fontWeight: '500' })}>
