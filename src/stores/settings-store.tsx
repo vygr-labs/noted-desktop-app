@@ -19,6 +19,8 @@ interface SettingsStore {
 	theme: () => AppTheme
 	setTheme: (v: AppTheme) => void
 	cycleTheme: () => void
+	popoutSkipTaskbar: () => boolean
+	setPopoutSkipTaskbar: (v: boolean) => void
 }
 
 const SettingsStoreContext = createContext<SettingsStore>()
@@ -50,6 +52,7 @@ export function SettingsStoreProvider(props: ParentProps) {
 	)
 	const [showSettingsDialog, setShowSettingsDialog] = createSignal(false)
 	const [theme, _setTheme] = createSignal<AppTheme>('system')
+	const [popoutSkipTaskbar, _setPopoutSkipTaskbar] = createSignal(false)
 
 	onMount(async () => {
 		const savedType = await window.electronAPI.getSetting('defaultNoteType')
@@ -61,6 +64,11 @@ export function SettingsStoreProvider(props: ParentProps) {
 		if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'warm' || savedTheme === 'slate' || savedTheme === 'system') {
 			_setTheme(savedTheme)
 			applyTheme(savedTheme)
+		}
+
+		const savedSkip = await window.electronAPI.getSetting('popoutSkipTaskbar')
+		if (savedSkip === 'true') {
+			_setPopoutSkipTaskbar(true)
 		}
 	})
 
@@ -85,6 +93,12 @@ export function SettingsStoreProvider(props: ParentProps) {
 		setTheme(next)
 	}
 
+	function setPopoutSkipTaskbar(v: boolean) {
+		_setPopoutSkipTaskbar(v)
+		window.electronAPI.setSetting('popoutSkipTaskbar', String(v))
+		window.electronAPI.popoutUpdateSkipTaskbar(v)
+	}
+
 	const store: SettingsStore = {
 		defaultNoteType,
 		setDefaultNoteType,
@@ -93,6 +107,8 @@ export function SettingsStoreProvider(props: ParentProps) {
 		theme,
 		setTheme,
 		cycleTheme,
+		popoutSkipTaskbar,
+		setPopoutSkipTaskbar,
 	}
 
 	return (

@@ -87,6 +87,18 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	submitQuickCapture: (text: string) =>
 		ipcRenderer.invoke('quick-capture:submit', text),
 
+	// Popout
+	openPopout: (opts: { view: string; listId?: string; title?: string }) =>
+		ipcRenderer.invoke('popout:open', opts),
+	popoutTogglePin: () => ipcRenderer.invoke('popout:toggle-pin'),
+	popoutIsPinned: () => ipcRenderer.invoke('popout:is-pinned'),
+	popoutClose: () => ipcRenderer.invoke('popout:close'),
+	popoutUpdateSkipTaskbar: (skip: boolean) =>
+		ipcRenderer.invoke('popout:update-skip-taskbar', skip),
+	onPopoutTodosChanged: (callback: () => void) => {
+		ipcRenderer.on('popout:todos-changed', () => callback())
+	},
+
 	// Window controls
 	windowMinimize: () => ipcRenderer.invoke('window:minimize'),
 	windowMaximize: () => ipcRenderer.invoke('window:maximize'),

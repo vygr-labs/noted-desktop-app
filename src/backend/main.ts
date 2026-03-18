@@ -15,12 +15,14 @@ import { dirname } from 'path'
 import { RESOURCES_PATH } from './constants.js'
 import { registerAllHandlers } from './ipc/register-all.js'
 import { createNote } from './database/note-operations.js'
+import { getSetting } from './database/settings-operations.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
 const { autoUpdater } = electronUpdater
 let appWindow: BrowserWindow | null = null
 let quickCaptureWindow: BrowserWindow | null = null
+const popoutWindows = new Map<string, BrowserWindow>()
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const store = new ElectronStore()
 
@@ -122,6 +124,58 @@ function spawnQuickCaptureWindow() {
 	})
 }
 
+function spawnPopoutWindow(opts: { view: string; listId?: string; title?: string }) {
+	const key = `${opts.view}:${opts.listId || 'all'}`
+
+	const existing = popoutWindows.get(key)
+	if (existing && !existing.isDestroyed()) {
+		existing.show()
+		existing.focus()
+		return
+	}
+
+	const params = new URLSearchParams({ view: opts.view })
+	if (opts.listId) params.set('listId', opts.listId)
+	if (opts.title) params.set('title', opts.title)
+
+	const skipTaskbar = getSetting('popoutSkipTaskbar') === 'true'
+
+	const popout = new BrowserWindow({
+		width: 320,
+		height: 480,
+		minWidth: 240,
+		minHeight: 200,
+		frame: false,
+		transparent: false,
+		resizable: true,
+		skipTaskbar,
+		show: false,
+		icon: getAssetPath('icon.png'),
+		title: opts.title || 'noted',
+		webPreferences: {
+			preload: PRELOAD_PATH,
+			webSecurity: !electronIsDev,
+		},
+	})
+
+	const route = `/popout?${params.toString()}`
+	popout.loadURL(
+		electronIsDev
+			? `http://localhost:7241${route}`
+			: `file://${path.join(__dirname, '../../dist/popout/index.html')}?${params.toString()}`
+	)
+
+	popout.once('ready-to-show', () => {
+		popout.show()
+	})
+
+	popout.on('closed', () => {
+		popoutWindows.delete(key)
+	})
+
+	popoutWindows.set(key, popout)
+}
+
 function registerGlobalShortcuts() {
 	globalShortcut.register('CommandOrControl+Shift+N', () => {
 		spawnQuickCaptureWindow()
@@ -193,6 +247,39 @@ function registerAppHandlers() {
 	// Quick capture
 	ipcMain.handle('quick-capture:open', () => {
 		spawnQuickCaptureWindow()
+	})
+
+	// Popout
+	ipcMain.handle('popout:open', (_, opts: { view: string; listId?: string; title?: string }) => {
+		spawnPopoutWindow(opts)
+	})
+
+	ipcMain.handle('popout:toggle-pin', (event) => {
+		const win = BrowserWindow.fromWebContents(event.sender)
+		if (win) {
+			const pinned = !win.isAlwaysOnTop()
+			win.setAlwaysOnTop(pinned)
+			return pinned
+		}
+		return false
+	})
+
+	ipcMain.handle('popout:is-pinned', (event) => {
+		const win = BrowserWindow.fromWebContents(event.sender)
+		return win?.isAlwaysOnTop() ?? false
+	})
+
+	ipcMain.handle('popout:close', (event) => {
+		const win = BrowserWindow.fromWebContents(event.sender)
+		win?.close()
+	})
+
+	ipcMain.handle('popout:update-skip-taskbar', (_, skip: boolean) => {
+		for (const [, win] of popoutWindows) {
+			if (!win.isDestroyed()) {
+				win.setSkipTaskbar(skip)
+			}
+		}
 	})
 
 	ipcMain.handle('quick-capture:submit', (_, text: string) => {

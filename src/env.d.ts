@@ -185,6 +185,14 @@ interface ElectronAPI {
 	openQuickCapture: () => Promise<void>
 	submitQuickCapture: (text: string) => Promise<void>
 
+	// Popout
+	openPopout: (opts: { view: string; listId?: string; title?: string }) => Promise<void>
+	popoutTogglePin: () => Promise<boolean>
+	popoutIsPinned: () => Promise<boolean>
+	popoutClose: () => Promise<void>
+	popoutUpdateSkipTaskbar: (skip: boolean) => Promise<void>
+	onPopoutTodosChanged: (callback: () => void) => void
+
 	// Window controls
 	windowMinimize: () => Promise<void>
 	windowMaximize: () => Promise<boolean>

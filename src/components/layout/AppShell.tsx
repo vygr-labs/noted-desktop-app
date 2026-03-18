@@ -84,15 +84,15 @@ export function AppShell() {
 	// Keyboard shortcuts
 	onMount(() => {
 		function handleKeyDown(e: KeyboardEvent) {
-			// Ctrl+K: command palette
-			if ((e.ctrlKey || e.metaKey) && e.key === 'k') {
+			// Ctrl+Shift+F: command palette / search
+			if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
 				e.preventDefault()
 				store.setCommandPaletteOpen(!store.commandPaletteOpen())
 			}
-			// Ctrl+Shift+F: focus mode
-			if ((e.ctrlKey || e.metaKey) && e.shiftKey && e.key === 'F') {
+			// Ctrl+F: search in current note
+			if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'f') {
 				e.preventDefault()
-				store.setFocusMode(!store.focusMode())
+				store.setNoteSearchOpen(!store.noteSearchOpen())
 			}
 			// Ctrl+B: toggle sidebar
 			if ((e.ctrlKey || e.metaKey) && e.key === 'b') {

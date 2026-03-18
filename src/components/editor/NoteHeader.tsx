@@ -9,6 +9,7 @@ import {
 	Trash2Icon,
 	RotateCcwIcon,
 	XIcon,
+	ExternalLinkIcon,
 } from 'lucide-solid'
 
 const headerStyle = css({
@@ -233,6 +234,19 @@ export function NoteHeader(props: { note: Note; readonly?: boolean }) {
 							</>
 						}
 					>
+						<button
+							class={actionBtn}
+							onClick={() => {
+								window.electronAPI.openPopout({
+									view: 'note',
+									listId: props.note.id,
+									title: props.note.title || 'Untitled',
+								})
+							}}
+							title="Pop out note"
+						>
+							<ExternalLinkIcon class={iconSize} />
+						</button>
 						<button class={actionBtn} onClick={handlePin} title="Pin/Unpin">
 							<Show
 								when={props.note.is_pinned}

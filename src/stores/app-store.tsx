@@ -31,6 +31,8 @@ interface AppStore {
 	setFocusMode: (v: boolean) => void
 	commandPaletteOpen: () => boolean
 	setCommandPaletteOpen: (v: boolean) => void
+	noteSearchOpen: () => boolean
+	setNoteSearchOpen: (v: boolean) => void
 	noteSort: () => NoteSortOrder
 	setNoteSort: (sort: NoteSortOrder) => void
 
@@ -78,6 +80,7 @@ export function AppStoreProvider(props: ParentProps) {
 	const [noteListCollapsed, setNoteListCollapsed] = createSignal(false)
 	const [focusMode, setFocusMode] = createSignal(false)
 	const [commandPaletteOpen, setCommandPaletteOpen] = createSignal(false)
+	const [noteSearchOpen, setNoteSearchOpen] = createSignal(false)
 	const [noteSort, _setNoteSort] = createSignal<NoteSortOrder>('updated_at')
 	const [noteTagsMap, setNoteTagsMap] = createSignal<Record<string, Tag[]>>({})
 
@@ -87,12 +90,16 @@ export function AppStoreProvider(props: ParentProps) {
 		window.electronAPI.setSetting('noteSort', sort)
 	}
 
-	// Load saved sort on startup
+	// Load saved sort on startup + listen for cross-window todo changes
 	onMount(async () => {
 		const saved = await window.electronAPI.getSetting('noteSort')
 		if (saved === 'updated_at' || saved === 'created_at' || saved === 'title') {
 			_setNoteSort(saved)
 		}
+
+		window.electronAPI.onPopoutTodosChanged(() => {
+			refetchTodos()
+		})
 	})
 
 	async function loadTagsForNotes(ids: string[]) {
@@ -135,6 +142,8 @@ export function AppStoreProvider(props: ParentProps) {
 		setFocusMode,
 		commandPaletteOpen,
 		setCommandPaletteOpen,
+		noteSearchOpen,
+		setNoteSearchOpen,
 		noteSort,
 		setNoteSort,
 

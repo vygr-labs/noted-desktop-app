@@ -13,6 +13,7 @@ import {
 	FileIcon,
 	CoffeeIcon,
 	CloudyIcon,
+	ExternalLinkIcon,
 } from 'lucide-solid'
 
 // ─── Overlay + shell ──────────────────────────────────────
@@ -225,6 +226,37 @@ const themeOptionLabel = css({
 	fontWeight: '600',
 })
 
+// ─── Toggle switch ────────────────────────────────────
+
+const toggleTrack = css({
+	position: 'relative',
+	width: '40px',
+	height: '22px',
+	borderRadius: 'full',
+	bg: 'gray.a4',
+	cursor: 'pointer',
+	transition: 'background 0.2s',
+	flexShrink: 0,
+	'&[data-active="true"]': {
+		bg: 'indigo.9',
+	},
+	'&[data-active="true"] > div': {
+		transform: 'translateX(18px)',
+	},
+})
+
+const toggleThumb = css({
+	position: 'absolute',
+	top: '2px',
+	left: '2px',
+	width: '18px',
+	height: '18px',
+	borderRadius: 'full',
+	bg: 'white',
+	boxShadow: '0 1px 3px rgba(0,0,0,0.2)',
+	transition: 'transform 0.2s cubic-bezier(0.4, 0, 0.2, 1)',
+})
+
 // ─── Footer ───────────────────────────────────────────────
 
 const footer = css({
@@ -356,6 +388,30 @@ export function SettingsDialog() {
 									Plain Text
 								</div>
 							</div>
+						</div>
+
+						<div class={sectionDivider} />
+
+						{/* Popout section */}
+						<div class={sectionTitle}>
+							<ExternalLinkIcon class={sectionIcon} />
+							Popout
+						</div>
+
+						<div class={settingRow}>
+							<div class={settingInfo}>
+								<div class={settingLabel}>Hide from Alt+Tab</div>
+								<div class={settingDesc}>
+									When enabled, pinned popout windows won't appear in the task switcher
+								</div>
+							</div>
+							<button
+								class={toggleTrack}
+								data-active={settings.popoutSkipTaskbar()}
+								onClick={() => settings.setPopoutSkipTaskbar(!settings.popoutSkipTaskbar())}
+							>
+								<div class={toggleThumb} />
+							</button>
 						</div>
 
 						<div class={sectionDivider} />

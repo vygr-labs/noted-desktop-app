@@ -7,6 +7,7 @@ const headerStyle = css({
 	display: 'flex',
 	alignItems: 'center',
 	justifyContent: 'space-between',
+	gap: '2',
 	px: '5',
 	py: '4',
 	flexShrink: 0,
@@ -19,13 +20,6 @@ const titleStyle = css({
 	fontWeight: '700',
 	color: 'fg.default',
 	letterSpacing: '-0.02em',
-})
-
-const sortLabel = css({
-	fontSize: '12px',
-	fontWeight: '400',
-	color: 'fg.subtle',
-	marginLeft: '1.5',
 })
 
 const actions = css({
@@ -119,15 +113,9 @@ export function NoteListHeader(props: {
 		onCleanup(() => document.removeEventListener('mousedown', handleClickOutside))
 	})
 
-	const currentSortLabel = () =>
-		sortOptions.find((o) => o.value === store.noteSort())?.label || ''
-
 	return (
 		<div class={headerStyle}>
-			<span>
-				<span class={titleStyle}>{props.title}</span>
-				<span class={sortLabel}>· {currentSortLabel()}</span>
-			</span>
+			<div class={titleStyle}>{props.title}</div>
 			<div class={actions}>
 				<div ref={sortContainerRef} style={{ position: 'relative' }}>
 					<button

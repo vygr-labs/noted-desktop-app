@@ -431,7 +431,7 @@ export function Sidebar() {
 						class={collapsedItem}
 						data-active={isActive('search')}
 						onClick={() => store.setCommandPaletteOpen(true)}
-						title="Search (Ctrl+K)"
+						title="Search (Ctrl+Shift+F)"
 					>
 						<div class={`nav-indicator ${collapsedIndicator}`} />
 						<SearchIcon class={iconStyle} />
@@ -519,7 +519,7 @@ export function Sidebar() {
 					>
 						<SearchIcon class={css({ width: '3.5', height: '3.5', flexShrink: 0 })} />
 						<span>Search</span>
-						<span class={searchKbd}>Ctrl+K</span>
+						<span class={searchKbd}>Ctrl+Shift+F</span>
 					</div>
 				</div>
 

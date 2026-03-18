@@ -10,6 +10,7 @@ import {
 	PlusIcon,
 	XIcon,
 	SparklesIcon,
+	ExternalLinkIcon,
 } from 'lucide-solid'
 
 const container = css({
@@ -455,8 +456,35 @@ export function TodoView() {
 				{/* Header */}
 				<div class={headerRow}>
 					<h1 class={headerTitle}>To-dos</h1>
-					<Show when={hasTodos()}>
-						<div class={headerStats}>
+					<div class={headerStats}>
+						<button
+							class={css({
+								display: 'flex',
+								alignItems: 'center',
+								justifyContent: 'center',
+								width: '8',
+								height: '8',
+								borderRadius: 'md',
+								cursor: 'pointer',
+								color: 'fg.subtle',
+								transition: 'all 0.15s',
+								_hover: { bg: 'gray.a3', color: 'fg.default' },
+							})}
+							onClick={() => {
+								const listName = selectedListId()
+									? allTodoLists().find((l) => l.id === selectedListId())?.name
+									: undefined
+								window.electronAPI.openPopout({
+									view: 'todos',
+									listId: selectedListId() || undefined,
+									title: listName ? `To-dos · ${listName}` : 'To-dos',
+								})
+							}}
+							title="Pop out to mini window"
+						>
+							<ExternalLinkIcon class={css({ width: '4', height: '4' })} />
+						</button>
+						<Show when={hasTodos()}>
 							<div class={statChip}>
 								<div class={statDot} style={{ background: 'var(--colors-indigo-9)' }} />
 								{activeCount()} active
@@ -465,8 +493,8 @@ export function TodoView() {
 								<div class={statDot} style={{ background: 'var(--colors-green-9)' }} />
 								{completedCount()} done
 							</div>
-						</div>
-					</Show>
+						</Show>
+					</div>
 				</div>
 				<p class={headerSubtext}>{progressMessage()}</p>
 
