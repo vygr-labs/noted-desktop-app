@@ -14,6 +14,7 @@ import { useEditorStore } from '../../stores/editor-store'
 import { debounce } from '../../lib/debounce'
 import { tiptapToPlaintext } from '../../lib/tiptap-to-plaintext'
 import { hasListPatterns, parseLinesToNodes, cleanTipTapContent } from '../../lib/text-cleanup'
+import { CodeBlockWithCopy } from './codeblock-with-copy'
 
 const editorWrap = css({
 	minHeight: '200px',
@@ -204,7 +205,9 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 			extensions: [
 				StarterKit.configure({
 					heading: { levels: [1, 2, 3] },
+					codeBlock: false,
 				}),
+				CodeBlockWithCopy,
 				TaskList,
 				TaskItem.configure({ nested: true }),
 				Placeholder.configure({ placeholder: 'Start writing...' }),
@@ -255,6 +258,7 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				}
 			}
 		})
+
 	})
 
 	// When the note changes (different note selected), update editor content

@@ -108,6 +108,7 @@ export const globalCss = {
         color: 'indigo.11',
       },
       '& pre': {
+        position: 'relative',
         bg: '{colors.gray.2}',
         borderRadius: '10px',
         p: '5',
@@ -120,6 +121,38 @@ export const globalCss = {
           p: 0,
           fontSize: '0.85em',
           color: 'fg.default',
+        },
+        '& .codeblock-copy-btn': {
+          position: 'absolute',
+          top: '8px',
+          right: '8px',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          width: '28px',
+          height: '28px',
+          borderRadius: '6px',
+          border: '1px solid',
+          borderColor: 'gray.a4',
+          bg: 'gray.a2',
+          color: 'fg.subtle',
+          cursor: 'pointer',
+          opacity: 0,
+          transition: 'opacity 0.15s, color 0.15s, background 0.15s',
+          zIndex: 1,
+        },
+        _hover: {
+          '& .codeblock-copy-btn': {
+            opacity: 1,
+          },
+        },
+        '& .codeblock-copy-btn:hover': {
+          bg: 'gray.a3',
+          color: 'fg.default',
+        },
+        '& .codeblock-copy-btn.copied': {
+          opacity: 1,
+          color: 'green.9',
         },
       },
       '& hr': {
