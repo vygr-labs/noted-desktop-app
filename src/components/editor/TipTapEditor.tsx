@@ -9,9 +9,11 @@ import Underline from '@tiptap/extension-underline'
 import Highlight from '@tiptap/extension-highlight'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
+import { Slice } from '@tiptap/pm/model'
 import { useEditorStore } from '../../stores/editor-store'
 import { debounce } from '../../lib/debounce'
 import { tiptapToPlaintext } from '../../lib/tiptap-to-plaintext'
+import { hasListPatterns, parseLinesToNodes, cleanTipTapContent } from '../../lib/text-cleanup'
 
 const editorWrap = css({
 	minHeight: '200px',
@@ -128,6 +130,57 @@ export function scrollToSearchMatch(index: number) {
 	}
 }
 
+// ─── Paste formatter plugin ──────────────────────────────
+
+function createPasteFormatterPlugin() {
+	return new Plugin({
+		key: new PluginKey('pasteFormatter'),
+		props: {
+			handlePaste(view, event) {
+				const clipboardData = event.clipboardData
+				if (!clipboardData) return false
+
+				const text = clipboardData.getData('text/plain')
+				const html = clipboardData.getData('text/html')
+
+				// Only intercept plain text paste with list patterns
+				if (html && html.trim()) return false
+				if (!text || !hasListPatterns(text)) return false
+
+				try {
+					const lines = text.split('\n')
+					const parsedNodes = parseLinesToNodes(lines)
+					if (parsedNodes.length === 0) return false
+
+					const { schema } = view.state
+					const doc = schema.nodeFromJSON({
+						type: 'doc',
+						content: parsedNodes,
+					})
+					const slice = new Slice(doc.content, 0, 0)
+					const tr = view.state.tr.replaceSelection(slice)
+					view.dispatch(tr)
+					return true
+				} catch {
+					// Fall back to default paste behavior
+					return false
+				}
+			},
+		},
+	})
+}
+
+// ─── Clean content ───────────────────────────────────────
+
+export function cleanEditorContent() {
+	const editor = currentEditor
+	if (!editor) return
+
+	const json = editor.getJSON()
+	const cleaned = cleanTipTapContent(json as any)
+	editor.commands.setContent(cleaned)
+}
+
 // Store cursor positions per note ID
 const cursorPositions = new Map<string, { from: number; to: number }>()
 
@@ -160,6 +213,10 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				Extension.create({
 					name: 'searchHighlight',
 					addProseMirrorPlugins: () => [createSearchPlugin()],
+				}),
+				Extension.create({
+					name: 'pasteFormatter',
+					addProseMirrorPlugins: () => [createPasteFormatterPlugin()],
 				}),
 			],
 			content: parseContent(props.note.content),

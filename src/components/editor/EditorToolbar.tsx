@@ -1,5 +1,5 @@
 import { css } from '../../../styled-system/css'
-import { getEditorInstance } from './TipTapEditor'
+import { getEditorInstance, cleanEditorContent } from './TipTapEditor'
 import {
 	BoldIcon,
 	ItalicIcon,
@@ -15,6 +15,7 @@ import {
 	CodeIcon,
 	QuoteIcon,
 	MinusIcon,
+	SparklesIcon,
 } from 'lucide-solid'
 
 export type ToolbarPosition = 'top' | 'right' | 'bottom' | 'left'
@@ -238,6 +239,16 @@ export function EditorToolbar(props: {
 				title="Horizontal Rule"
 			>
 				<MinusIcon class={iconSize} />
+			</button>
+
+			<div style={dividerStyle()} />
+
+			<button
+				class={toolBtn}
+				onMouseDown={cmd(() => cleanEditorContent())}
+				title="Clean & Format (fix lists, trim whitespace)"
+			>
+				<SparklesIcon class={iconSize} />
 			</button>
 		</div>
 	)
