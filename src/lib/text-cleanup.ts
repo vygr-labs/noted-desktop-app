@@ -32,6 +32,83 @@ export function hasListPatterns(text: string): boolean {
 }
 
 /**
+ * Check if text contains a markdown table pattern.
+ */
+export function hasTablePattern(text: string): boolean {
+	const lines = text.split('\n').filter((l) => l.trim())
+	if (lines.length < 2) return false
+	// Need at least a header row and a separator row with pipes and dashes
+	return lines.some((line) => /^\|.*\|$/.test(line.trim())) &&
+		lines.some((line) => /^\|[\s\-:|]+\|$/.test(line.trim()))
+}
+
+/**
+ * Parse a markdown table into TipTap table JSON node.
+ */
+export function parseMarkdownTable(lines: string[]): TipTapNode | null {
+	// Filter to only lines that look like table rows
+	const tableLines = lines
+		.map((l) => l.trim())
+		.filter((l) => l.startsWith('|') && l.endsWith('|'))
+	if (tableLines.length < 2) return null
+
+	// Find the separator row (e.g. |---|---|)
+	const sepIdx = tableLines.findIndex((l) =>
+		/^\|[\s\-:|]+\|$/.test(l)
+	)
+	if (sepIdx < 1) return null
+
+	function parseCells(line: string): string[] {
+		return line
+			.slice(1, -1) // remove leading/trailing |
+			.split('|')
+			.map((c) => c.trim())
+	}
+
+	const headerRows = tableLines.slice(0, sepIdx)
+	const bodyRows = tableLines.slice(sepIdx + 1)
+
+	const rows: TipTapNode[] = []
+
+	// Header rows
+	for (const row of headerRows) {
+		const cells = parseCells(row)
+		rows.push({
+			type: 'tableRow',
+			content: cells.map((cell) => ({
+				type: 'tableHeader',
+				content: [
+					{
+						type: 'paragraph',
+						content: cell ? [{ type: 'text', text: cell }] : undefined,
+					},
+				],
+			})),
+		})
+	}
+
+	// Body rows
+	for (const row of bodyRows) {
+		const cells = parseCells(row)
+		rows.push({
+			type: 'tableRow',
+			content: cells.map((cell) => ({
+				type: 'tableCell',
+				content: [
+					{
+						type: 'paragraph',
+						content: cell ? [{ type: 'text', text: cell }] : undefined,
+					},
+				],
+			})),
+		})
+	}
+
+	if (rows.length === 0) return null
+	return { type: 'table', content: rows }
+}
+
+/**
  * Parse lines of plain text into TipTap JSON nodes.
  * Converts "- text" → bullet list, "1. text" → ordered list,
  * "- [ ] text" / "- [x] text" → task list.
@@ -42,6 +119,22 @@ export function parseLinesToNodes(lines: string[]): TipTapNode[] {
 
 	while (i < lines.length) {
 		const line = lines[i]
+
+		// Markdown table: lines starting and ending with |
+		if (/^\s*\|.*\|\s*$/.test(line)) {
+			const tableLines: string[] = []
+			while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
+				tableLines.push(lines[i])
+				i++
+			}
+			const table = parseMarkdownTable(tableLines)
+			if (table) {
+				nodes.push(table)
+				continue
+			}
+			// Not a valid table, fall through and reprocess
+			i -= tableLines.length
+		}
 
 		// Task list: - [ ] or - [x]
 		if (/^\s*[-*•]\s+\[[ xX]\]\s+/.test(line)) {

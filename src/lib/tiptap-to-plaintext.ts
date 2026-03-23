@@ -19,6 +19,13 @@ function extractText(node: TipTapNode): string {
 	if (node.text) return node.text
 	if (!node.content) return ''
 
+	// Handle table rows: join cells with tab
+	if (node.type === 'tableRow') {
+		return node.content
+			.map((cell) => extractText(cell).trim())
+			.join('\t') + '\n'
+	}
+
 	return node.content
 		.map((child) => {
 			const text = extractText(child)
@@ -28,7 +35,8 @@ function extractText(node: TipTapNode): string {
 				child.type === 'taskItem' ||
 				child.type === 'listItem' ||
 				child.type === 'blockquote' ||
-				child.type === 'codeBlock'
+				child.type === 'codeBlock' ||
+				child.type === 'table'
 			) {
 				return text + '\n'
 			}

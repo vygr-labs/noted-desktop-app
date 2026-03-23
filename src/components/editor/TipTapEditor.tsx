@@ -7,13 +7,14 @@ import TaskItem from '@tiptap/extension-task-item'
 import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
 import Highlight from '@tiptap/extension-highlight'
+import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { Slice } from '@tiptap/pm/model'
 import { useEditorStore } from '../../stores/editor-store'
 import { debounce } from '../../lib/debounce'
 import { tiptapToPlaintext } from '../../lib/tiptap-to-plaintext'
-import { hasListPatterns, parseLinesToNodes, cleanTipTapContent } from '../../lib/text-cleanup'
+import { hasListPatterns, hasTablePattern, parseLinesToNodes, parseMarkdownTable, cleanTipTapContent } from '../../lib/text-cleanup'
 import { CodeBlockWithCopy } from './codeblock-with-copy'
 
 const editorWrap = css({
@@ -144,9 +145,12 @@ function createPasteFormatterPlugin() {
 				const text = clipboardData.getData('text/plain')
 				const html = clipboardData.getData('text/html')
 
-				// Only intercept plain text paste with list patterns
+				// Only intercept plain text paste with list/table patterns
 				if (html && html.trim()) return false
-				if (!text || !hasListPatterns(text)) return false
+				if (!text) return false
+				const hasList = hasListPatterns(text)
+				const hasTable = hasTablePattern(text)
+				if (!hasList && !hasTable) return false
 
 				try {
 					const lines = text.split('\n')
@@ -213,6 +217,10 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				Placeholder.configure({ placeholder: 'Start writing...' }),
 				Underline,
 				Highlight.configure({ multicolor: false }),
+				Table.configure({ resizable: false }),
+				TableRow,
+				TableHeader,
+				TableCell,
 				Extension.create({
 					name: 'searchHighlight',
 					addProseMirrorPlugins: () => [createSearchPlugin()],

@@ -2391,6 +2391,43 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tiptap/extension-table-cell@npm:^3.20.4":
+  version: 3.20.4
+  resolution: "@tiptap/extension-table-cell@npm:3.20.4"
+  peerDependencies:
+    "@tiptap/extension-table": ^3.20.4
+  checksum: 10c0/81c2583938b6b9e80d25b69a36ff7235c3d696d076db51a732c966aa5aed6824f0e75a30b47bbf36e9a87bd06210aee175c45b1d324521534e7d6c6b57943819
+  languageName: node
+  linkType: hard
+
+"@tiptap/extension-table-header@npm:^3.20.4":
+  version: 3.20.4
+  resolution: "@tiptap/extension-table-header@npm:3.20.4"
+  peerDependencies:
+    "@tiptap/extension-table": ^3.20.4
+  checksum: 10c0/69096c37cc46381e714eec257f91226ce115ee1d372f5471a1798aa483f4811a8ad6477cd0797342bb03a278c8a00807e33d2672cb147a35cedf3e3a3340f5d7
+  languageName: node
+  linkType: hard
+
+"@tiptap/extension-table-row@npm:^3.20.4":
+  version: 3.20.4
+  resolution: "@tiptap/extension-table-row@npm:3.20.4"
+  peerDependencies:
+    "@tiptap/extension-table": ^3.20.4
+  checksum: 10c0/7d6da8512648e0a0aff5a8c1268222b168fbac6b22451af66c8669e8c87ec07cf0d33269d13dd58fa83b2fa711dc5180012ab0a68b5dab4212f471584469dadf
+  languageName: node
+  linkType: hard
+
+"@tiptap/extension-table@npm:^3.20.4":
+  version: 3.20.4
+  resolution: "@tiptap/extension-table@npm:3.20.4"
+  peerDependencies:
+    "@tiptap/core": ^3.20.4
+    "@tiptap/pm": ^3.20.4
+  checksum: 10c0/4ebd0a279aac5e4172274461133c4bcd2336686d021c563dcf692a2670a46da22881339b7bbea39af55ee10e15c90ac85bc83fc2f1a0a18d631fa3fc3a0d28c8
+  languageName: node
+  linkType: hard
+
 "@tiptap/extension-task-item@npm:^3.20.4":
   version: 3.20.4
   resolution: "@tiptap/extension-task-item@npm:3.20.4"
@@ -8669,6 +8706,10 @@ __metadata:
     "@tiptap/extension-bubble-menu": "npm:^3.20.4"
     "@tiptap/extension-highlight": "npm:^3.20.4"
     "@tiptap/extension-placeholder": "npm:^3.20.4"
+    "@tiptap/extension-table": "npm:^3.20.4"
+    "@tiptap/extension-table-cell": "npm:^3.20.4"
+    "@tiptap/extension-table-header": "npm:^3.20.4"
+    "@tiptap/extension-table-row": "npm:^3.20.4"
     "@tiptap/extension-task-item": "npm:^3.20.4"
     "@tiptap/extension-task-list": "npm:^3.20.4"
     "@tiptap/extension-underline": "npm:^3.20.4"
