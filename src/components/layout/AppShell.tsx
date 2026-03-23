@@ -94,11 +94,6 @@ export function AppShell() {
 				e.preventDefault()
 				store.setNoteSearchOpen(!store.noteSearchOpen())
 			}
-			// Ctrl+B: toggle sidebar
-			if ((e.ctrlKey || e.metaKey) && e.key === 'b') {
-				e.preventDefault()
-				store.setSidebarCollapsed(!store.sidebarCollapsed())
-			}
 			// Ctrl+[: toggle note list
 			if ((e.ctrlKey || e.metaKey) && e.key === '[') {
 				e.preventDefault()

@@ -69,7 +69,7 @@ export const globalCss = {
         mb: '0.3em',
       },
       '& p': {
-        lineHeight: '1.8',
+        lineHeight: '1.6',
         fontSize: '0.9375rem',
         color: 'fg.default',
         letterSpacing: '-0.005em',
@@ -85,7 +85,7 @@ export const globalCss = {
         listStyleType: 'decimal',
       },
       '& li': {
-        lineHeight: '1.8',
+        lineHeight: '1.6',
         '& > p': {
           margin: 0,
         },

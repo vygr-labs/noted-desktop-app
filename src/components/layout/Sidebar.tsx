@@ -322,6 +322,24 @@ const collapsedDivider = css({
 	my: '1',
 })
 
+const collapsedBadge = css({
+	position: 'absolute',
+	bottom: '-4px',
+	right: '-6px',
+	fontSize: '9px',
+	fontWeight: '700',
+	lineHeight: 1,
+	minWidth: '14px',
+	height: '14px',
+	display: 'flex',
+	alignItems: 'center',
+	justifyContent: 'center',
+	borderRadius: 'full',
+	bg: 'indigo.9',
+	color: 'white',
+	px: '1',
+})
+
 // ─── Component ────────────────────────────────────────────
 
 export function Sidebar() {
@@ -463,6 +481,36 @@ export function Sidebar() {
 						<div class={`nav-indicator ${collapsedIndicator}`} />
 						<CheckSquareIcon class={iconStyle} />
 					</div>
+
+					{/* Lists */}
+					<Show when={store.lists()?.length}>
+						<div class={collapsedDivider} />
+						<For each={store.lists()}>
+							{(list) => {
+								const count = createMemo(() =>
+									(store.notes() || []).filter(
+										(n) => n.list_id === list.id && !n.is_trashed
+									).length
+								)
+								return (
+									<div
+										class={collapsedItem}
+										data-active={isListActive(list.id)}
+										onClick={() => handleListClick(list.id)}
+										title={list.name}
+									>
+										<div class={`nav-indicator ${collapsedIndicator}`} />
+										<div style={{ position: 'relative', display: 'flex', 'align-items': 'center', 'justify-content': 'center' }}>
+											<FolderIcon class={iconStyle} />
+											<Show when={count() > 0}>
+												<span class={collapsedBadge}>{count()}</span>
+											</Show>
+										</div>
+									</div>
+								)
+							}}
+						</For>
+					</Show>
 
 					<div class={css({ flex: 1 })} />
 
@@ -651,7 +699,7 @@ export function Sidebar() {
 						<button
 							class={toolbarBtn}
 							onClick={() => store.setSidebarCollapsed(true)}
-							title="Collapse sidebar (Ctrl+B)"
+							title="Collapse sidebar"
 						>
 							<PanelLeftCloseIcon class={smallIcon} />
 						</button>
