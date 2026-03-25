@@ -21,6 +21,76 @@ function isEmptyNode(node: TipTapNode): boolean {
 }
 
 /**
+ * Check if text contains markdown formatting (headings, bold, etc.)
+ */
+export function hasMarkdownPatterns(text: string): boolean {
+	const lines = text.split('\n')
+	return lines.some(
+		(line) =>
+			/^#{1,3}\s+/.test(line) ||
+			/\*\*[^*]+\*\*/.test(line) ||
+			/^>\s+/.test(line) ||
+			/^---\s*$/.test(line.trim()) ||
+			/^```/.test(line.trim()) ||
+			/\[.+?\]\(.+?\)/.test(line)
+	)
+}
+
+/**
+ * Parse inline markdown (bold, italic, code, links, strikethrough) into TipTap text nodes with marks.
+ */
+export function parseInlineMarkdown(text: string): TipTapNode[] {
+	if (!text) return []
+
+	const nodes: TipTapNode[] = []
+	// Regex matches: **bold**, *italic*, ~~strike~~, `code`, [text](url)
+	const inlineRegex = /(\*\*(.+?)\*\*|\*(.+?)\*|~~(.+?)~~|`([^`]+)`|\[(.+?)\]\((.+?)\))/g
+	let lastIndex = 0
+	let match: RegExpExecArray | null
+
+	while ((match = inlineRegex.exec(text)) !== null) {
+		// Add plain text before the match
+		if (match.index > lastIndex) {
+			nodes.push({ type: 'text', text: text.slice(lastIndex, match.index) })
+		}
+
+		if (match[2]) {
+			// **bold**
+			nodes.push({ type: 'text', text: match[2], marks: [{ type: 'bold' }] })
+		} else if (match[3]) {
+			// *italic*
+			nodes.push({ type: 'text', text: match[3], marks: [{ type: 'italic' }] })
+		} else if (match[4]) {
+			// ~~strikethrough~~
+			nodes.push({ type: 'text', text: match[4], marks: [{ type: 'strike' }] })
+		} else if (match[5]) {
+			// `code`
+			nodes.push({ type: 'text', text: match[5], marks: [{ type: 'code' }] })
+		} else if (match[6] && match[7]) {
+			// [text](url)
+			nodes.push({ type: 'text', text: match[6], marks: [{ type: 'link', attrs: { href: match[7] } }] })
+		}
+
+		lastIndex = match.index + match[0].length
+	}
+
+	// Add remaining plain text
+	if (lastIndex < text.length) {
+		nodes.push({ type: 'text', text: text.slice(lastIndex) })
+	}
+
+	return nodes.length > 0 ? nodes : [{ type: 'text', text }]
+}
+
+/**
+ * Create a paragraph or heading node with inline markdown parsing.
+ */
+function makeTextBlock(type: string, text: string, attrs?: Record<string, unknown>): TipTapNode {
+	const content = parseInlineMarkdown(text)
+	return { type, content, ...(attrs ? { attrs } : {}) }
+}
+
+/**
  * Check if text contains list-like lines that should be auto-formatted.
  */
 export function hasListPatterns(text: string): boolean {
@@ -109,9 +179,9 @@ export function parseMarkdownTable(lines: string[]): TipTapNode | null {
 }
 
 /**
- * Parse lines of plain text into TipTap JSON nodes.
- * Converts "- text" → bullet list, "1. text" → ordered list,
- * "- [ ] text" / "- [x] text" → task list.
+ * Parse lines of plain text / markdown into TipTap JSON nodes.
+ * Handles headings, bold/italic/links, lists, tables, blockquotes,
+ * code blocks, and horizontal rules.
  */
 export function parseLinesToNodes(lines: string[]): TipTapNode[] {
 	const nodes: TipTapNode[] = []
@@ -119,6 +189,55 @@ export function parseLinesToNodes(lines: string[]): TipTapNode[] {
 
 	while (i < lines.length) {
 		const line = lines[i]
+
+		// Code block: ```
+		if (/^\s*```/.test(line)) {
+			const codeLines: string[] = []
+			i++ // skip opening ```
+			while (i < lines.length && !/^\s*```/.test(lines[i])) {
+				codeLines.push(lines[i])
+				i++
+			}
+			if (i < lines.length) i++ // skip closing ```
+			nodes.push({
+				type: 'codeBlock',
+				content: codeLines.length > 0
+					? [{ type: 'text', text: codeLines.join('\n') }]
+					: undefined,
+			})
+			continue
+		}
+
+		// Horizontal rule: ---, ***, ___
+		if (/^\s*(---+|\*\*\*+|___+)\s*$/.test(line)) {
+			nodes.push({ type: 'horizontalRule' })
+			i++
+			continue
+		}
+
+		// Heading: # ## ###
+		const headingMatch = line.match(/^(#{1,3})\s+(.+)/)
+		if (headingMatch) {
+			const level = headingMatch[1].length
+			nodes.push(makeTextBlock('heading', headingMatch[2].trim(), { level }))
+			i++
+			continue
+		}
+
+		// Blockquote: > text
+		if (/^\s*>\s+/.test(line)) {
+			const quoteLines: string[] = []
+			while (i < lines.length && /^\s*>\s?/.test(lines[i])) {
+				quoteLines.push(lines[i].replace(/^\s*>\s?/, ''))
+				i++
+			}
+			const innerNodes = parseLinesToNodes(quoteLines)
+			nodes.push({
+				type: 'blockquote',
+				content: innerNodes.length > 0 ? innerNodes : [{ type: 'paragraph' }],
+			})
+			continue
+		}
 
 		// Markdown table: lines starting and ending with |
 		if (/^\s*\|.*\|\s*$/.test(line)) {
@@ -147,12 +266,7 @@ export function parseLinesToNodes(lines: string[]): TipTapNode[] {
 				taskItems.push({
 					type: 'taskItem',
 					attrs: { checked },
-					content: [
-						{
-							type: 'paragraph',
-							content: text ? [{ type: 'text', text }] : undefined,
-						},
-					],
+					content: [makeTextBlock('paragraph', text)],
 				})
 				i++
 			}
@@ -160,23 +274,18 @@ export function parseLinesToNodes(lines: string[]): TipTapNode[] {
 			continue
 		}
 
-		// Bullet list: - text, * text, • text
-		if (/^\s*[-*•]\s+/.test(line)) {
+		// Bullet list: - text, • text (but NOT * text since * is italic marker)
+		// Use - or • for bullets; standalone * lines are treated as bullets only if followed by space+text
+		if (/^\s*[-•]\s+/.test(line) || /^\s*\*\s+[^*]/.test(line)) {
 			const listItems: TipTapNode[] = []
 			while (i < lines.length) {
 				const bm = lines[i].match(/^\s*[-*•]\s+(.*)/)
 				if (!bm) break
-				// Stop if this is actually a task item
 				if (/^\s*[-*•]\s+\[[ xX]\]\s+/.test(lines[i])) break
 				const text = bm[1].trim()
 				listItems.push({
 					type: 'listItem',
-					content: [
-						{
-							type: 'paragraph',
-							content: text ? [{ type: 'text', text }] : undefined,
-						},
-					],
+					content: [makeTextBlock('paragraph', text)],
 				})
 				i++
 			}
@@ -193,12 +302,7 @@ export function parseLinesToNodes(lines: string[]): TipTapNode[] {
 				const text = om[1].trim()
 				listItems.push({
 					type: 'listItem',
-					content: [
-						{
-							type: 'paragraph',
-							content: text ? [{ type: 'text', text }] : undefined,
-						},
-					],
+					content: [makeTextBlock('paragraph', text)],
 				})
 				i++
 			}
@@ -206,15 +310,11 @@ export function parseLinesToNodes(lines: string[]): TipTapNode[] {
 			continue
 		}
 
-		// Regular text line
+		// Regular text line — parse inline markdown
 		const trimmed = line.trim()
 		if (trimmed) {
-			nodes.push({
-				type: 'paragraph',
-				content: [{ type: 'text', text: trimmed }],
-			})
+			nodes.push(makeTextBlock('paragraph', trimmed))
 		} else if (nodes.length > 0) {
-			// Blank line → empty paragraph for spacing
 			nodes.push({ type: 'paragraph' })
 		}
 		i++

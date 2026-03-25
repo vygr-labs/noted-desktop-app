@@ -21,6 +21,10 @@ interface SettingsStore {
 	cycleTheme: () => void
 	popoutSkipTaskbar: () => boolean
 	setPopoutSkipTaskbar: (v: boolean) => void
+	syncServerUrl: () => string
+	setSyncServerUrl: (v: string) => void
+	syncToken: () => string
+	setSyncToken: (v: string) => void
 }
 
 const SettingsStoreContext = createContext<SettingsStore>()
@@ -53,6 +57,8 @@ export function SettingsStoreProvider(props: ParentProps) {
 	const [showSettingsDialog, setShowSettingsDialog] = createSignal(false)
 	const [theme, _setTheme] = createSignal<AppTheme>('system')
 	const [popoutSkipTaskbar, _setPopoutSkipTaskbar] = createSignal(false)
+	const [syncServerUrl, _setSyncServerUrl] = createSignal('ws://localhost:9090')
+	const [syncToken, _setSyncToken] = createSignal('')
 
 	onMount(async () => {
 		const savedType = await window.electronAPI.getSetting('defaultNoteType')
@@ -70,6 +76,12 @@ export function SettingsStoreProvider(props: ParentProps) {
 		if (savedSkip === 'true') {
 			_setPopoutSkipTaskbar(true)
 		}
+
+		const savedSyncUrl = await window.electronAPI.getSetting('syncServerUrl')
+		if (savedSyncUrl) _setSyncServerUrl(savedSyncUrl)
+
+		const savedSyncToken = await window.electronAPI.getSetting('syncToken')
+		if (savedSyncToken) _setSyncToken(savedSyncToken)
 	})
 
 	function setDefaultNoteType(v: 'rich' | 'plain') {
@@ -99,6 +111,16 @@ export function SettingsStoreProvider(props: ParentProps) {
 		window.electronAPI.popoutUpdateSkipTaskbar(v)
 	}
 
+	function setSyncServerUrl(v: string) {
+		_setSyncServerUrl(v)
+		window.electronAPI.setSetting('syncServerUrl', v)
+	}
+
+	function setSyncToken(v: string) {
+		_setSyncToken(v)
+		window.electronAPI.setSetting('syncToken', v)
+	}
+
 	const store: SettingsStore = {
 		defaultNoteType,
 		setDefaultNoteType,
@@ -109,6 +131,10 @@ export function SettingsStoreProvider(props: ParentProps) {
 		cycleTheme,
 		popoutSkipTaskbar,
 		setPopoutSkipTaskbar,
+		syncServerUrl,
+		setSyncServerUrl,
+		syncToken,
+		setSyncToken,
 	}
 
 	return (

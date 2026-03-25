@@ -12,6 +12,8 @@ export interface Note {
 	is_pinned: number
 	is_trashed: number
 	spellcheck: number
+	sync_id: string | null
+	is_shared: number
 	created_at: string
 	updated_at: string
 }

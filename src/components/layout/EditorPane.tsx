@@ -22,6 +22,10 @@ import {
 	ChevronDownIcon,
 	ReplaceIcon,
 	DownloadIcon,
+	Share2Icon,
+	LinkIcon,
+	CopyIcon,
+	UsersIcon,
 } from 'lucide-solid'
 
 const editorContainer = css({
@@ -299,6 +303,10 @@ export function EditorPane() {
 	const [replaceQuery, setReplaceQuery] = createSignal('')
 	const [showReplace, setShowReplace] = createSignal(false)
 	const [showExportMenu, setShowExportMenu] = createSignal(false)
+	const [showShareMenu, setShowShareMenu] = createSignal(false)
+	const [shareCode, setShareCode] = createSignal('')
+	const [joinCode, setJoinCode] = createSignal('')
+	const [showJoinDialog, setShowJoinDialog] = createSignal(false)
 	const [searchMatches, setSearchMatches] = createSignal(0)
 	const [currentMatch, setCurrentMatch] = createSignal(0)
 	let searchInputRef: HTMLInputElement | undefined
@@ -362,6 +370,34 @@ export function EditorPane() {
 		setCurrentMatch(0)
 	}
 
+	async function handleShare(noteId: string) {
+		const syncId = await window.electronAPI.shareNote(noteId)
+		if (syncId) {
+			setShareCode(syncId)
+			navigator.clipboard.writeText(syncId)
+			appStore.refetchNotes()
+		}
+	}
+
+	async function handleUnshare(noteId: string) {
+		await window.electronAPI.unshareNote(noteId)
+		setShareCode('')
+		setShowShareMenu(false)
+		appStore.refetchNotes()
+	}
+
+	async function handleJoin() {
+		const code = joinCode().trim()
+		if (!code) return
+		const noteId = await window.electronAPI.joinSharedNote(code)
+		if (noteId) {
+			appStore.refetchNotes()
+			appStore.setSelectedNoteId(noteId)
+			setJoinCode('')
+			setShowJoinDialog(false)
+		}
+	}
+
 	function closeSearch() {
 		appStore.setNoteSearchOpen(false)
 		setSearchQuery('')
@@ -403,11 +439,12 @@ export function EditorPane() {
 			}
 		}
 		function handleClickOutside(e: MouseEvent) {
-			if (showExportMenu()) {
-				const target = e.target as HTMLElement
-				if (!target.closest('[data-export-menu]')) {
-					setShowExportMenu(false)
-				}
+			const target = e.target as HTMLElement
+			if (showExportMenu() && !target.closest('[data-export-menu]')) {
+				setShowExportMenu(false)
+			}
+			if (showShareMenu() && !target.closest('[data-share-menu]')) {
+				setShowShareMenu(false)
 			}
 		}
 		window.addEventListener('keydown', handleReplaceShortcut)
@@ -649,6 +686,84 @@ export function EditorPane() {
 									</div>
 								</Show>
 							</div>
+							<Show when={note().note_type === 'rich' && !isTrash()}>
+								<div style={{ position: 'relative' }} data-share-menu>
+									<button
+										class={controlBtn}
+										onClick={() => {
+											if (note().is_shared && note().sync_id) {
+												setShareCode(note().sync_id!)
+											}
+											setShowShareMenu(!showShareMenu())
+										}}
+										title={note().is_shared ? 'Sharing active' : 'Share note'}
+										style={note().is_shared ? { color: 'var(--colors-indigo-11)', opacity: '1' } : {}}
+									>
+										<Share2Icon class={controlIconSize} />
+									</button>
+									<Show when={showShareMenu()}>
+										<div class={exportMenu}>
+											<Show
+												when={note().is_shared}
+												fallback={
+													<>
+														<button
+															class={exportMenuItem}
+															onClick={() => {
+																handleShare(note().id)
+																setShowShareMenu(false)
+															}}
+														>
+															<LinkIcon class={css({ width: '3.5', height: '3.5', mr: '2' })} />
+															Share &amp; copy code
+														</button>
+														<button
+															class={exportMenuItem}
+															onClick={() => {
+																setShowShareMenu(false)
+																setShowJoinDialog(true)
+															}}
+														>
+															<UsersIcon class={css({ width: '3.5', height: '3.5', mr: '2' })} />
+															Join shared note
+														</button>
+													</>
+												}
+											>
+												<div style={{ padding: '8px 12px', 'font-size': '11px', color: 'var(--colors-fg-subtle)' }}>
+													Share code:
+												</div>
+												<div style={{ padding: '0 12px 8px', display: 'flex', gap: '4px' }}>
+													<input
+														class={css({
+															flex: 1, bg: 'gray.a2', border: '1px solid', borderColor: 'gray.a4',
+															borderRadius: 'sm', px: '2', py: '1', fontSize: '11px', color: 'fg.default',
+															fontFamily: 'mono', outline: 'none',
+														})}
+														value={shareCode()}
+														readOnly
+													/>
+													<button
+														class={exportMenuItem}
+														style={{ padding: '4px 8px', width: 'auto' }}
+														onClick={() => navigator.clipboard.writeText(shareCode())}
+														title="Copy"
+													>
+														<CopyIcon class={css({ width: '3', height: '3' })} />
+													</button>
+												</div>
+												<button
+													class={exportMenuItem}
+													style={{ color: 'var(--colors-red-11)' }}
+													onClick={() => handleUnshare(note().id)}
+												>
+													Stop sharing
+												</button>
+											</Show>
+										</div>
+									</Show>
+								</div>
+							</Show>
 							<Show when={showToolbar(note())}>
 								<button
 									class={controlBtn}
@@ -687,6 +802,73 @@ export function EditorPane() {
 						</div>
 					</>
 				)}
+			</Show>
+			{/* Join shared note dialog */}
+			<Show when={showJoinDialog()}>
+				<div
+					style={{
+						position: 'fixed', inset: '0', background: 'rgba(0,0,0,0.5)',
+						display: 'flex', 'align-items': 'center', 'justify-content': 'center',
+						'z-index': '50',
+					}}
+					onClick={() => setShowJoinDialog(false)}
+				>
+					<div
+						style={{
+							background: 'var(--colors-gray-2)', 'border-radius': '12px',
+							padding: '24px', width: '380px',
+							'box-shadow': '0 24px 64px -8px rgba(0,0,0,0.4)',
+							border: '1px solid var(--colors-gray-a3)',
+						}}
+						onClick={(e) => e.stopPropagation()}
+					>
+						<div style={{ 'font-size': '16px', 'font-weight': '600', 'margin-bottom': '4px', color: 'var(--colors-fg-default)' }}>
+							Join shared note
+						</div>
+						<div style={{ 'font-size': '13px', color: 'var(--colors-fg-muted)', 'margin-bottom': '16px' }}>
+							Enter the share code to start collaborating
+						</div>
+						<input
+							class={css({
+								width: '100%', bg: 'gray.a2', border: '1px solid', borderColor: 'gray.a4',
+								borderRadius: 'md', px: '3', py: '2.5', fontSize: '14px', color: 'fg.default',
+								fontFamily: 'mono', outline: 'none', mb: '4',
+								_focus: { borderColor: 'indigo.8' },
+								'&::placeholder': { color: 'fg.subtle' },
+							})}
+							value={joinCode()}
+							onInput={(e) => setJoinCode(e.currentTarget.value)}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter') handleJoin()
+								if (e.key === 'Escape') setShowJoinDialog(false)
+							}}
+							placeholder="Paste share code..."
+							ref={(el) => requestAnimationFrame(() => el.focus())}
+						/>
+						<div style={{ display: 'flex', gap: '8px', 'justify-content': 'flex-end' }}>
+							<button
+								class={css({
+									px: '4', py: '2', borderRadius: 'md', fontSize: '13px',
+									cursor: 'pointer', color: 'fg.muted',
+									_hover: { bg: 'gray.a3' },
+								})}
+								onClick={() => setShowJoinDialog(false)}
+							>
+								Cancel
+							</button>
+							<button
+								class={css({
+									px: '4', py: '2', borderRadius: 'md', fontSize: '13px', fontWeight: '500',
+									cursor: 'pointer', bg: 'indigo.9', color: 'white',
+									_hover: { bg: 'indigo.10' },
+								})}
+								onClick={handleJoin}
+							>
+								Join
+							</button>
+						</div>
+					</div>
+				</div>
 			</Show>
 		</div>
 	)

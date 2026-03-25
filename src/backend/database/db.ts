@@ -210,6 +210,14 @@ function runMigrations() {
 		setSchemaVersion(4)
 	}
 
+	if (currentVersion < 5) {
+		db.exec(`
+			ALTER TABLE notes ADD COLUMN sync_id TEXT;
+			ALTER TABLE notes ADD COLUMN is_shared INTEGER DEFAULT 0;
+		`)
+		setSchemaVersion(5)
+	}
+
 }
 
 runMigrations()

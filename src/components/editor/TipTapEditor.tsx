@@ -12,11 +12,15 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { Slice } from '@tiptap/pm/model'
 import { useEditorStore } from '../../stores/editor-store'
+import { useSettingsStore } from '../../stores/settings-store'
 import { debounce } from '../../lib/debounce'
 import { tiptapToPlaintext } from '../../lib/tiptap-to-plaintext'
-import { hasListPatterns, hasTablePattern, parseLinesToNodes, parseMarkdownTable, cleanTipTapContent, alignLeftContent } from '../../lib/text-cleanup'
+import { hasListPatterns, hasTablePattern, hasMarkdownPatterns, parseLinesToNodes, parseMarkdownTable, cleanTipTapContent, alignLeftContent } from '../../lib/text-cleanup'
 import { CodeBlockWithCopy } from './codeblock-with-copy'
 import { DetailsBlock } from './details-block'
+import Collaboration from '@tiptap/extension-collaboration'
+import { HocuspocusProvider } from '@hocuspocus/provider'
+import * as Y from 'yjs'
 
 const editorWrap = css({
 	minHeight: '200px',
@@ -177,12 +181,19 @@ function createPasteFormatterPlugin() {
 				const text = clipboardData.getData('text/plain')
 				const html = clipboardData.getData('text/html')
 
-				// Only intercept plain text paste with list/table patterns
-				if (html && html.trim()) return false
 				if (!text) return false
+
+				// If HTML has proper list/table markup, let TipTap handle it natively
+				if (html && html.trim()) {
+					const hasHtmlLists = /<(ul|ol|table)\b/i.test(html)
+					if (hasHtmlLists) return false
+				}
+
+				// Check if plain text has markdown patterns worth converting
 				const hasList = hasListPatterns(text)
 				const hasTable = hasTablePattern(text)
-				if (!hasList && !hasTable) return false
+				const hasMd = hasMarkdownPatterns(text)
+				if (!hasList && !hasTable && !hasMd) return false
 
 				try {
 					const lines = text.split('\n')
@@ -264,8 +275,12 @@ const cursorPositions = new Map<string, { from: number; to: number }>()
 export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	let containerRef: HTMLDivElement | undefined
 	let editor: Editor | null = null
+	let provider: HocuspocusProvider | null = null
+	let ydoc: Y.Doc | null = null
 	const editorStore = useEditorStore()
+	const settingsStore = useSettingsStore()
 	let isUpdatingContent = false
+	let currentSyncId: string | null = null
 
 	const debouncedSave = debounce(async (jsonContent: string) => {
 		const plainText = tiptapToPlaintext(jsonContent)
@@ -275,35 +290,70 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		})
 	}, 500)
 
-	onMount(() => {
+	function getBaseExtensions() {
+		return [
+			StarterKit.configure({
+				heading: { levels: [1, 2, 3] },
+				codeBlock: false,
+				// Disable history in collab mode — Yjs handles undo/redo
+				...(currentSyncId ? { history: false } : {}),
+			}),
+			CodeBlockWithCopy,
+			DetailsBlock,
+			TaskList,
+			TaskItem.configure({ nested: true }),
+			Placeholder.configure({ placeholder: 'Start writing...' }),
+			Underline,
+			Highlight.configure({ multicolor: false }),
+			Table.configure({ resizable: false }),
+			TableRow,
+			TableHeader,
+			TableCell,
+			Extension.create({
+				name: 'searchHighlight',
+				addProseMirrorPlugins: () => [createSearchPlugin()],
+			}),
+			Extension.create({
+				name: 'pasteFormatter',
+				addProseMirrorPlugins: () => [createPasteFormatterPlugin()],
+			}),
+		]
+	}
+
+	function destroyEditor() {
+		if (provider) { provider.destroy(); provider = null }
+		if (ydoc) { ydoc.destroy(); ydoc = null }
+		if (editor) { editor.destroy(); editor = null }
+		currentEditor = null
+	}
+
+	function createEditorInstance(note: Note) {
+		destroyEditor()
+		if (!containerRef) return
+
+		currentSyncId = note.sync_id || null
+		const extensions = getBaseExtensions()
+
+		// If shared, set up Yjs collaboration
+		if (note.sync_id) {
+			ydoc = new Y.Doc()
+			provider = new HocuspocusProvider({
+				url: settingsStore.syncServerUrl(),
+				name: note.sync_id,
+				document: ydoc,
+				token: settingsStore.syncToken() || 'anonymous',
+			})
+			extensions.push(
+				Collaboration.configure({ document: ydoc })
+			)
+		}
+
 		editor = new Editor({
-			element: containerRef!,
-			extensions: [
-				StarterKit.configure({
-					heading: { levels: [1, 2, 3] },
-					codeBlock: false,
-				}),
-				CodeBlockWithCopy,
-				DetailsBlock,
-				TaskList,
-				TaskItem.configure({ nested: true }),
-				Placeholder.configure({ placeholder: 'Start writing...' }),
-				Underline,
-				Highlight.configure({ multicolor: false }),
-				Table.configure({ resizable: false }),
-				TableRow,
-				TableHeader,
-				TableCell,
-				Extension.create({
-					name: 'searchHighlight',
-					addProseMirrorPlugins: () => [createSearchPlugin()],
-				}),
-				Extension.create({
-					name: 'pasteFormatter',
-					addProseMirrorPlugins: () => [createPasteFormatterPlugin()],
-				}),
-			],
-			content: parseContent(props.note.content),
+			element: containerRef,
+			extensions,
+			// For shared notes, content comes from Yjs (server)
+			// For local notes, content comes from SQLite
+			content: note.sync_id ? undefined : parseContent(note.content),
 			editable: !props.readonly,
 			onUpdate: ({ editor: ed }) => {
 				if (isUpdatingContent) return
@@ -315,16 +365,29 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				setInTable(ed.isActive('table'))
 			},
 		})
+
 		currentEditor = editor
 		setInTable(editor.isActive('table'))
-		editor.view.dom.spellcheck = !!props.note.spellcheck
+		editor.view.dom.spellcheck = !!note.spellcheck
+
+		// For newly shared notes, push local content to Yjs if the doc is empty
+		if (note.sync_id && ydoc && note.content) {
+			provider?.on('synced', () => {
+				if (editor && ydoc) {
+					const fragment = ydoc.getXmlFragment('default')
+					if (fragment.length === 0 && note.content) {
+						// Document is empty on server — initialize with local content
+						editor.commands.setContent(parseContent(note.content))
+					}
+				}
+			})
+		}
 
 		// Prevent task checkboxes from stealing editor focus/cursor
-		containerRef!.addEventListener('mousedown', (e) => {
+		containerRef.addEventListener('mousedown', (e) => {
 			const target = e.target as HTMLElement
 			if (target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox') {
 				e.preventDefault()
-				// Toggle the checkbox via TipTap's command instead
 				const pos = editor?.view.posAtDOM(target, 0)
 				if (pos != null && editor) {
 					const resolved = editor.state.doc.resolve(pos)
@@ -343,50 +406,78 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				}
 			}
 		})
+	}
 
+	onMount(() => {
+		createEditorInstance(props.note)
 	})
 
-	// When the note changes (different note selected), update editor content
+	// When the note changes, recreate or update the editor
 	let previousNoteId: string | null = null
 	createEffect(
 		on(
 			() => props.note.id,
 			(newId) => {
-				if (editor) {
-					// Save cursor position for the previous note
-					if (previousNoteId) {
-						const { from, to } = editor.state.selection
-						cursorPositions.set(previousNoteId, { from, to })
-					}
+				// Save cursor position for the previous note
+				if (previousNoteId && editor) {
+					const { from, to } = editor.state.selection
+					cursorPositions.set(previousNoteId, { from, to })
+				}
 
+				const note = props.note
+				const newSyncId = note.sync_id || null
+
+				// If collaboration mode changed, recreate the editor
+				if (newSyncId !== currentSyncId) {
 					debouncedSave.cancel()
-					isUpdatingContent = true
-					const content = parseContent(props.note.content)
-					editor.commands.setContent(content)
-					editor.setEditable(!props.readonly)
-					isUpdatingContent = false
-
-					// Restore cursor position for the new note (skip for new notes — title gets focus)
-					if (!editorStore.isNewNote()) {
-						const saved = cursorPositions.get(newId)
-						requestAnimationFrame(() => {
-							if (editor) {
-								if (saved) {
-									const docSize = editor.state.doc.content.size
-									const from = Math.min(saved.from, docSize)
-									const to = Math.min(saved.to, docSize)
-									editor.commands.setTextSelection({ from, to })
-								} else {
-									editor.commands.setTextSelection(editor.state.doc.content.size)
-								}
-								editor.commands.focus()
-							}
-						})
+					createEditorInstance(note)
+				} else if (editor) {
+					// Same mode — just swap content
+					debouncedSave.cancel()
+					if (!note.sync_id) {
+						isUpdatingContent = true
+						editor.commands.setContent(parseContent(note.content))
+						editor.setEditable(!props.readonly)
+						isUpdatingContent = false
+					} else {
+						editor.setEditable(!props.readonly)
 					}
 				}
+
+				// Restore cursor position for local notes
+				if (!note.sync_id && !editorStore.isNewNote()) {
+					const saved = cursorPositions.get(newId)
+					requestAnimationFrame(() => {
+						if (editor) {
+							if (saved) {
+								const docSize = editor.state.doc.content.size
+								const from = Math.min(saved.from, docSize)
+								const to = Math.min(saved.to, docSize)
+								editor.commands.setTextSelection({ from, to })
+							} else {
+								editor.commands.setTextSelection(editor.state.doc.content.size)
+							}
+							editor.commands.focus()
+						}
+					})
+				}
+
 				previousNoteId = newId
 			},
 			{ defer: true }
+		)
+	)
+
+	// Watch for sync_id changes on the SAME note (e.g., user clicks Share)
+	createEffect(
+		on(
+			() => props.note.sync_id,
+			(newSyncId) => {
+				if ((newSyncId || null) !== currentSyncId) {
+					debouncedSave.cancel()
+					createEditorInstance(props.note)
+				}
+			}
 		)
 	)
 
@@ -401,7 +492,6 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		)
 	)
 
-	// Apply spellcheck attribute directly on the ProseMirror contenteditable element
 	createEffect(
 		on(
 			() => props.note.spellcheck,
@@ -414,10 +504,7 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	)
 
 	onCleanup(() => {
-		if (editor) {
-			editor.destroy()
-			currentEditor = null
-		}
+		destroyEditor()
 	})
 
 	return <div ref={containerRef} class={editorWrap} />

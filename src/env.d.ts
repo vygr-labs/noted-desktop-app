@@ -14,6 +14,8 @@ interface Note {
 	is_pinned: number
 	is_trashed: number
 	spellcheck: number
+	sync_id: string | null
+	is_shared: number
 	created_at: string
 	updated_at: string
 }
@@ -175,6 +177,11 @@ interface ElectronAPI {
 
 	// Search
 	searchNotes: (query: string) => Promise<SearchResult[]>
+
+	// Sync
+	shareNote: (noteId: string) => Promise<string | null>
+	unshareNote: (noteId: string) => Promise<void>
+	joinSharedNote: (syncId: string) => Promise<string>
 
 	// Export
 	exportNote: (noteId: string, format: string) => Promise<boolean>

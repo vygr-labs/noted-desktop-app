@@ -15,6 +15,7 @@ import {
 	CloudyIcon,
 	ExternalLinkIcon,
 	TerminalIcon,
+	RefreshCwIcon,
 } from 'lucide-solid'
 
 // ─── Overlay + shell ──────────────────────────────────────
@@ -146,6 +147,23 @@ const settingDesc = css({
 	color: 'fg.muted',
 	mt: '1',
 	lineHeight: '1.5',
+})
+
+const settingInput = css({
+	bg: 'gray.a2',
+	border: '1px solid',
+	borderColor: 'gray.a4',
+	borderRadius: 'md',
+	px: '3',
+	py: '2',
+	fontSize: '13px',
+	color: 'fg.default',
+	fontFamily: 'mono',
+	width: '220px',
+	outline: 'none',
+	transition: 'border-color 0.15s',
+	_focus: { borderColor: 'indigo.8' },
+	'&::placeholder': { color: 'fg.subtle' },
 })
 
 // ─── Controls ─────────────────────────────────────────────
@@ -428,6 +446,44 @@ export function SettingsDialog() {
 							>
 								<div class={toggleThumb} />
 							</button>
+						</div>
+
+						<div class={sectionDivider} />
+
+						{/* Sync section */}
+						<div class={sectionTitle}>
+							<RefreshCwIcon class={sectionIcon} />
+							Collaboration
+						</div>
+
+						<div class={settingRow}>
+							<div class={settingInfo}>
+								<div class={settingLabel}>Sync server</div>
+								<div class={settingDesc}>
+									WebSocket URL for real-time collaboration
+								</div>
+							</div>
+							<input
+								class={settingInput}
+								value={settings.syncServerUrl()}
+								onInput={(e) => settings.setSyncServerUrl(e.currentTarget.value)}
+								placeholder="ws://localhost:9090"
+							/>
+						</div>
+
+						<div class={settingRow}>
+							<div class={settingInfo}>
+								<div class={settingLabel}>Auth token</div>
+								<div class={settingDesc}>
+									Token for authenticating with the sync server
+								</div>
+							</div>
+							<input
+								class={settingInput}
+								value={settings.syncToken()}
+								onInput={(e) => settings.setSyncToken(e.currentTarget.value)}
+								placeholder="Optional"
+							/>
 						</div>
 
 						<div class={sectionDivider} />

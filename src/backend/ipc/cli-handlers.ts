@@ -71,7 +71,7 @@ function removeFromWindowsPath(dir: string): void {
 		const currentPath = execSync('reg query "HKCU\\Environment" /v Path', { encoding: 'utf-8' })
 		const match = currentPath.match(/Path\s+REG_(?:EXPAND_)?SZ\s+(.+)/i)
 		if (!match) return
-		const parts = match[1].trim().split(';').filter(p => p.toLowerCase() !== dir.toLowerCase())
+		const parts = match[1].trim().split(';').filter((p: string) => p.toLowerCase() !== dir.toLowerCase())
 		execSync(`reg add "HKCU\\Environment" /v Path /t REG_EXPAND_SZ /d "${parts.join(';')}" /f`)
 	} catch {
 		// Non-fatal

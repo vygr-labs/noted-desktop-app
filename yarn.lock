@@ -1102,6 +1102,30 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@hocuspocus/common@npm:^3.4.4":
+  version: 3.4.4
+  resolution: "@hocuspocus/common@npm:3.4.4"
+  dependencies:
+    lib0: "npm:^0.2.87"
+  checksum: 10c0/412a7b2ff47cfa6570d841bc3ae7b2d6279c96b32726c7c20dbd3389557bf69abbe70059ca040ee813364a0617a33351e5c1099253855b95e4fcc3980467de32
+  languageName: node
+  linkType: hard
+
+"@hocuspocus/provider@npm:^3.4.4":
+  version: 3.4.4
+  resolution: "@hocuspocus/provider@npm:3.4.4"
+  dependencies:
+    "@hocuspocus/common": "npm:^3.4.4"
+    "@lifeomic/attempt": "npm:^3.0.2"
+    lib0: "npm:^0.2.87"
+    ws: "npm:^8.17.1"
+  peerDependencies:
+    y-protocols: ^1.0.6
+    yjs: ^13.6.8
+  checksum: 10c0/77b7aeacdd4de9a35a580826e5c9eeef13250f30bfdcbfc3e6d6762990e90baed92e7b486d81040ee25ba69dcf1edcf468ef0e2330d39eb3e60d4f41be9b4197
+  languageName: node
+  linkType: hard
+
 "@hono/node-server@npm:^1.19.9":
   version: 1.19.11
   resolution: "@hono/node-server@npm:1.19.11"
@@ -1451,6 +1475,13 @@ __metadata:
     "@jridgewell/resolve-uri": "npm:^3.1.0"
     "@jridgewell/sourcemap-codec": "npm:^1.4.14"
   checksum: 10c0/4b30ec8cd56c5fd9a661f088230af01e0c1a3888d11ffb6b47639700f71225be21d1f7e168048d6d4f9449207b978a235c07c8f15c07705685d16dc06280e9d9
+  languageName: node
+  linkType: hard
+
+"@lifeomic/attempt@npm:^3.0.2":
+  version: 3.1.0
+  resolution: "@lifeomic/attempt@npm:3.1.0"
+  checksum: 10c0/c9963737cb4697e62f9de9504ce235d209c7588568cc1dcd1a26c24f2cbcee0184af82a9f5efa7eec5831c020fb962d722f19819b88ff94d020b83df31f3ad20
   languageName: node
   linkType: hard
 
@@ -2240,6 +2271,18 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@tiptap/extension-collaboration@npm:^3.20.5":
+  version: 3.20.5
+  resolution: "@tiptap/extension-collaboration@npm:3.20.5"
+  peerDependencies:
+    "@tiptap/core": ^3.20.5
+    "@tiptap/pm": ^3.20.5
+    "@tiptap/y-tiptap": ^3.0.2
+    yjs: ^13
+  checksum: 10c0/62c47fbed504b11956d76de215a71024252d3c2ade9ac71baa07fb24f9739e7a1e2701135166c4acede3e3630c468cb04e04313394c5aaae8b38fd922f309c8d
+  languageName: node
+  linkType: hard
+
 "@tiptap/extension-document@npm:^3.20.5":
   version: 3.20.5
   resolution: "@tiptap/extension-document@npm:3.20.5"
@@ -2527,6 +2570,21 @@ __metadata:
     "@tiptap/extensions": "npm:^3.20.5"
     "@tiptap/pm": "npm:^3.20.5"
   checksum: 10c0/7ad6bbd553d0a2be7bfd34d1a956380ca3292303c8acdbc36e05852516896f67beac58e3db622d7e8128d7da10e7980c0206cde1d406127ce6cf8582d30315b0
+  languageName: node
+  linkType: hard
+
+"@tiptap/y-tiptap@npm:^3.0.2":
+  version: 3.0.2
+  resolution: "@tiptap/y-tiptap@npm:3.0.2"
+  dependencies:
+    lib0: "npm:^0.2.100"
+  peerDependencies:
+    prosemirror-model: ^1.7.1
+    prosemirror-state: ^1.2.3
+    prosemirror-view: ^1.9.10
+    y-protocols: ^1.0.1
+    yjs: ^13.5.38
+  checksum: 10c0/abca7a69f874eb9b42bfe39d6ce0bfca16299e2305f7a33b394fc8a8268e3b54b5feb75fe2777c59a523cc7f4f212002a5a73a1b0427f64b46314a89de85d3d2
   languageName: node
   linkType: hard
 
@@ -7379,6 +7437,13 @@ __metadata:
   languageName: node
   linkType: hard
 
+"isomorphic.js@npm:^0.2.4":
+  version: 0.2.5
+  resolution: "isomorphic.js@npm:0.2.5"
+  checksum: 10c0/7cd268c8e58146a8160c8cd16596291fd1fbf3e8799a325f269accda9dc1238806e371ccef0b66fe2ad957209230c55997248d8b6d02cf2d7c575ffeb759c789
+  languageName: node
+  linkType: hard
+
 "jackspeak@npm:^3.1.2":
   version: 3.4.3
   resolution: "jackspeak@npm:3.4.3"
@@ -7585,6 +7650,19 @@ __metadata:
     prelude-ls: "npm:^1.2.1"
     type-check: "npm:~0.4.0"
   checksum: 10c0/effb03cad7c89dfa5bd4f6989364bfc79994c2042ec5966cb9b95990e2edee5cd8969ddf42616a0373ac49fac1403437deaf6e9050fbbaa3546093a59b9ac94e
+  languageName: node
+  linkType: hard
+
+"lib0@npm:^0.2.100, lib0@npm:^0.2.85, lib0@npm:^0.2.87, lib0@npm:^0.2.99":
+  version: 0.2.117
+  resolution: "lib0@npm:0.2.117"
+  dependencies:
+    isomorphic.js: "npm:^0.2.4"
+  bin:
+    0ecdsa-generate-keypair: bin/0ecdsa-generate-keypair.js
+    0gentesthtml: bin/gentesthtml.js
+    0serve: bin/0serve.js
+  checksum: 10c0/d1b9205890d5d0cbd95ffdb0d6df6f9fd2c315b89e195fc9b015f3778046fb34bc12e94205ccf410a3073b836444045dcef6671fa2f6d5a7f70ebf8b6b0c0616
   languageName: node
   linkType: hard
 
@@ -8942,9 +9020,11 @@ __metadata:
   dependencies:
     "@ark-ui/solid": "npm:^5.34.1"
     "@astrojs/solid-js": "npm:^6.0.0"
+    "@hocuspocus/provider": "npm:^3.4.4"
     "@pandacss/dev": "npm:^1.9.0"
     "@tiptap/core": "npm:^3.20.4"
     "@tiptap/extension-bubble-menu": "npm:^3.20.4"
+    "@tiptap/extension-collaboration": "npm:^3.20.5"
     "@tiptap/extension-highlight": "npm:^3.20.4"
     "@tiptap/extension-placeholder": "npm:^3.20.4"
     "@tiptap/extension-table": "npm:^3.20.4"
@@ -8956,6 +9036,7 @@ __metadata:
     "@tiptap/extension-underline": "npm:^3.20.4"
     "@tiptap/pm": "npm:^3.20.4"
     "@tiptap/starter-kit": "npm:^3.20.4"
+    "@tiptap/y-tiptap": "npm:^3.0.2"
     "@types/archiver": "npm:^7.0.0"
     "@types/better-sqlite3": "npm:^7.6.13"
     "@types/node": "npm:^25.5.0"
@@ -8979,6 +9060,10 @@ __metadata:
     tsc-alias: "npm:^1.8.16"
     typescript: "npm:^5.9.3"
     wait-on: "npm:^9.0.4"
+    y-protocols: "npm:^1.0.7"
+    yjs: "npm:^13.6.30"
+  bin:
+    noted-cli: cli/build/noted-cli.js
   languageName: unknown
   linkType: soft
 
@@ -12027,6 +12112,21 @@ __metadata:
   languageName: node
   linkType: hard
 
+"ws@npm:^8.17.1":
+  version: 8.20.0
+  resolution: "ws@npm:8.20.0"
+  peerDependencies:
+    bufferutil: ^4.0.1
+    utf-8-validate: ">=5.0.2"
+  peerDependenciesMeta:
+    bufferutil:
+      optional: true
+    utf-8-validate:
+      optional: true
+  checksum: 10c0/956ac5f11738c914089b65878b9223692ace77337ba55379ae68e1ecbeae9b47a0c6eb9403688f609999a58c80d83d99865fe0029b229d308b08c1ef93d4ea14
+  languageName: node
+  linkType: hard
+
 "xmlbuilder@npm:>=11.0.1, xmlbuilder@npm:^15.1.1":
   version: 15.1.1
   resolution: "xmlbuilder@npm:15.1.1"
@@ -12038,6 +12138,17 @@ __metadata:
   version: 1.1.0
   resolution: "xxhash-wasm@npm:1.1.0"
   checksum: 10c0/35aa152fc7d775ae13364fe4fb20ebd89c6ac1f56cdb6060a6d2f1ed68d15180694467e63a4adb3d11936a4798ccd75a540979070e70d9b911e9981bbdd9cea6
+  languageName: node
+  linkType: hard
+
+"y-protocols@npm:^1.0.7":
+  version: 1.0.7
+  resolution: "y-protocols@npm:1.0.7"
+  dependencies:
+    lib0: "npm:^0.2.85"
+  peerDependencies:
+    yjs: ^13.0.0
+  checksum: 10c0/70e14ab50b9200e97602c5effc3e14ae4ea0f51479a1628569af7cc12a6739fbc02484335828f5c508a4bf6fa0c3ef5ae1c17e13346b7a6093abeb9627f59021
   languageName: node
   linkType: hard
 
@@ -12105,6 +12216,15 @@ __metadata:
     buffer-crc32: "npm:~0.2.3"
     fd-slicer: "npm:~1.1.0"
   checksum: 10c0/f265002af7541b9ec3589a27f5fb8f11cf348b53cc15e2751272e3c062cd73f3e715bc72d43257de71bbaecae446c3f1b14af7559e8ab0261625375541816422
+  languageName: node
+  linkType: hard
+
+"yjs@npm:^13.6.30":
+  version: 13.6.30
+  resolution: "yjs@npm:13.6.30"
+  dependencies:
+    lib0: "npm:^0.2.99"
+  checksum: 10c0/98ec3c85fdb8420fe250e86e66676d7421dd4c1960319409a39e6ae90d05dc967793b67705736751633d8b22e334dba51a1404ad83139300c0be42195f068261
   languageName: node
   linkType: hard
 
