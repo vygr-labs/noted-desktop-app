@@ -1,5 +1,6 @@
 import { css } from '../../../styled-system/css'
-import { getEditorInstance, cleanEditorContent, alignEditorContent } from './TipTapEditor'
+import { getEditorInstance, cleanEditorContent, alignEditorContent, isInTable } from './TipTapEditor'
+import { Show } from 'solid-js'
 import {
 	BoldIcon,
 	ItalicIcon,
@@ -18,6 +19,7 @@ import {
 	SparklesIcon,
 	TableIcon,
 	AlignLeftIcon,
+	Trash2Icon,
 } from 'lucide-solid'
 
 export type ToolbarPosition = 'top' | 'right' | 'bottom' | 'left'
@@ -41,6 +43,23 @@ const toolBtn = css({
 })
 
 const iconSize = css({ width: '4', height: '4' })
+
+const tableCtxBtn = css({
+	display: 'flex',
+	alignItems: 'center',
+	justifyContent: 'center',
+	height: '7',
+	padding: '0 8px',
+	borderRadius: 'md',
+	cursor: 'pointer',
+	color: 'fg.subtle',
+	transition: 'all 0.15s',
+	flexShrink: 0,
+	fontSize: '11px',
+	fontWeight: 'medium',
+	fontFamily: 'inherit',
+	_hover: { bg: 'gray.a3', color: 'fg.default' },
+})
 
 export function EditorToolbar(props: {
 	scrolled?: boolean
@@ -251,6 +270,44 @@ export function EditorToolbar(props: {
 			>
 				<TableIcon class={iconSize} />
 			</button>
+
+			<Show when={isInTable()}>
+				<button
+					class={tableCtxBtn}
+					onMouseDown={cmd(() => e()?.chain().focus().addRowAfter().run())}
+					title="Add Row Below"
+				>
+					+Row
+				</button>
+				<button
+					class={tableCtxBtn}
+					onMouseDown={cmd(() => e()?.chain().focus().deleteRow().run())}
+					title="Delete Row"
+				>
+					−Row
+				</button>
+				<button
+					class={tableCtxBtn}
+					onMouseDown={cmd(() => e()?.chain().focus().addColumnAfter().run())}
+					title="Add Column Right"
+				>
+					+Col
+				</button>
+				<button
+					class={tableCtxBtn}
+					onMouseDown={cmd(() => e()?.chain().focus().deleteColumn().run())}
+					title="Delete Column"
+				>
+					−Col
+				</button>
+				<button
+					class={toolBtn}
+					onMouseDown={cmd(() => e()?.chain().focus().deleteTable().run())}
+					title="Delete Table"
+				>
+					<Trash2Icon class={iconSize} />
+				</button>
+			</Show>
 
 			<div style={dividerStyle()} />
 

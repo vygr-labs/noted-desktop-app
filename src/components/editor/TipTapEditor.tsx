@@ -1,4 +1,4 @@
-import { onMount, onCleanup, createEffect, on } from 'solid-js'
+import { onMount, onCleanup, createEffect, on, createSignal } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { Editor, Extension } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
@@ -39,6 +39,10 @@ let currentEditor: Editor | null = null
 export function getEditorInstance(): Editor | null {
 	return currentEditor
 }
+
+// Reactive signal for whether cursor is inside a table
+const [inTable, setInTable] = createSignal(false)
+export function isInTable() { return inTable() }
 
 // ─── Search plugin ───────────────────────────────────────
 
@@ -190,9 +194,40 @@ export function alignEditorContent() {
 	const editor = currentEditor
 	if (!editor) return
 
-	const json = editor.getJSON()
-	const aligned = alignLeftContent(json as any)
-	editor.commands.setContent(aligned)
+	const { from, to, empty } = editor.state.selection
+
+	if (empty) {
+		// No selection — align entire document
+		const json = editor.getJSON()
+		const aligned = alignLeftContent(json as any)
+		editor.commands.setContent(aligned)
+		return
+	}
+
+	// Selection exists — strip leading whitespace from textblocks in range
+	const { tr } = editor.state
+	const deletions: { from: number; to: number }[] = []
+
+	editor.state.doc.nodesBetween(from, to, (node, pos) => {
+		if (!node.isTextblock) return
+		const firstChild = node.firstChild
+		if (firstChild?.isText && firstChild.text) {
+			const match = firstChild.text.match(/^[\t ]+/)
+			if (match) {
+				const textStart = pos + 1
+				deletions.push({ from: textStart, to: textStart + match[0].length })
+			}
+		}
+	})
+
+	// Apply in reverse to preserve positions
+	for (let i = deletions.length - 1; i >= 0; i--) {
+		tr.delete(deletions[i].from, deletions[i].to)
+	}
+
+	if (deletions.length > 0) {
+		editor.view.dispatch(tr)
+	}
 }
 
 // Store cursor positions per note ID
@@ -247,8 +282,12 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				const json = JSON.stringify(ed.getJSON())
 				debouncedSave(json)
 			},
+			onTransaction: ({ editor: ed }) => {
+				setInTable(ed.isActive('table'))
+			},
 		})
 		currentEditor = editor
+		setInTable(editor.isActive('table'))
 		editor.view.dom.spellcheck = !!props.note.spellcheck
 
 		// Prevent task checkboxes from stealing editor focus/cursor
