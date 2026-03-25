@@ -180,6 +180,11 @@ interface ElectronAPI {
 	exportNote: (noteId: string, format: string) => Promise<boolean>
 	exportAllNotes: (format: string) => Promise<boolean>
 
+	// CLI
+	installCli: () => Promise<{ success: boolean; path?: string; error?: string }>
+	uninstallCli: () => Promise<{ success: boolean; error?: string }>
+	isCliInstalled: () => Promise<boolean>
+
 	// Settings
 	getSetting: (key: string) => Promise<string | null>
 	setSetting: (key: string, value: string) => Promise<void>

@@ -77,6 +77,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	exportNote: (noteId: string, format: string) => ipcRenderer.invoke('export:note', noteId, format),
 	exportAllNotes: (format: string) => ipcRenderer.invoke('export:all', format),
 
+	// CLI
+	installCli: () => ipcRenderer.invoke('cli:install'),
+	uninstallCli: () => ipcRenderer.invoke('cli:uninstall'),
+	isCliInstalled: () => ipcRenderer.invoke('cli:is-installed'),
+
 	// Settings
 	getSetting: (key: string) => ipcRenderer.invoke('settings:get', key),
 	setSetting: (key: string, value: string) =>

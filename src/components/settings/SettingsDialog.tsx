@@ -1,4 +1,4 @@
-import { Show } from 'solid-js'
+import { Show, createSignal, onMount } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { useSettingsStore, type AppTheme } from '../../stores/settings-store'
 import {
@@ -14,6 +14,7 @@ import {
 	CoffeeIcon,
 	CloudyIcon,
 	ExternalLinkIcon,
+	TerminalIcon,
 } from 'lucide-solid'
 
 // ─── Overlay + shell ──────────────────────────────────────
@@ -274,6 +275,21 @@ const footer = css({
 
 export function SettingsDialog() {
 	const settings = useSettingsStore()
+	const [cliInstalled, setCliInstalled] = createSignal(false)
+
+	onMount(async () => {
+		setCliInstalled(await window.electronAPI.isCliInstalled())
+	})
+
+	async function toggleCli() {
+		if (cliInstalled()) {
+			const result = await window.electronAPI.uninstallCli()
+			if (result.success) setCliInstalled(false)
+		} else {
+			const result = await window.electronAPI.installCli()
+			if (result.success) setCliInstalled(true)
+		}
+	}
 
 	return (
 		<Show when={settings.showSettingsDialog()}>
@@ -409,6 +425,30 @@ export function SettingsDialog() {
 								class={toggleTrack}
 								data-active={settings.popoutSkipTaskbar()}
 								onClick={() => settings.setPopoutSkipTaskbar(!settings.popoutSkipTaskbar())}
+							>
+								<div class={toggleThumb} />
+							</button>
+						</div>
+
+						<div class={sectionDivider} />
+
+						{/* CLI section */}
+						<div class={sectionTitle}>
+							<TerminalIcon class={sectionIcon} />
+							Command Line
+						</div>
+
+						<div class={settingRow}>
+							<div class={settingInfo}>
+								<div class={settingLabel}>Install CLI</div>
+								<div class={settingDesc}>
+									Adds the <code style={{ 'font-family': 'var(--fonts-mono)', 'font-size': '11px', background: 'var(--colors-gray-a3)', padding: '1px 5px', 'border-radius': '3px' }}>noted-cli</code> command to your system PATH for creating and managing notes from the terminal
+								</div>
+							</div>
+							<button
+								class={toggleTrack}
+								data-active={cliInstalled()}
+								onClick={toggleCli}
 							>
 								<div class={toggleThumb} />
 							</button>

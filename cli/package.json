@@ -1,0 +1,10 @@
+{
+	"name": "noted-cli",
+	"version": "1.0.0",
+	"type": "module",
+	"description": "CLI tool for the Noted app",
+	"bin": "build/noted-cli.js",
+	"dependencies": {
+		"better-sqlite3": "^12.8.0"
+	}
+}

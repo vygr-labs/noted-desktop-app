@@ -37,7 +37,7 @@ dmg:
   icon: assets/icon.icns
 
 files: ['src/backend/build/**/*', 'dist/**/*']
-extraResources: ['./assets/**']
+extraResources: ['./assets/**', './cli/build/**']
 directories:
   output: 'release'
   buildResources: 'assets'
