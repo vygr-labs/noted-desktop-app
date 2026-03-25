@@ -136,6 +136,33 @@ export function scrollToSearchMatch(index: number) {
 	}
 }
 
+export function replaceCurrentMatch(query: string, replacement: string, matchIndex: number): number {
+	if (!currentEditor || matchIndex < 0 || matchIndex >= searchMatchPositions.length) return searchMatchPositions.length
+
+	const { from, to } = searchMatchPositions[matchIndex]
+	const { tr } = currentEditor.state
+	tr.insertText(replacement, from, to)
+	currentEditor.view.dispatch(tr)
+
+	// Re-run search to update positions
+	return searchInNote(query, Math.min(matchIndex, searchMatchPositions.length - 1))
+}
+
+export function replaceAllMatches(query: string, replacement: string): number {
+	if (!currentEditor || searchMatchPositions.length === 0) return 0
+
+	const { tr } = currentEditor.state
+	// Replace in reverse order to keep positions valid
+	for (let i = searchMatchPositions.length - 1; i >= 0; i--) {
+		const { from, to } = searchMatchPositions[i]
+		tr.insertText(replacement, from, to)
+	}
+	currentEditor.view.dispatch(tr)
+
+	// Re-run search (should find 0 matches now)
+	return searchInNote(query, 0)
+}
+
 // ─── Paste formatter plugin ──────────────────────────────
 
 function createPasteFormatterPlugin() {

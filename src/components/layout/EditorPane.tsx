@@ -1,9 +1,9 @@
-import { Show, createSignal, createEffect, on } from 'solid-js'
+import { Show, createSignal, createEffect, on, onMount, onCleanup } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { useEditorStore } from '../../stores/editor-store'
 import { useAppStore } from '../../stores/app-store'
 import { NoteHeader } from '../editor/NoteHeader'
-import { TipTapEditor, getEditorInstance, searchInNote, clearNoteSearch, scrollToSearchMatch } from '../editor/TipTapEditor'
+import { TipTapEditor, getEditorInstance, searchInNote, clearNoteSearch, scrollToSearchMatch, replaceCurrentMatch, replaceAllMatches } from '../editor/TipTapEditor'
 import { PlainTextEditor } from '../editor/PlainTextEditor'
 import { TagsBar } from '../editor/TagsBar'
 import { EditorToolbar, type ToolbarPosition } from '../editor/EditorToolbar'
@@ -20,6 +20,7 @@ import {
 	XIcon,
 	ChevronUpIcon,
 	ChevronDownIcon,
+	ReplaceIcon,
 } from 'lucide-solid'
 
 const editorContainer = css({
@@ -200,6 +201,36 @@ const searchBtn = css({
 
 const searchBtnIcon = css({ width: '3.5', height: '3.5' })
 
+const replaceRow = css({
+	display: 'flex',
+	alignItems: 'center',
+	gap: '2',
+	px: '4',
+	py: '2',
+	borderBottom: '1px solid',
+	borderBottomColor: 'gray.a3',
+	bg: 'gray.a2',
+	flexShrink: 0,
+	animation: 'fade-in 0.1s ease',
+})
+
+const replaceTextBtn = css({
+	display: 'flex',
+	alignItems: 'center',
+	justifyContent: 'center',
+	height: '6',
+	padding: '0 8px',
+	borderRadius: 'sm',
+	cursor: 'pointer',
+	color: 'fg.subtle',
+	flexShrink: 0,
+	fontSize: '11px',
+	fontWeight: 'medium',
+	fontFamily: 'inherit',
+	transition: 'all 0.1s',
+	_hover: { bg: 'gray.a3', color: 'fg.default' },
+})
+
 const POSITIONS: ToolbarPosition[] = ['top', 'right', 'bottom', 'left']
 
 function ToolbarPositionIcon(props: { position: ToolbarPosition }) {
@@ -227,6 +258,8 @@ export function EditorPane() {
 
 	const [isScrolled, setIsScrolled] = createSignal(false)
 	const [searchQuery, setSearchQuery] = createSignal('')
+	const [replaceQuery, setReplaceQuery] = createSignal('')
+	const [showReplace, setShowReplace] = createSignal(false)
 	const [searchMatches, setSearchMatches] = createSignal(0)
 	const [currentMatch, setCurrentMatch] = createSignal(0)
 	let searchInputRef: HTMLInputElement | undefined
@@ -272,9 +305,29 @@ export function EditorPane() {
 		}
 	}
 
+	function handleReplace() {
+		const query = searchQuery()
+		if (!query || searchMatches() === 0) return
+		const idx = currentMatch() - 1
+		const count = replaceCurrentMatch(query, replaceQuery(), idx)
+		setSearchMatches(count)
+		setCurrentMatch(count > 0 ? Math.min(currentMatch(), count) : 0)
+		if (count > 0) scrollToSearchMatch(currentMatch() - 1)
+	}
+
+	function handleReplaceAll() {
+		const query = searchQuery()
+		if (!query || searchMatches() === 0) return
+		const count = replaceAllMatches(query, replaceQuery())
+		setSearchMatches(count)
+		setCurrentMatch(0)
+	}
+
 	function closeSearch() {
 		appStore.setNoteSearchOpen(false)
 		setSearchQuery('')
+		setReplaceQuery('')
+		setShowReplace(false)
 		setSearchMatches(0)
 		setCurrentMatch(0)
 		clearNoteSearch()
@@ -288,6 +341,8 @@ export function EditorPane() {
 					requestAnimationFrame(() => searchInputRef?.focus())
 				} else {
 					setSearchQuery('')
+					setReplaceQuery('')
+					setShowReplace(false)
 					setSearchMatches(0)
 					setCurrentMatch(0)
 					clearNoteSearch()
@@ -295,6 +350,22 @@ export function EditorPane() {
 			}
 		)
 	)
+
+	// Ctrl+H: open search with replace
+	onMount(() => {
+		function handleReplaceShortcut(e: KeyboardEvent) {
+			if ((e.ctrlKey || e.metaKey) && e.key === 'h') {
+				e.preventDefault()
+				if (!appStore.noteSearchOpen()) {
+					appStore.setNoteSearchOpen(true)
+				}
+				setShowReplace(true)
+				requestAnimationFrame(() => searchInputRef?.focus())
+			}
+		}
+		window.addEventListener('keydown', handleReplaceShortcut)
+		onCleanup(() => window.removeEventListener('keydown', handleReplaceShortcut))
+	})
 
 	const [toolbarPosition, setToolbarPosition] =
 		createSignal<ToolbarPosition>('top')
@@ -369,7 +440,13 @@ export function EditorPane() {
 						{/* In-note search bar */}
 						<Show when={appStore.noteSearchOpen()}>
 							<div class={searchBar}>
-								<SearchIcon class={searchBtnIcon} style={{ 'flex-shrink': '0', color: 'var(--colors-fg-subtle)' }} />
+								<button
+									class={searchBtn}
+									onClick={() => setShowReplace(!showReplace())}
+									title={showReplace() ? 'Hide replace (Ctrl+H)' : 'Show replace (Ctrl+H)'}
+								>
+									<ReplaceIcon class={searchBtnIcon} />
+								</button>
 								<input
 									ref={searchInputRef}
 									class={searchInput}
@@ -400,6 +477,27 @@ export function EditorPane() {
 									<XIcon class={searchBtnIcon} />
 								</button>
 							</div>
+							<Show when={showReplace()}>
+								<div class={replaceRow}>
+									<ReplaceIcon class={searchBtnIcon} style={{ 'flex-shrink': '0', color: 'var(--colors-fg-subtle)', visibility: 'hidden' }} />
+									<input
+										class={searchInput}
+										value={replaceQuery()}
+										onInput={(e) => setReplaceQuery(e.currentTarget.value)}
+										onKeyDown={(e) => {
+											if (e.key === 'Escape') closeSearch()
+											if (e.key === 'Enter') { e.preventDefault(); handleReplace() }
+										}}
+										placeholder="Replace with..."
+									/>
+									<button class={replaceTextBtn} onClick={handleReplace} title="Replace current match">
+										Replace
+									</button>
+									<button class={replaceTextBtn} onClick={handleReplaceAll} title="Replace all matches">
+										All
+									</button>
+								</div>
+							</Show>
 						</Show>
 
 						{/* Body: left toolbar | content | right toolbar */}
