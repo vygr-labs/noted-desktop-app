@@ -62,13 +62,14 @@ export const DetailsBlock = Node.create({
 			summaryEl.classList.add('details-summary-text')
 			summaryEl.textContent = node.attrs.summary
 
-			// Click summary text to edit
-			summaryEl.addEventListener('click', (e) => {
+			// Double-click summary text to edit
+			summaryEl.addEventListener('dblclick', (e) => {
 				e.stopPropagation()
 				const input = document.createElement('input')
 				input.className = 'details-summary-input'
 				input.value = node.attrs.summary
 				input.addEventListener('keydown', (ke) => {
+					ke.stopPropagation()
 					if (ke.key === 'Enter') input.blur()
 					if (ke.key === 'Escape') {
 						input.value = node.attrs.summary
