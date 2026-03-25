@@ -241,6 +241,73 @@ export const globalCss = {
         borderRadius: '2px',
         px: '1px',
       },
+      // Details block (collapsible)
+      '& .details-block': {
+        borderRadius: '8px',
+        borderWidth: '1px',
+        borderStyle: 'solid',
+        borderColor: 'gray.a3',
+        my: '0.75em',
+        overflow: 'hidden',
+        '& .details-header': {
+          display: 'flex',
+          alignItems: 'center',
+          gap: '0.5em',
+          px: '3',
+          py: '2',
+          bg: 'gray.a2',
+          cursor: 'pointer',
+          userSelect: 'none',
+          fontSize: '0.875rem',
+          fontWeight: '500',
+          color: 'fg.muted',
+          transition: 'background 0.15s',
+          _hover: {
+            bg: 'gray.a3',
+          },
+        },
+        '& .details-chevron': {
+          display: 'flex',
+          alignItems: 'center',
+          flexShrink: 0,
+          color: 'fg.subtle',
+          transition: 'transform 0.2s ease',
+        },
+        '& .details-summary-text': {
+          cursor: 'text',
+          _hover: {
+            color: 'fg.default',
+          },
+        },
+        '& .details-summary-input': {
+          bg: 'transparent',
+          border: 'none',
+          outline: 'none',
+          color: 'fg.default',
+          fontSize: '0.875rem',
+          fontWeight: '500',
+          fontFamily: 'inherit',
+          width: '100%',
+        },
+        '& .details-content': {
+          px: '4',
+          py: '3',
+          transition: 'opacity 0.15s',
+        },
+        '&[data-open="true"]': {
+          '& .details-chevron': {
+            transform: 'rotate(90deg)',
+          },
+          '& .details-content': {
+            display: 'block',
+          },
+        },
+        '&[data-open="false"]': {
+          '& .details-content': {
+            display: 'none',
+          },
+        },
+      },
       // Task list styles
       '& ul[data-type="taskList"]': {
         listStyle: 'none',

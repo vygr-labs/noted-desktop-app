@@ -125,6 +125,10 @@ function renderNode(node: TipTapNode): string {
 					.join('\n') + '\n\n'
 			)
 		}
+		case 'detailsBlock': {
+			const summary = node.attrs?.summary || 'Hidden section'
+			return `<details>\n<summary>${summary}</summary>\n\n${children()}\n</details>\n\n`
+		}
 		case 'horizontalRule':
 			return '---\n\n'
 		case 'hardBreak':

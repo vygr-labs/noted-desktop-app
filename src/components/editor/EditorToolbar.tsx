@@ -20,6 +20,7 @@ import {
 	TableIcon,
 	AlignLeftIcon,
 	Trash2Icon,
+	EyeOffIcon,
 } from 'lucide-solid'
 
 export type ToolbarPosition = 'top' | 'right' | 'bottom' | 'left'
@@ -251,6 +252,15 @@ export function EditorToolbar(props: {
 				title="Blockquote (Ctrl+Shift+B)"
 			>
 				<QuoteIcon class={iconSize} />
+			</button>
+			<button
+				class={toolBtn}
+				onMouseDown={cmd(() =>
+					e()?.chain().focus().toggleDetailsBlock().run()
+				)}
+				title="Toggle Hidden Section"
+			>
+				<EyeOffIcon class={iconSize} />
 			</button>
 			<button
 				class={toolBtn}

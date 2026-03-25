@@ -36,7 +36,8 @@ function extractText(node: TipTapNode): string {
 				child.type === 'listItem' ||
 				child.type === 'blockquote' ||
 				child.type === 'codeBlock' ||
-				child.type === 'table'
+				child.type === 'table' ||
+				child.type === 'detailsBlock'
 			) {
 				return text + '\n'
 			}

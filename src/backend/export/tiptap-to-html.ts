@@ -83,6 +83,10 @@ function renderNode(node: TipTapNode): string {
 			return `<pre><code>${children}</code></pre>`
 		case 'blockquote':
 			return `<blockquote>${children}</blockquote>`
+		case 'detailsBlock': {
+			const summary = escapeHtml(String(node.attrs?.summary || 'Hidden section'))
+			return `<details><summary>${summary}</summary>${children}</details>`
+		}
 		case 'horizontalRule':
 			return '<hr>'
 		case 'hardBreak':

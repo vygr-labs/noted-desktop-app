@@ -16,6 +16,7 @@ import { debounce } from '../../lib/debounce'
 import { tiptapToPlaintext } from '../../lib/tiptap-to-plaintext'
 import { hasListPatterns, hasTablePattern, parseLinesToNodes, parseMarkdownTable, cleanTipTapContent, alignLeftContent } from '../../lib/text-cleanup'
 import { CodeBlockWithCopy } from './codeblock-with-copy'
+import { DetailsBlock } from './details-block'
 
 const editorWrap = css({
 	minHeight: '200px',
@@ -283,6 +284,7 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					codeBlock: false,
 				}),
 				CodeBlockWithCopy,
+				DetailsBlock,
 				TaskList,
 				TaskItem.configure({ nested: true }),
 				Placeholder.configure({ placeholder: 'Start writing...' }),
