@@ -73,6 +73,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	// Search
 	searchNotes: (query: string) => ipcRenderer.invoke('search:notes', query),
 
+	// Export
+	exportNote: (noteId: string, format: string) => ipcRenderer.invoke('export:note', noteId, format),
+	exportAllNotes: (format: string) => ipcRenderer.invoke('export:all', format),
+
 	// Settings
 	getSetting: (key: string) => ipcRenderer.invoke('settings:get', key),
 	setSetting: (key: string, value: string) =>

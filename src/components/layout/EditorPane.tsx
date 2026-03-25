@@ -1,4 +1,4 @@
-import { Show, createSignal, createEffect, on, onMount, onCleanup } from 'solid-js'
+import { Show, For, createSignal, createEffect, on, onMount, onCleanup } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { useEditorStore } from '../../stores/editor-store'
 import { useAppStore } from '../../stores/app-store'
@@ -21,6 +21,7 @@ import {
 	ChevronUpIcon,
 	ChevronDownIcon,
 	ReplaceIcon,
+	DownloadIcon,
 } from 'lucide-solid'
 
 const editorContainer = css({
@@ -231,6 +232,43 @@ const replaceTextBtn = css({
 	_hover: { bg: 'gray.a3', color: 'fg.default' },
 })
 
+const exportMenu = css({
+	position: 'absolute',
+	top: '100%',
+	right: 0,
+	mt: '1',
+	minWidth: '160px',
+	py: '1',
+	bg: 'gray.1',
+	borderRadius: 'lg',
+	border: '1px solid',
+	borderColor: 'gray.a3',
+	boxShadow: '0 8px 24px -4px rgba(0,0,0,0.15)',
+	zIndex: 20,
+	animation: 'fade-in 0.1s ease',
+})
+
+const exportMenuItem = css({
+	display: 'flex',
+	alignItems: 'center',
+	width: '100%',
+	px: '3',
+	py: '1.5',
+	fontSize: '13px',
+	color: 'fg.muted',
+	cursor: 'pointer',
+	transition: 'all 0.1s',
+	_hover: { bg: 'gray.a3', color: 'fg.default' },
+})
+
+const NOTE_EXPORT_FORMATS = [
+	{ key: 'pdf', label: 'PDF Document' },
+	{ key: 'doc', label: 'Word Document' },
+	{ key: 'html', label: 'HTML File' },
+	{ key: 'md', label: 'Markdown' },
+	{ key: 'txt', label: 'Plain Text' },
+]
+
 const POSITIONS: ToolbarPosition[] = ['top', 'right', 'bottom', 'left']
 
 function ToolbarPositionIcon(props: { position: ToolbarPosition }) {
@@ -260,6 +298,7 @@ export function EditorPane() {
 	const [searchQuery, setSearchQuery] = createSignal('')
 	const [replaceQuery, setReplaceQuery] = createSignal('')
 	const [showReplace, setShowReplace] = createSignal(false)
+	const [showExportMenu, setShowExportMenu] = createSignal(false)
 	const [searchMatches, setSearchMatches] = createSignal(0)
 	const [currentMatch, setCurrentMatch] = createSignal(0)
 	let searchInputRef: HTMLInputElement | undefined
@@ -363,8 +402,20 @@ export function EditorPane() {
 				requestAnimationFrame(() => searchInputRef?.focus())
 			}
 		}
+		function handleClickOutside(e: MouseEvent) {
+			if (showExportMenu()) {
+				const target = e.target as HTMLElement
+				if (!target.closest('[data-export-menu]')) {
+					setShowExportMenu(false)
+				}
+			}
+		}
 		window.addEventListener('keydown', handleReplaceShortcut)
-		onCleanup(() => window.removeEventListener('keydown', handleReplaceShortcut))
+		window.addEventListener('mousedown', handleClickOutside)
+		onCleanup(() => {
+			window.removeEventListener('keydown', handleReplaceShortcut)
+			window.removeEventListener('mousedown', handleClickOutside)
+		})
 	})
 
 	const [toolbarPosition, setToolbarPosition] =
@@ -572,6 +623,32 @@ export function EditorPane() {
 									<PanelLeftOpenIcon class={controlIconSize} />
 								</button>
 							</Show>
+							<div style={{ position: 'relative' }} data-export-menu>
+								<button
+									class={controlBtn}
+									onClick={() => setShowExportMenu(!showExportMenu())}
+									title="Export note"
+								>
+									<DownloadIcon class={controlIconSize} />
+								</button>
+								<Show when={showExportMenu()}>
+									<div class={exportMenu}>
+										<For each={NOTE_EXPORT_FORMATS}>
+											{(fmt) => (
+												<button
+													class={exportMenuItem}
+													onClick={() => {
+														setShowExportMenu(false)
+														window.electronAPI.exportNote(note().id, fmt.key)
+													}}
+												>
+													{fmt.label}
+												</button>
+											)}
+										</For>
+									</div>
+								</Show>
+							</div>
 							<Show when={showToolbar(note())}>
 								<button
 									class={controlBtn}

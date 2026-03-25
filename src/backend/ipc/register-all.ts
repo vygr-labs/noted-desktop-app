@@ -6,6 +6,7 @@ import { registerSearchHandlers } from './search-handlers.js'
 import { registerSettingsHandlers } from './settings-handlers.js'
 import { registerDailyHandlers } from './daily-handlers.js'
 import { registerTodoListsHandlers } from './todo-lists-handlers.js'
+import { registerExportHandlers } from './export-handlers.js'
 
 export function registerAllHandlers() {
 	registerNotesHandlers()
@@ -16,4 +17,5 @@ export function registerAllHandlers() {
 	registerSearchHandlers()
 	registerSettingsHandlers()
 	registerDailyHandlers()
+	registerExportHandlers()
 }

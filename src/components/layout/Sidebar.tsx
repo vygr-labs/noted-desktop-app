@@ -1,4 +1,4 @@
-import { For, Show, createSignal, createMemo } from 'solid-js'
+import { For, Show, createSignal, createMemo, onMount, onCleanup } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { useAppStore } from '../../stores/app-store'
 import { useEditorStore } from '../../stores/editor-store'
@@ -15,6 +15,7 @@ import {
 	PanelLeftCloseIcon,
 	PanelLeftOpenIcon,
 	SunIcon,
+	DownloadIcon,
 } from 'lucide-solid'
 
 // ─── Styles ───────────────────────────────────────────────
@@ -267,6 +268,41 @@ const toolbarBtn = css({
 
 const smallIcon = css({ width: '4', height: '4' })
 
+const bulkExportMenu = css({
+	position: 'absolute',
+	bottom: '100%',
+	left: 0,
+	mb: '1',
+	minWidth: '180px',
+	py: '1',
+	bg: 'bg.default',
+	borderRadius: 'lg',
+	border: '1px solid',
+	borderColor: 'gray.a3',
+	boxShadow: '0 8px 24px -4px rgba(0,0,0,0.15)',
+	zIndex: 20,
+	animation: 'fade-in 0.1s ease',
+})
+
+const bulkExportMenuItem = css({
+	display: 'flex',
+	alignItems: 'center',
+	width: '100%',
+	px: '3',
+	py: '1.5',
+	fontSize: '13px',
+	color: 'fg.muted',
+	cursor: 'pointer',
+	transition: 'all 0.1s',
+	_hover: { bg: 'gray.a3', color: 'fg.default' },
+})
+
+const BULK_EXPORT_FORMATS = [
+	{ key: 'json', label: 'JSON File' },
+	{ key: 'sql', label: 'SQL File' },
+	{ key: 'zip', label: 'ZIP Archive' },
+]
+
 // ─── Collapsed ────────────────────────────────────────────
 
 const collapsedContainer = css({
@@ -348,6 +384,20 @@ export function Sidebar() {
 	const settingsStore = useSettingsStore()
 	const [showInlineInput, setShowInlineInput] = createSignal(false)
 	const [newListName, setNewListName] = createSignal('')
+	const [showBulkExport, setShowBulkExport] = createSignal(false)
+
+	onMount(() => {
+		function handleClickOutside(e: MouseEvent) {
+			if (showBulkExport()) {
+				const target = e.target as HTMLElement
+				if (!target.closest('[data-bulk-export]')) {
+					setShowBulkExport(false)
+				}
+			}
+		}
+		window.addEventListener('mousedown', handleClickOutside)
+		onCleanup(() => window.removeEventListener('mousedown', handleClickOutside))
+	})
 
 	const isActive = (view: string) => {
 		const current = store.currentView()
@@ -547,6 +597,32 @@ export function Sidebar() {
 					>
 						<SettingsIcon class={iconStyle} />
 					</div>
+					<div style={{ position: 'relative' }} data-bulk-export>
+						<div
+							class={collapsedItem}
+							onClick={() => setShowBulkExport(!showBulkExport())}
+							title="Export all notes"
+						>
+							<DownloadIcon class={iconStyle} />
+						</div>
+						<Show when={showBulkExport()}>
+							<div class={bulkExportMenu} style={{ left: '100%', bottom: 'auto', top: 0 }}>
+								<For each={BULK_EXPORT_FORMATS}>
+									{(fmt) => (
+										<button
+											class={bulkExportMenuItem}
+											onClick={() => {
+												setShowBulkExport(false)
+												window.electronAPI.exportAllNotes(fmt.key)
+											}}
+										>
+											{fmt.label}
+										</button>
+									)}
+								</For>
+							</div>
+						</Show>
+					</div>
 					<div
 						class={collapsedItem}
 						onClick={() => store.setSidebarCollapsed(false)}
@@ -688,6 +764,32 @@ export function Sidebar() {
 						>
 							<SettingsIcon class={smallIcon} />
 						</button>
+						<div style={{ position: 'relative' }} data-bulk-export>
+							<button
+								class={toolbarBtn}
+								onClick={() => setShowBulkExport(!showBulkExport())}
+								title="Export all notes"
+							>
+								<DownloadIcon class={smallIcon} />
+							</button>
+							<Show when={showBulkExport()}>
+								<div class={bulkExportMenu}>
+									<For each={BULK_EXPORT_FORMATS}>
+										{(fmt) => (
+											<button
+												class={bulkExportMenuItem}
+												onClick={() => {
+													setShowBulkExport(false)
+													window.electronAPI.exportAllNotes(fmt.key)
+												}}
+											>
+												{fmt.label}
+											</button>
+										)}
+									</For>
+								</div>
+							</Show>
+						</div>
 						<button
 							class={toolbarBtn}
 							onClick={() => settingsStore.cycleTheme()}

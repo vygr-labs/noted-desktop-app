@@ -176,6 +176,10 @@ interface ElectronAPI {
 	// Search
 	searchNotes: (query: string) => Promise<SearchResult[]>
 
+	// Export
+	exportNote: (noteId: string, format: string) => Promise<boolean>
+	exportAllNotes: (format: string) => Promise<boolean>
+
 	// Settings
 	getSetting: (key: string) => Promise<string | null>
 	setSetting: (key: string, value: string) => Promise<void>

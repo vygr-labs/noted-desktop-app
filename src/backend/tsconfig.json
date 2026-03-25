@@ -12,7 +12,8 @@
 		"strict": true,
 		"skipLibCheck": true,
 		"noFallthroughCasesInSwitch": true,
-		"outDir": "build"
+		"outDir": "build",
+		"types": ["node", "better-sqlite3", "archiver"]
 	},
 	"include": ["**/*.ts", "**/*.sqlite"],
 	"exclude": ["node_modules"]
