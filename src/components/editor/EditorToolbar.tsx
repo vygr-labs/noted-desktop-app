@@ -1,5 +1,5 @@
 import { css } from '../../../styled-system/css'
-import { getEditorInstance, cleanEditorContent } from './TipTapEditor'
+import { getEditorInstance, cleanEditorContent, alignEditorContent } from './TipTapEditor'
 import {
 	BoldIcon,
 	ItalicIcon,
@@ -17,6 +17,7 @@ import {
 	MinusIcon,
 	SparklesIcon,
 	TableIcon,
+	AlignLeftIcon,
 } from 'lucide-solid'
 
 export type ToolbarPosition = 'top' | 'right' | 'bottom' | 'left'
@@ -253,6 +254,13 @@ export function EditorToolbar(props: {
 
 			<div style={dividerStyle()} />
 
+			<button
+				class={toolBtn}
+				onMouseDown={cmd(() => alignEditorContent())}
+				title="Align (remove leading whitespace)"
+			>
+				<AlignLeftIcon class={iconSize} />
+			</button>
 			<button
 				class={toolBtn}
 				onMouseDown={cmd(() => cleanEditorContent())}

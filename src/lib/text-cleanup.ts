@@ -224,6 +224,25 @@ export function parseLinesToNodes(lines: string[]): TipTapNode[] {
 }
 
 /**
+ * Strip all leading whitespace from text nodes in the document.
+ * Useful for pasted text that has unwanted indentation.
+ */
+export function alignLeftContent(json: TipTapNode): TipTapNode {
+	if (!json) return json
+
+	if (json.type === 'text' && json.text) {
+		return { ...json, text: json.text.replace(/^[\t ]+/gm, '') }
+	}
+
+	if (!json.content) return json
+
+	return {
+		...json,
+		content: json.content.map((child) => alignLeftContent(child)),
+	}
+}
+
+/**
  * Clean and format TipTap JSON content:
  * - Convert "- text" paragraphs → bullet lists
  * - Convert "1. text" paragraphs → ordered lists

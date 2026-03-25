@@ -14,7 +14,7 @@ import { Slice } from '@tiptap/pm/model'
 import { useEditorStore } from '../../stores/editor-store'
 import { debounce } from '../../lib/debounce'
 import { tiptapToPlaintext } from '../../lib/tiptap-to-plaintext'
-import { hasListPatterns, hasTablePattern, parseLinesToNodes, parseMarkdownTable, cleanTipTapContent } from '../../lib/text-cleanup'
+import { hasListPatterns, hasTablePattern, parseLinesToNodes, parseMarkdownTable, cleanTipTapContent, alignLeftContent } from '../../lib/text-cleanup'
 import { CodeBlockWithCopy } from './codeblock-with-copy'
 
 const editorWrap = css({
@@ -184,6 +184,15 @@ export function cleanEditorContent() {
 	const json = editor.getJSON()
 	const cleaned = cleanTipTapContent(json as any)
 	editor.commands.setContent(cleaned)
+}
+
+export function alignEditorContent() {
+	const editor = currentEditor
+	if (!editor) return
+
+	const json = editor.getJSON()
+	const aligned = alignLeftContent(json as any)
+	editor.commands.setContent(aligned)
 }
 
 // Store cursor positions per note ID
