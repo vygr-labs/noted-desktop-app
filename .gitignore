@@ -28,7 +28,7 @@ styled-system
 styled-system-studio
 
 # Electron
-src/backend/build/
-release/
+app/src/backend/build/
+app/release/
 out/
-.yarn/install-state.gz
+**/.yarn/install-state.gz

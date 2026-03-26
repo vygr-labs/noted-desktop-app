@@ -9062,8 +9062,6 @@ __metadata:
     wait-on: "npm:^9.0.4"
     y-protocols: "npm:^1.0.7"
     yjs: "npm:^13.6.30"
-  bin:
-    noted-cli: cli/build/noted-cli.js
   languageName: unknown
   linkType: soft
 

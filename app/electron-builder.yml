@@ -15,7 +15,7 @@ nsis:
   installerHeader: installer/header.bmp
   installerSidebar: installer/sidebar.bmp
   uninstallerSidebar: installer/sidebar.bmp
-  license: LICENSE
+  license: ../LICENSE
   deleteAppDataOnUninstall: false
   createDesktopShortcut: true
   createStartMenuShortcut: true
@@ -37,7 +37,7 @@ dmg:
   icon: assets/icon.icns
 
 files: ['src/backend/build/**/*', 'dist/**/*']
-extraResources: ['./assets/**', './cli/build/**', './app.config.json']
+extraResources: ['./assets/**', '../cli/build/**', './app.config.json']
 directories:
   output: 'release'
   buildResources: 'assets'

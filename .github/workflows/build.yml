@@ -29,17 +29,21 @@ jobs:
           node-version: 22
 
       - name: Enable Corepack & install dependencies
+        working-directory: app
         run: |
           corepack enable
           yarn install --immutable
 
       - name: Generate PandaCSS
+        working-directory: app
         run: yarn prepare
 
       - name: Build CLI
+        working-directory: app
         run: yarn cli:build
 
       - name: Build & package
+        working-directory: app
         run: yarn run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -49,8 +53,8 @@ jobs:
         with:
           name: noted-windows
           path: |
-            release/*.exe
-            release/*.yml
+            app/release/*.exe
+            app/release/*.yml
           if-no-files-found: warn
 
   build-macos:
@@ -64,17 +68,21 @@ jobs:
           node-version: 22
 
       - name: Enable Corepack & install dependencies
+        working-directory: app
         run: |
           corepack enable
           yarn install --immutable
 
       - name: Generate PandaCSS
+        working-directory: app
         run: yarn prepare
 
       - name: Build CLI
+        working-directory: app
         run: yarn cli:build
 
       - name: Build & package
+        working-directory: app
         run: yarn run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -85,8 +93,8 @@ jobs:
         with:
           name: noted-macos
           path: |
-            release/*.dmg
-            release/*.yml
+            app/release/*.dmg
+            app/release/*.yml
           if-no-files-found: warn
 
   build-linux:
@@ -100,17 +108,21 @@ jobs:
           node-version: 22
 
       - name: Enable Corepack & install dependencies
+        working-directory: app
         run: |
           corepack enable
           yarn install --immutable
 
       - name: Generate PandaCSS
+        working-directory: app
         run: yarn prepare
 
       - name: Build CLI
+        working-directory: app
         run: yarn cli:build
 
       - name: Build & package
+        working-directory: app
         run: yarn run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
@@ -120,7 +132,6 @@ jobs:
         with:
           name: noted-linux
           path: |
-            release/*.AppImage
-            release/*.yml
+            app/release/*.AppImage
+            app/release/*.yml
           if-no-files-found: warn
-
