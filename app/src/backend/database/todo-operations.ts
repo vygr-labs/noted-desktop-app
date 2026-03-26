@@ -5,6 +5,7 @@ export interface Todo {
 	note_id: string | null
 	todo_list_id: string | null
 	text: string
+	description: string | null
 	is_completed: number
 	due_date: string | null
 	source_daily_date: string | null
@@ -37,6 +38,7 @@ export function createTodo(data: {
 	text: string
 	note_id?: string | null
 	todo_list_id?: string | null
+	description?: string | null
 	due_date?: string | null
 	source_daily_date?: string | null
 }): Todo {
@@ -47,13 +49,14 @@ export function createTodo(data: {
 	const sortOrder = (maxOrder?.max ?? -1) + 1
 
 	db.prepare(
-		`INSERT INTO todos (id, text, note_id, todo_list_id, due_date, source_daily_date, sort_order)
-		 VALUES (?, ?, ?, ?, ?, ?, ?)`
+		`INSERT INTO todos (id, text, note_id, todo_list_id, description, due_date, source_daily_date, sort_order)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
 	).run(
 		id,
 		data.text,
 		data.note_id ?? null,
 		data.todo_list_id ?? null,
+		data.description ?? null,
 		data.due_date ?? null,
 		data.source_daily_date ?? null,
 		sortOrder
@@ -65,6 +68,7 @@ export function updateTodo(
 	id: string,
 	data: {
 		text?: string
+		description?: string | null
 		is_completed?: boolean
 		due_date?: string | null
 		todo_list_id?: string | null
@@ -75,6 +79,7 @@ export function updateTodo(
 	if (!existing) return undefined
 
 	const text = data.text ?? existing.text
+	const description = data.description !== undefined ? data.description : existing.description
 	const isCompleted =
 		data.is_completed !== undefined
 			? data.is_completed
@@ -88,15 +93,27 @@ export function updateTodo(
 	const sortOrder = data.sort_order ?? existing.sort_order
 
 	db.prepare(
-		`UPDATE todos SET text = ?, is_completed = ?, due_date = ?, todo_list_id = ?, sort_order = ?,
+		`UPDATE todos SET text = ?, description = ?, is_completed = ?, due_date = ?, todo_list_id = ?, sort_order = ?,
 		 updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-	).run(text, isCompleted, dueDate, todoListId, sortOrder, id)
+	).run(text, description, isCompleted, dueDate, todoListId, sortOrder, id)
 
 	return fetchTodoById(id)
 }
 
 export function deleteTodo(id: string): void {
 	db.prepare('DELETE FROM todos WHERE id = ?').run(id)
+}
+
+export function reorderTodos(ids: string[]): void {
+	const stmt = db.prepare(
+		'UPDATE todos SET sort_order = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?'
+	)
+	const transaction = db.transaction(() => {
+		ids.forEach((id, index) => {
+			stmt.run(index, id)
+		})
+	})
+	transaction()
 }
 
 export function rolloverTodos(fromDate: string, toDate: string): number {

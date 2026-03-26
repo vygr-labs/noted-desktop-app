@@ -255,6 +255,14 @@ function runMigrations() {
 		setSchemaVersion(8)
 	}
 
+	if (currentVersion < 9) {
+		const todoCols = db.prepare("PRAGMA table_info(todos)").all() as { name: string }[]
+		if (!todoCols.some(c => c.name === 'description')) {
+			db.exec(`ALTER TABLE todos ADD COLUMN description TEXT;`)
+		}
+		setSchemaVersion(9)
+	}
+
 }
 
 runMigrations()

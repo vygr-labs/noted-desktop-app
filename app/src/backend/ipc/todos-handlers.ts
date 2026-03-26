@@ -5,6 +5,7 @@ import {
 	createTodo,
 	updateTodo,
 	deleteTodo,
+	reorderTodos,
 	rolloverTodos,
 } from '../database/todo-operations.js'
 
@@ -35,6 +36,10 @@ export function registerTodosHandlers() {
 		const result = deleteTodo(id)
 		broadcastTodosChanged(event.sender)
 		return result
+	})
+	ipcMain.handle('todos:reorder', (event, ids: string[]) => {
+		reorderTodos(ids)
+		broadcastTodosChanged(event.sender)
 	})
 	ipcMain.handle('todos:rollover', (event, fromDate: string, toDate: string) => {
 		const result = rolloverTodos(fromDate, toDate)

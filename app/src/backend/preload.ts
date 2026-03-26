@@ -59,6 +59,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	updateTodo: (id: string, data: Record<string, unknown>) =>
 		ipcRenderer.invoke('todos:update', id, data),
 	deleteTodo: (id: string) => ipcRenderer.invoke('todos:delete', id),
+	reorderTodos: (ids: string[]) => ipcRenderer.invoke('todos:reorder', ids),
 	rolloverTodos: (fromDate: string, toDate: string) =>
 		ipcRenderer.invoke('todos:rollover', fromDate, toDate),
 
