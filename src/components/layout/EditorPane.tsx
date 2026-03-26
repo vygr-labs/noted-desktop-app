@@ -8,6 +8,7 @@ import { PlainTextEditor } from '../editor/PlainTextEditor'
 import { TagsBar } from '../editor/TagsBar'
 import { EditorToolbar, type ToolbarPosition } from '../editor/EditorToolbar'
 import { LockOverlay } from '../editor/LockOverlay'
+import { PinDialog } from '../editor/PinDialog'
 import {
 	MaximizeIcon,
 	MinimizeIcon,
@@ -322,22 +323,31 @@ export function EditorPane() {
 		setUnlockedIds((prev) => new Set([...prev, noteId]))
 	}
 
+	const [pinDialog, setPinDialog] = createSignal<{
+		title: string; description: string; confirmLabel: string;
+		onConfirm: (pin: string) => void | Promise<void>
+	} | null>(null)
+
 	async function toggleLock(noteId: string) {
 		const hasPin = await window.electronAPI.hasLockPin()
 		if (!hasPin) {
-			// Prompt to set a PIN first
-			const pin = prompt('Set a lock PIN (used for all locked notes):')
-			if (!pin || pin.trim().length < 4) {
-				alert('PIN must be at least 4 characters.')
-				return
-			}
-			await window.electronAPI.setLockPin(pin.trim())
+			// Need to set a PIN first
+			setPinDialog({
+				title: 'Set a lock PIN',
+				description: 'This PIN will be used to lock and unlock notes.',
+				confirmLabel: 'Set PIN',
+				onConfirm: async (pin) => {
+					await window.electronAPI.setLockPin(pin)
+					setPinDialog(null)
+					const isNowLocked = await window.electronAPI.toggleNoteLock(noteId)
+					if (!isNowLocked) unlockNote(noteId)
+					await editorStore.refreshCurrentNote()
+				},
+			})
+			return
 		}
 		const isNowLocked = await window.electronAPI.toggleNoteLock(noteId)
-		if (!isNowLocked) {
-			// If unlocking, add to session unlocked set
-			unlockNote(noteId)
-		}
+		if (!isNowLocked) unlockNote(noteId)
 		await editorStore.refreshCurrentNote()
 	}
 	const [searchMatches, setSearchMatches] = createSignal(0)
@@ -852,6 +862,18 @@ export function EditorPane() {
 							</button>
 						</div>
 					</>
+				)}
+			</Show>
+			{/* PIN dialog */}
+			<Show when={pinDialog()}>
+				{(dlg) => (
+					<PinDialog
+						title={dlg().title}
+						description={dlg().description}
+						confirmLabel={dlg().confirmLabel}
+						onConfirm={dlg().onConfirm}
+						onCancel={() => setPinDialog(null)}
+					/>
 				)}
 			</Show>
 			{/* Join shared note dialog */}

@@ -1,4 +1,5 @@
 import { Show, createSignal, onMount } from 'solid-js'
+import { PinDialog } from '../editor/PinDialog'
 import { css } from '../../../styled-system/css'
 import { useSettingsStore, type AppTheme } from '../../stores/settings-store'
 import {
@@ -302,22 +303,36 @@ export function SettingsDialog() {
 		setHasPinSet(await window.electronAPI.hasLockPin())
 	})
 
-	async function toggleLockPin() {
+	const [pinDialog, setPinDialog] = createSignal<{
+		title: string; description: string; confirmLabel: string;
+		onConfirm: (pin: string) => void | Promise<void>
+	} | null>(null)
+
+	function toggleLockPin() {
 		if (hasPinSet()) {
-			const pin = prompt('Enter current PIN to remove it:')
-			if (!pin) return
-			const valid = await window.electronAPI.verifyLockPin(pin)
-			if (!valid) { alert('Incorrect PIN.'); return }
-			await window.electronAPI.removeLockPin()
-			setHasPinSet(false)
+			setPinDialog({
+				title: 'Remove lock PIN',
+				description: 'Enter your current PIN to remove it. All notes will be unlocked.',
+				confirmLabel: 'Remove PIN',
+				onConfirm: async (pin) => {
+					const valid = await window.electronAPI.verifyLockPin(pin)
+					if (!valid) throw new Error('Incorrect PIN')
+					await window.electronAPI.removeLockPin()
+					setHasPinSet(false)
+					setPinDialog(null)
+				},
+			})
 		} else {
-			const pin = prompt('Set a lock PIN (min 4 characters):')
-			if (!pin || pin.trim().length < 4) {
-				if (pin) alert('PIN must be at least 4 characters.')
-				return
-			}
-			await window.electronAPI.setLockPin(pin.trim())
-			setHasPinSet(true)
+			setPinDialog({
+				title: 'Set a lock PIN',
+				description: 'This PIN will be used to lock and unlock notes.',
+				confirmLabel: 'Set PIN',
+				onConfirm: async (pin) => {
+					await window.electronAPI.setLockPin(pin)
+					setHasPinSet(true)
+					setPinDialog(null)
+				},
+			})
 		}
 	}
 
@@ -332,6 +347,7 @@ export function SettingsDialog() {
 	}
 
 	return (
+		<>
 		<Show when={settings.showSettingsDialog()}>
 			<div
 				class={overlay}
@@ -592,5 +608,17 @@ export function SettingsDialog() {
 				</div>
 			</div>
 		</Show>
+		<Show when={pinDialog()}>
+			{(dlg) => (
+				<PinDialog
+					title={dlg().title}
+					description={dlg().description}
+					confirmLabel={dlg().confirmLabel}
+					onConfirm={dlg().onConfirm}
+					onCancel={() => setPinDialog(null)}
+				/>
+			)}
+		</Show>
+		</>
 	)
 }
