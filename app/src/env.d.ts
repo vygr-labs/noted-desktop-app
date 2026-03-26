@@ -52,6 +52,7 @@ interface Todo {
 	note_id: string | null
 	todo_list_id: string | null
 	text: string
+	description: string | null
 	is_completed: number
 	due_date: string | null
 	source_daily_date: string | null
@@ -170,6 +171,7 @@ interface ElectronAPI {
 		text: string
 		note_id?: string | null
 		todo_list_id?: string | null
+		description?: string | null
 		due_date?: string | null
 		source_daily_date?: string | null
 	}) => Promise<Todo>
@@ -177,6 +179,7 @@ interface ElectronAPI {
 		id: string,
 		data: {
 			text?: string
+			description?: string | null
 			is_completed?: boolean
 			due_date?: string | null
 			todo_list_id?: string | null
@@ -184,6 +187,7 @@ interface ElectronAPI {
 		}
 	) => Promise<Todo | undefined>
 	deleteTodo: (id: string) => Promise<void>
+	reorderTodos: (ids: string[]) => Promise<void>
 	rolloverTodos: (fromDate: string, toDate: string) => Promise<number>
 
 	// Search

@@ -346,6 +346,37 @@ export function TodoView() {
 
 	const allTodos = () => store.todos() || []
 	const allTodoLists = () => store.todoLists() || []
+	let dragTodoId: string | null = null
+
+	function makeDragHandlers(todos: () => Todo[]) {
+		return {
+			onDragStart: (todoId: string) => (e: DragEvent) => {
+				dragTodoId = todoId
+				if (e.dataTransfer) {
+					e.dataTransfer.effectAllowed = 'move'
+					e.dataTransfer.setData('text/plain', todoId)
+				}
+			},
+			onDragOver: (e: DragEvent) => {
+				e.preventDefault()
+				if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+			},
+			onDrop: (targetId: string) => async (e: DragEvent) => {
+				e.preventDefault()
+				if (!dragTodoId || dragTodoId === targetId) return
+				const list = todos()
+				const ids = list.map(t => t.id)
+				const fromIdx = ids.indexOf(dragTodoId)
+				const toIdx = ids.indexOf(targetId)
+				if (fromIdx === -1 || toIdx === -1) return
+				ids.splice(fromIdx, 1)
+				ids.splice(toIdx, 0, dragTodoId)
+				await window.electronAPI.reorderTodos(ids)
+				store.refetchTodos()
+			},
+			onDragEnd: () => { dragTodoId = null },
+		}
+	}
 
 	// Filter todos by selected list
 	const filteredTodos = createMemo(() => {
@@ -596,32 +627,52 @@ export function TodoView() {
 				>
 					<div class={activeTodosSection}>
 						<Show when={overdue().length > 0}>
-							<TodoList title="Overdue" variant="danger">
-								<For each={overdue()}>
-									{(todo) => <TodoItem todo={todo} />}
-								</For>
-							</TodoList>
+							{(() => {
+								const h = makeDragHandlers(overdue)
+								return (
+									<TodoList title="Overdue" variant="danger">
+										<For each={overdue()}>
+											{(todo) => <TodoItem todo={todo} onDragStart={h.onDragStart(todo.id)} onDragOver={h.onDragOver} onDrop={h.onDrop(todo.id)} onDragEnd={h.onDragEnd} />}
+										</For>
+									</TodoList>
+								)
+							})()}
 						</Show>
 						<Show when={today().length > 0}>
-							<TodoList title="Today">
-								<For each={today()}>
-									{(todo) => <TodoItem todo={todo} />}
-								</For>
-							</TodoList>
+							{(() => {
+								const h = makeDragHandlers(today)
+								return (
+									<TodoList title="Today">
+										<For each={today()}>
+											{(todo) => <TodoItem todo={todo} onDragStart={h.onDragStart(todo.id)} onDragOver={h.onDragOver} onDrop={h.onDrop(todo.id)} onDragEnd={h.onDragEnd} />}
+										</For>
+									</TodoList>
+								)
+							})()}
 						</Show>
 						<Show when={upcoming().length > 0}>
-							<TodoList title="Upcoming">
-								<For each={upcoming()}>
-									{(todo) => <TodoItem todo={todo} />}
-								</For>
-							</TodoList>
+							{(() => {
+								const h = makeDragHandlers(upcoming)
+								return (
+									<TodoList title="Upcoming">
+										<For each={upcoming()}>
+											{(todo) => <TodoItem todo={todo} onDragStart={h.onDragStart(todo.id)} onDragOver={h.onDragOver} onDrop={h.onDrop(todo.id)} onDragEnd={h.onDragEnd} />}
+										</For>
+									</TodoList>
+								)
+							})()}
 						</Show>
 						<Show when={noDueDate().length > 0}>
-							<TodoList title="No Due Date">
-								<For each={noDueDate()}>
-									{(todo) => <TodoItem todo={todo} />}
-								</For>
-							</TodoList>
+							{(() => {
+								const h = makeDragHandlers(noDueDate)
+								return (
+									<TodoList title="No Due Date">
+										<For each={noDueDate()}>
+											{(todo) => <TodoItem todo={todo} onDragStart={h.onDragStart(todo.id)} onDragOver={h.onDragOver} onDrop={h.onDrop(todo.id)} onDragEnd={h.onDragEnd} />}
+										</For>
+									</TodoList>
+								)
+							})()}
 						</Show>
 					</div>
 					<Show when={completed().length > 0}>
@@ -642,11 +693,16 @@ export function TodoView() {
 									</div>
 								</div>
 							</div>
-							<TodoList title="Completed" variant="muted">
-								<For each={completed()}>
-									{(todo) => <TodoItem todo={todo} />}
-								</For>
-							</TodoList>
+							{(() => {
+								const h = makeDragHandlers(completed)
+								return (
+									<TodoList title="Completed" variant="muted">
+										<For each={completed()}>
+											{(todo) => <TodoItem todo={todo} onDragStart={h.onDragStart(todo.id)} onDragOver={h.onDragOver} onDrop={h.onDrop(todo.id)} onDragEnd={h.onDragEnd} />}
+										</For>
+									</TodoList>
+								)
+							})()}
 						</div>
 					</Show>
 				</Show>
