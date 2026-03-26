@@ -125,3 +125,48 @@ export function rolloverTodos(fromDate: string, toDate: string): number {
 		.run(toDate, fromDate)
 	return result.changes
 }
+
+export function fetchTodosByList(listId: string): Todo[] {
+	return db
+		.prepare('SELECT * FROM todos WHERE todo_list_id = ? ORDER BY sort_order ASC, created_at ASC')
+		.all(listId) as Todo[]
+}
+
+export function syncTodosFromRemote(listId: string, remoteTodos: {
+	id: string
+	text: string
+	description: string | null
+	is_completed: number
+	due_date: string | null
+	sort_order: number
+}[]): void {
+	const transaction = db.transaction(() => {
+		const localTodos = fetchTodosByList(listId)
+		const localMap = new Map(localTodos.map(t => [t.id, t]))
+		const remoteIds = new Set(remoteTodos.map(t => t.id))
+
+		// Delete todos that exist locally but not remotely
+		for (const local of localTodos) {
+			if (!remoteIds.has(local.id)) {
+				db.prepare('DELETE FROM todos WHERE id = ?').run(local.id)
+				db.prepare('DELETE FROM notes_fts WHERE note_id = ?').run(local.id)
+			}
+		}
+
+		// Upsert remote todos
+		for (const remote of remoteTodos) {
+			if (localMap.has(remote.id)) {
+				db.prepare(
+					`UPDATE todos SET text = ?, description = ?, is_completed = ?, due_date = ?, sort_order = ?,
+					 updated_at = CURRENT_TIMESTAMP WHERE id = ?`
+				).run(remote.text, remote.description, remote.is_completed, remote.due_date, remote.sort_order, remote.id)
+			} else {
+				db.prepare(
+					`INSERT INTO todos (id, text, description, is_completed, due_date, todo_list_id, sort_order)
+					 VALUES (?, ?, ?, ?, ?, ?, ?)`
+				).run(remote.id, remote.text, remote.description, remote.is_completed, remote.due_date, listId, remote.sort_order)
+			}
+		}
+	})
+	transaction()
+}

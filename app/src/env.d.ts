@@ -188,6 +188,15 @@ interface ElectronAPI {
 	) => Promise<Todo | undefined>
 	deleteTodo: (id: string) => Promise<void>
 	reorderTodos: (ids: string[]) => Promise<void>
+	fetchTodosByList: (listId: string) => Promise<Todo[]>
+	syncTodosFromRemote: (listId: string, remoteTodos: {
+		id: string
+		text: string
+		description: string | null
+		is_completed: number
+		due_date: string | null
+		sort_order: number
+	}[]) => Promise<void>
 	rolloverTodos: (fromDate: string, toDate: string) => Promise<number>
 
 	// Search

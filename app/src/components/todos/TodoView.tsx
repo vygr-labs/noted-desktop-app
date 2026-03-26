@@ -1,6 +1,8 @@
-import { createMemo, For, Show, createSignal } from 'solid-js'
+import { createMemo, For, Show, createSignal, createEffect, on, onCleanup } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { useAppStore } from '../../stores/app-store'
+import { useSyncStore } from '../../stores/sync-store'
+import { TodoListSync } from '../../lib/todo-sync'
 import { TodoItem } from './TodoItem'
 import { TodoList } from './TodoList'
 import { getTodayDate, isOverdue, isToday } from '../../lib/date-utils'
@@ -339,6 +341,7 @@ function ProgressRingSVG(props: { pct: number }) {
 
 export function TodoView() {
 	const store = useAppStore()
+	const syncStore = useSyncStore()
 	const [newTodoText, setNewTodoText] = createSignal('')
 	const [selectedListId, setSelectedListId] = createSignal<string | null>(null)
 	const [showNewList, setShowNewList] = createSignal(false)
@@ -347,6 +350,78 @@ export function TodoView() {
 	const allTodos = () => store.todos() || []
 	const allTodoLists = () => store.todoLists() || []
 	let dragTodoId: string | null = null
+	let activeTodoSync: TodoListSync | null = null
+
+	// Get the currently selected list object
+	const selectedList = createMemo(() => {
+		const id = selectedListId()
+		if (!id) return null
+		return (store.lists() || []).find(l => l.id === id) || null
+	})
+
+	// Connect/disconnect todo sync when selected list changes
+	createEffect(on(selectedListId, (listId) => {
+		// Cleanup previous sync
+		if (activeTodoSync) {
+			activeTodoSync.destroy()
+			activeTodoSync = null
+		}
+
+		if (!listId) return
+
+		// Find the list to check if it's shared
+		const list = (store.lists() || []).find(l => l.id === listId)
+		if (!list?.sync_id || !list?.sync_secret) return
+
+		// Connect to the Yjs doc for this shared list
+		const managed = syncStore.getDoc(list.sync_id, list.sync_secret)
+		activeTodoSync = new TodoListSync(managed.ydoc, listId, () => {
+			// Called when remote changes arrive — refetch todos
+			store.refetchTodos()
+		})
+
+		// Seed Yjs with local todos if Yjs is empty
+		if (activeTodoSync.isEmpty()) {
+			const localTodos = allTodos().filter(t => t.todo_list_id === listId)
+			if (localTodos.length > 0) {
+				activeTodoSync.pushLocal(localTodos)
+			}
+		} else {
+			// Yjs has data — apply remote state to local
+			const remoteTodos = activeTodoSync.getRemoteTodos()
+			if (remoteTodos.length > 0) {
+				window.electronAPI.syncTodosFromRemote(listId, remoteTodos).then(() => {
+					store.refetchTodos()
+				})
+			}
+		}
+	}))
+
+	onCleanup(() => {
+		if (activeTodoSync) {
+			// Release the Yjs doc back to the sync store (starts idle timer)
+			const list = selectedList()
+			if (list?.sync_id) syncStore.releaseDoc(list.sync_id)
+			activeTodoSync.destroy()
+			activeTodoSync = null
+		}
+	})
+
+	// Push local state to Yjs after any todo mutation
+	function pushToSync() {
+		if (!activeTodoSync) return
+		const listId = selectedListId()
+		if (!listId) return
+		const todos = allTodos().filter(t => t.todo_list_id === listId)
+		activeTodoSync.pushLocal(todos)
+	}
+
+	// Auto-push to sync whenever todos change (catches all mutations from TodoItem too)
+	createEffect(on(
+		() => allTodos(),
+		() => pushToSync(),
+		{ defer: true }
+	))
 
 	function makeDragHandlers(todos: () => Todo[]) {
 		return {
@@ -434,7 +509,8 @@ export function TodoView() {
 			todo_list_id: selectedListId(),
 		})
 		setNewTodoText('')
-		store.refetchTodos()
+		await store.refetchTodos()
+		pushToSync()
 	}
 
 	function handleKeyDown(e: KeyboardEvent) {

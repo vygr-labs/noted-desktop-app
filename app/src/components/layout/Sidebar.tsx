@@ -444,17 +444,20 @@ export function Sidebar() {
 		}
 	}
 
+	const [listShareCode, setListShareCode] = createSignal('')
+
 	async function handleShareList(e: Event, list: NoteList) {
 		e.stopPropagation()
 		if (list.is_shared && list.sync_id && list.sync_secret) {
-			// Already shared — copy the share code
 			const code = `${list.sync_id}.${list.sync_secret}`
 			navigator.clipboard.writeText(code)
+			setListShareCode(code)
 			return
 		}
 		const code = await window.electronAPI.shareList(list.id)
 		if (code) {
 			navigator.clipboard.writeText(code)
+			setListShareCode(code)
 			store.refetchLists()
 			store.refetchNotes()
 		}
@@ -955,6 +958,62 @@ export function Sidebar() {
 								onClick={handleJoinFromSidebar}
 							>
 								Join
+							</button>
+						</div>
+					</div>
+				</div>
+			</Show>
+			{/* Share code result dialog */}
+			<Show when={listShareCode()}>
+				<div
+					style={{
+						position: 'fixed', inset: '0', background: 'rgba(0,0,0,0.5)',
+						display: 'flex', 'align-items': 'center', 'justify-content': 'center',
+						'z-index': '50',
+					}}
+					onClick={() => setListShareCode('')}
+				>
+					<div
+						style={{
+							background: 'var(--colors-gray-2)', 'border-radius': '12px',
+							padding: '24px', width: '380px',
+							'box-shadow': '0 24px 64px -8px rgba(0,0,0,0.4)',
+							border: '1px solid var(--colors-gray-a3)',
+						}}
+						onClick={(e: MouseEvent) => e.stopPropagation()}
+					>
+						<div style={{ 'font-size': '16px', 'font-weight': '600', 'margin-bottom': '4px', color: 'var(--colors-fg-default)' }}>
+							List shared
+						</div>
+						<div style={{ 'font-size': '13px', color: 'var(--colors-fg-muted)', 'margin-bottom': '16px' }}>
+							Share this code with collaborators. It's been copied to your clipboard.
+						</div>
+						<div style={{
+							display: 'flex', gap: '4px', 'margin-bottom': '16px',
+						}}>
+							<input
+								class={inlineInputField}
+								style={{
+									flex: '1', background: 'var(--colors-gray-a2)',
+									border: '1px solid var(--colors-gray-a4)',
+									'border-radius': '8px', padding: '10px 12px',
+									'font-family': 'monospace',
+								}}
+								value={listShareCode()}
+								readOnly
+								onClick={(e) => (e.target as HTMLInputElement).select()}
+							/>
+						</div>
+						<div style={{ display: 'flex', 'justify-content': 'flex-end' }}>
+							<button
+								class={css({
+									px: '4', py: '2', borderRadius: 'md', fontSize: '13px', fontWeight: '500',
+									cursor: 'pointer', bg: 'indigo.9', color: 'white',
+									_hover: { bg: 'indigo.10' },
+								})}
+								onClick={() => setListShareCode('')}
+							>
+								Done
 							</button>
 						</div>
 					</div>

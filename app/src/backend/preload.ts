@@ -62,6 +62,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	reorderTodos: (ids: string[]) => ipcRenderer.invoke('todos:reorder', ids),
 	rolloverTodos: (fromDate: string, toDate: string) =>
 		ipcRenderer.invoke('todos:rollover', fromDate, toDate),
+	fetchTodosByList: (listId: string) => ipcRenderer.invoke('todos:fetch-by-list', listId),
+	syncTodosFromRemote: (listId: string, remoteTodos: unknown[]) => ipcRenderer.invoke('todos:sync-from-remote', listId, remoteTodos),
 
 	// Todo Lists
 	fetchAllTodoLists: () => ipcRenderer.invoke('todo-lists:fetch-all'),
