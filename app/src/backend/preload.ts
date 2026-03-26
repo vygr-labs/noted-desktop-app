@@ -92,7 +92,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	// Sync
 	shareNote: (noteId: string) => ipcRenderer.invoke('sync:share-note', noteId),
 	unshareNote: (noteId: string) => ipcRenderer.invoke('sync:unshare-note', noteId),
-	joinSharedNote: (shareCode: string) => ipcRenderer.invoke('sync:join-note', shareCode),
+	joinSharedNote: (shareCode: string, opts?: { list_id?: string; title?: string }) => ipcRenderer.invoke('sync:join-note', shareCode, opts),
 	shareList: (listId: string) => ipcRenderer.invoke('sync:share-list', listId),
 	unshareList: (listId: string) => ipcRenderer.invoke('sync:unshare-list', listId),
 	joinSharedList: (shareCode: string) => ipcRenderer.invoke('sync:join-list', shareCode),

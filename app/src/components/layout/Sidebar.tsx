@@ -779,7 +779,14 @@ export function Sidebar() {
 								>
 									<div class={`nav-indicator ${navIndicator}`} />
 									<FolderIcon class={iconStyle} />
-									<span class={listName}>{list.name}</span>
+									<Show
+										when={!(list.is_shared && (list.name === 'Shared List' || !list.name))}
+										fallback={
+											<span class={css({ flex: 1, height: '14px', borderRadius: 'sm', bg: 'gray.a3', animation: 'pulse 1.5s ease-in-out infinite' })} />
+										}
+									>
+										<span class={listName}>{list.name}</span>
+									</Show>
 									<Show when={list.is_shared}>
 										<Share2Icon class={css({ width: '3', height: '3', color: 'indigo.9', flexShrink: 0 })} />
 									</Show>
