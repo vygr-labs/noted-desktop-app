@@ -1,4 +1,4 @@
 {
-	"syncServerUrl": "wss://noted-sync.fly.dev",
-	"syncAuthToken": ""
+	"syncServerUrl": "wss://noted-sync.voyagerlabs.tech",
+	"syncAuthToken": "1577d5788c6128a4910f365d2e21296a3ae15ce00ae24ec30c235d0a69f110ff"
 }
