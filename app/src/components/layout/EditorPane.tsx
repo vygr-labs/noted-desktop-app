@@ -462,6 +462,11 @@ export function EditorPane() {
 	}
 
 	async function handleUnshare(noteId: string) {
+		const note = editorStore.currentNote()
+		// Signal unshare to remote peers before cleaning up locally
+		if (note?.sync_id) {
+			syncStore.signalUnshare(note.sync_id)
+		}
 		await window.electronAPI.unshareNote(noteId)
 		setShareCode('')
 		setShowShareMenu(false)
@@ -911,38 +916,40 @@ export function EditorPane() {
 										readonly={isTrash()}
 									/>
 									<Show
-										when={note().is_shared && !note().content && !note().content_plain}
-									>
-										<div class={syncSkeleton}>
-											<div class={skeletonLine} style={{ width: '90%' }} />
-											<div class={skeletonLine} style={{ width: '75%' }} />
-											<div class={skeletonLine} style={{ width: '85%' }} />
-											<div class={skeletonLine} style={{ width: '40%' }} />
-											<div style={{ height: '8px' }} />
-											<div class={skeletonLine} style={{ width: '95%' }} />
-											<div class={skeletonLine} style={{ width: '70%' }} />
-											<div class={skeletonLine} style={{ width: '80%' }} />
-											<div style={{
-												'font-size': '12px', color: 'var(--colors-fg-subtle)',
-												'text-align': 'center', 'margin-top': '16px',
-											}}>
-												Syncing content...
-											</div>
-										</div>
-									</Show>
-									<Show
-										when={note().note_type === 'rich'}
+										when={!(note().is_shared && !note().content && !note().content_plain)}
 										fallback={
-											<PlainTextEditor
+											<div class={syncSkeleton}>
+												<div class={skeletonLine} style={{ width: '90%' }} />
+												<div class={skeletonLine} style={{ width: '75%' }} />
+												<div class={skeletonLine} style={{ width: '85%' }} />
+												<div class={skeletonLine} style={{ width: '40%' }} />
+												<div style={{ height: '8px' }} />
+												<div class={skeletonLine} style={{ width: '95%' }} />
+												<div class={skeletonLine} style={{ width: '70%' }} />
+												<div class={skeletonLine} style={{ width: '80%' }} />
+												<div style={{
+													'font-size': '12px', color: 'var(--colors-fg-subtle)',
+													'text-align': 'center', 'margin-top': '16px',
+												}}>
+													Syncing content...
+												</div>
+											</div>
+										}
+									>
+										<Show
+											when={note().note_type === 'rich'}
+											fallback={
+												<PlainTextEditor
+													note={note()}
+													readonly={isTrash()}
+												/>
+											}
+										>
+											<TipTapEditor
 												note={note()}
 												readonly={isTrash()}
 											/>
-										}
-									>
-										<TipTapEditor
-											note={note()}
-											readonly={isTrash()}
-										/>
+										</Show>
 									</Show>
 								</div>
 							</div>
