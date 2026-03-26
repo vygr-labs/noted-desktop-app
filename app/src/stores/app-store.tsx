@@ -110,18 +110,17 @@ export function AppStoreProvider(props: ParentProps) {
 			const match = url.match(/^noted:\/\/join\/(.+)$/)
 			if (!match) return
 			const shareCode = decodeURIComponent(match[1])
-			// Try joining as a note
-			const noteId = await window.electronAPI.joinSharedNote(shareCode)
-			if (noteId) {
-				refetchNotes()
-				setSelectedNoteId(noteId)
-				return
-			}
-			// Try joining as a list
-			const listId = await window.electronAPI.joinSharedList(shareCode)
-			if (listId) {
-				refetchLists()
-				setCurrentView({ type: 'list', listId })
+			const type = shareCode.includes(':') ? shareCode.split(':')[0] : 'n'
+
+			if (type === 'n') {
+				const noteId = await window.electronAPI.joinSharedNote(shareCode)
+				if (noteId) { refetchNotes(); setSelectedNoteId(noteId) }
+			} else if (type === 'l') {
+				const listId = await window.electronAPI.joinSharedList(shareCode)
+				if (listId) { refetchLists(); setCurrentView({ type: 'list', listId }) }
+			} else if (type === 't') {
+				const todoListId = await window.electronAPI.joinSharedTodoList(shareCode)
+				if (todoListId) { refetchTodoLists(); setCurrentView('todos') }
 			}
 		})
 	})
