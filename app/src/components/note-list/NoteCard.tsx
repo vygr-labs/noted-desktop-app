@@ -167,8 +167,11 @@ export function NoteCard(props: {
 		return props.note.title || 'Untitled'
 	}
 
+	const isSyncing = () => props.note.is_shared && !props.note.content && !props.note.content_plain
+
 	const preview = () => {
 		if (props.note.is_locked) return 'Locked'
+		if (isSyncing()) return 'Syncing...'
 		if (props.isActive) {
 			const live = editorStore.livePreview()
 			if (live !== null) return live
