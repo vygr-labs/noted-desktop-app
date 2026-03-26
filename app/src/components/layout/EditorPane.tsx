@@ -678,7 +678,7 @@ export function EditorPane() {
 											const existingCode = shareCode()
 											if ((note().is_shared && note().sync_id) || existingCode) {
 												if (!existingCode && note().sync_id && note().sync_secret) {
-													const code = `${note().sync_id}.${note().sync_secret}`
+													const code = `n:${note().sync_id}.${note().sync_secret}`
 													setShareCode(code)
 													generateQrCode(code)
 												} else if (existingCode) {

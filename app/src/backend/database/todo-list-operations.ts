@@ -5,6 +5,9 @@ export interface TodoList {
 	name: string
 	color: string
 	sort_order: number
+	sync_id: string | null
+	sync_secret: string | null
+	is_shared: number
 	created_at: string
 }
 

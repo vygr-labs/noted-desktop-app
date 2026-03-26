@@ -263,6 +263,20 @@ function runMigrations() {
 		setSchemaVersion(9)
 	}
 
+	if (currentVersion < 10) {
+		const todoCols = db.prepare("PRAGMA table_info(todo_lists)").all() as { name: string }[]
+		if (!todoCols.some(c => c.name === 'sync_id')) {
+			db.exec(`ALTER TABLE todo_lists ADD COLUMN sync_id TEXT;`)
+		}
+		if (!todoCols.some(c => c.name === 'sync_secret')) {
+			db.exec(`ALTER TABLE todo_lists ADD COLUMN sync_secret TEXT;`)
+		}
+		if (!todoCols.some(c => c.name === 'is_shared')) {
+			db.exec(`ALTER TABLE todo_lists ADD COLUMN is_shared INTEGER DEFAULT 0;`)
+		}
+		setSchemaVersion(10)
+	}
+
 }
 
 runMigrations()

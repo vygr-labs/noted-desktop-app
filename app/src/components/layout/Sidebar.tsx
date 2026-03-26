@@ -449,7 +449,7 @@ export function Sidebar() {
 	async function handleShareList(e: Event, list: NoteList) {
 		e.stopPropagation()
 		if (list.is_shared && list.sync_id && list.sync_secret) {
-			const code = `${list.sync_id}.${list.sync_secret}`
+			const code = `l:${list.sync_id}.${list.sync_secret}`
 			navigator.clipboard.writeText(code)
 			setListShareCode(code)
 			return
@@ -503,22 +503,31 @@ export function Sidebar() {
 	async function handleJoinFromSidebar() {
 		const code = joinCode().trim()
 		if (!code) return
-		// Try joining as a note first, then as a list
-		const noteId = await window.electronAPI.joinSharedNote(code)
-		if (noteId) {
-			store.refetchNotes()
-			store.setSelectedNoteId(noteId)
-			setJoinCode('')
-			setShowJoinDialog(false)
-			return
+
+		// Route by type prefix: n: = note, l: = list, t: = todo list
+		const type = code.includes(':') ? code.split(':')[0] : 'n'
+
+		if (type === 'n') {
+			const noteId = await window.electronAPI.joinSharedNote(code)
+			if (noteId) {
+				store.refetchNotes()
+				store.setSelectedNoteId(noteId)
+			}
+		} else if (type === 'l') {
+			const listId = await window.electronAPI.joinSharedList(code)
+			if (listId) {
+				store.refetchLists()
+				store.setCurrentView({ type: 'list', listId })
+			}
+		} else if (type === 't') {
+			const todoListId = await window.electronAPI.joinSharedTodoList(code)
+			if (todoListId) {
+				store.refetchTodoLists()
+				store.setCurrentView('todos')
+			}
 		}
-		const listId = await window.electronAPI.joinSharedList(code)
-		if (listId) {
-			store.refetchLists()
-			store.setCurrentView({ type: 'list', listId })
-			setJoinCode('')
-			setShowJoinDialog(false)
-		}
+		setJoinCode('')
+		setShowJoinDialog(false)
 	}
 
 	function handleListInputKeyDown(e: KeyboardEvent) {

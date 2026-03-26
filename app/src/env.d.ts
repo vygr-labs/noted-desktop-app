@@ -66,6 +66,9 @@ interface TodoListItem {
 	name: string
 	color: string
 	sort_order: number
+	sync_id: string | null
+	sync_secret: string | null
+	is_shared: number
 	created_at: string
 }
 
@@ -218,6 +221,9 @@ interface ElectronAPI {
 	shareList: (listId: string) => Promise<string | null>
 	unshareList: (listId: string) => Promise<void>
 	joinSharedList: (shareCode: string) => Promise<string>
+	shareTodoList: (listId: string) => Promise<string | null>
+	unshareTodoList: (listId: string) => Promise<void>
+	joinSharedTodoList: (shareCode: string) => Promise<string>
 	getSharedNotes: () => Promise<Note[]>
 	getSharedLists: () => Promise<NoteList[]>
 	saveYjsState: (docName: string, state: Uint8Array) => Promise<void>

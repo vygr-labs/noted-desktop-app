@@ -13,6 +13,7 @@ import {
 	XIcon,
 	SparklesIcon,
 	ExternalLinkIcon,
+	Share2Icon,
 } from 'lucide-solid'
 
 const container = css({
@@ -546,6 +547,30 @@ export function TodoView() {
 		}
 	}
 
+	const [todoListShareCode, setTodoListShareCode] = createSignal('')
+
+	async function handleShareTodoList(e: Event, list: TodoListItem) {
+		e.stopPropagation()
+		if (list.is_shared && list.sync_id && list.sync_secret) {
+			const code = `t:${list.sync_id}.${list.sync_secret}`
+			navigator.clipboard.writeText(code)
+			setTodoListShareCode(code)
+			return
+		}
+		const code = await window.electronAPI.shareTodoList(list.id)
+		if (code) {
+			navigator.clipboard.writeText(code)
+			setTodoListShareCode(code)
+			store.refetchTodoLists()
+		}
+	}
+
+	async function handleUnshareTodoList(e: Event, listId: string) {
+		e.stopPropagation()
+		await window.electronAPI.unshareTodoList(listId)
+		store.refetchTodoLists()
+	}
+
 	const hasTodos = () => filteredTodos().length > 0
 
 	const progressMessage = () => {
@@ -632,16 +657,35 @@ export function TodoView() {
 								<span class={tabCount}>
 									{countForList(list.id)}
 								</span>
+								<Show when={!list.is_shared}>
 								<div
 									class={deleteTabBtn}
-									onClick={(e) => {
-										e.stopPropagation()
-										handleDeleteList(list.id)
-									}}
-									title={`Delete "${list.name}"`}
+									onClick={(e) => handleShareTodoList(e, list)}
+									title="Share list"
 								>
-									<XIcon class={css({ width: '3', height: '3' })} />
+									<Share2Icon class={css({ width: '3', height: '3' })} />
 								</div>
+							</Show>
+							<Show when={list.is_shared}>
+								<div
+									class={deleteTabBtn}
+									style={{ color: 'var(--colors-indigo-11)', opacity: '0.8' }}
+									onClick={(e) => handleShareTodoList(e, list)}
+									title="Copy share code"
+								>
+									<Share2Icon class={css({ width: '3', height: '3' })} />
+								</div>
+							</Show>
+							<div
+								class={deleteTabBtn}
+								onClick={(e) => {
+									e.stopPropagation()
+									handleDeleteList(list.id)
+								}}
+								title={`Delete "${list.name}"`}
+							>
+								<XIcon class={css({ width: '3', height: '3' })} />
+							</div>
 							</div>
 						)}
 					</For>
@@ -783,6 +827,56 @@ export function TodoView() {
 					</Show>
 				</Show>
 			</div>
+			{/* Share code dialog */}
+			<Show when={todoListShareCode()}>
+				<div
+					style={{
+						position: 'fixed', inset: '0', background: 'rgba(0,0,0,0.5)',
+						display: 'flex', 'align-items': 'center', 'justify-content': 'center',
+						'z-index': '50',
+					}}
+					onClick={() => setTodoListShareCode('')}
+				>
+					<div
+						style={{
+							background: 'var(--colors-gray-2)', 'border-radius': '12px',
+							padding: '24px', width: '380px',
+							'box-shadow': '0 24px 64px -8px rgba(0,0,0,0.4)',
+							border: '1px solid var(--colors-gray-a3)',
+						}}
+						onClick={(e: MouseEvent) => e.stopPropagation()}
+					>
+						<div style={{ 'font-size': '16px', 'font-weight': '600', 'margin-bottom': '4px', color: 'var(--colors-fg-default)' }}>
+							Todo list shared
+						</div>
+						<div style={{ 'font-size': '13px', color: 'var(--colors-fg-muted)', 'margin-bottom': '16px' }}>
+							Share this code with collaborators. It's been copied to your clipboard.
+						</div>
+						<input
+							class={css({
+								width: '100%', bg: 'gray.a2', border: '1px solid', borderColor: 'gray.a4',
+								borderRadius: 'md', px: '3', py: '2.5', fontSize: '13px', color: 'fg.default',
+								fontFamily: 'mono', outline: 'none', mb: '4',
+							})}
+							value={todoListShareCode()}
+							readOnly
+							onClick={(e) => (e.target as HTMLInputElement).select()}
+						/>
+						<div style={{ display: 'flex', 'justify-content': 'flex-end' }}>
+							<button
+								class={css({
+									px: '4', py: '2', borderRadius: 'md', fontSize: '13px', fontWeight: '500',
+									cursor: 'pointer', bg: 'indigo.9', color: 'white',
+									_hover: { bg: 'indigo.10' },
+								})}
+								onClick={() => setTodoListShareCode('')}
+							>
+								Done
+							</button>
+						</div>
+					</div>
+				</div>
+			</Show>
 		</div>
 	)
 }
