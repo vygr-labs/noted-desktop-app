@@ -217,7 +217,7 @@ interface ElectronAPI {
 	// Sync
 	shareNote: (noteId: string) => Promise<string | null>
 	unshareNote: (noteId: string) => Promise<void>
-	joinSharedNote: (shareCode: string) => Promise<string>
+	joinSharedNote: (shareCode: string, opts?: { list_id?: string; title?: string }) => Promise<string>
 	shareList: (listId: string) => Promise<string | null>
 	unshareList: (listId: string) => Promise<void>
 	joinSharedList: (shareCode: string) => Promise<string>

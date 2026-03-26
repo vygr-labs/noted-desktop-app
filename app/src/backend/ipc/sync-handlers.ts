@@ -51,24 +51,31 @@ export function registerSyncHandlers() {
 		).run(noteId)
 	})
 
-	ipcMain.handle('sync:join-note', (_, shareCode: string) => {
+	ipcMain.handle('sync:join-note', (_, shareCode: string, opts?: { list_id?: string; title?: string }) => {
 		const parsed = parseShareCode(shareCode)
 		if (!parsed) return null
 
 		const existing = db.prepare('SELECT id FROM notes WHERE sync_id = ?').get(parsed.syncId) as
 			| { id: string }
 			| undefined
-		if (existing) return existing.id
+		if (existing) {
+			// If a list_id is provided and the note doesn't have one, link it
+			if (opts?.list_id) {
+				db.prepare('UPDATE notes SET list_id = ? WHERE id = ? AND list_id IS NULL').run(opts.list_id, existing.id)
+			}
+			return existing.id
+		}
 
+		const title = opts?.title || 'Shared Note'
 		const id = generateId()
 		db.prepare(
-			`INSERT INTO notes (id, title, note_type, sync_id, sync_secret, is_shared)
-			 VALUES (?, 'Shared Note', 'rich', ?, ?, 1)`
-		).run(id, parsed.syncId, parsed.docSecret)
+			`INSERT INTO notes (id, title, note_type, list_id, sync_id, sync_secret, is_shared)
+			 VALUES (?, ?, 'rich', ?, ?, ?, 1)`
+		).run(id, title, opts?.list_id || null, parsed.syncId, parsed.docSecret)
 
 		db.prepare(
 			'INSERT INTO notes_fts (note_id, title, content_plain) VALUES (?, ?, ?)'
-		).run(id, 'Shared Note', '')
+		).run(id, title, '')
 
 		return id
 	})
