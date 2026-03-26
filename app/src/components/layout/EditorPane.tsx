@@ -272,6 +272,20 @@ const exportMenuItem = css({
 	_hover: { bg: 'gray.a3', color: 'fg.default' },
 })
 
+const syncSkeleton = css({
+	display: 'flex',
+	flexDirection: 'column',
+	gap: '3',
+	mt: '4',
+	animation: 'pulse 1.5s ease-in-out infinite',
+})
+
+const skeletonLine = css({
+	height: '14px',
+	borderRadius: 'sm',
+	bg: 'gray.a3',
+})
+
 const NOTE_EXPORT_FORMATS = [
 	{ key: 'pdf', label: 'PDF Document' },
 	{ key: 'doc', label: 'Word Document' },
@@ -896,6 +910,26 @@ export function EditorPane() {
 										noteId={note().id}
 										readonly={isTrash()}
 									/>
+									<Show
+										when={note().is_shared && !note().content && !note().content_plain}
+									>
+										<div class={syncSkeleton}>
+											<div class={skeletonLine} style={{ width: '90%' }} />
+											<div class={skeletonLine} style={{ width: '75%' }} />
+											<div class={skeletonLine} style={{ width: '85%' }} />
+											<div class={skeletonLine} style={{ width: '40%' }} />
+											<div style={{ height: '8px' }} />
+											<div class={skeletonLine} style={{ width: '95%' }} />
+											<div class={skeletonLine} style={{ width: '70%' }} />
+											<div class={skeletonLine} style={{ width: '80%' }} />
+											<div style={{
+												'font-size': '12px', color: 'var(--colors-fg-subtle)',
+												'text-align': 'center', 'margin-top': '16px',
+											}}>
+												Syncing content...
+											</div>
+										</div>
+									</Show>
 									<Show
 										when={note().note_type === 'rich'}
 										fallback={
