@@ -20,6 +20,7 @@ interface EditorStore {
 	livePreview: () => string | null
 	setLivePreview: (preview: string) => void
 	loadNote: (id: string) => Promise<void>
+	refreshCurrentNote: () => Promise<void>
 	saveNote: (data: {
 		title?: string
 		content?: string | null
@@ -44,6 +45,13 @@ export function EditorStoreProvider(props: ParentProps) {
 		setLivePreview(null)
 		const note = await window.electronAPI.fetchNote(id)
 		if (note) setCurrentNote(note)
+	}
+
+	async function refreshCurrentNote() {
+		const note = currentNote()
+		if (!note) return
+		const fresh = await window.electronAPI.fetchNote(note.id)
+		if (fresh) setCurrentNote(fresh)
 	}
 
 	async function saveNote(data: {
@@ -83,6 +91,7 @@ export function EditorStoreProvider(props: ParentProps) {
 		livePreview,
 		setLivePreview,
 		loadNote,
+		refreshCurrentNote,
 		saveNote,
 	}
 

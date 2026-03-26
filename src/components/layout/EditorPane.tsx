@@ -262,6 +262,8 @@ const exportMenuItem = css({
 	color: 'fg.muted',
 	cursor: 'pointer',
 	transition: 'all 0.1s',
+	whiteSpace: 'nowrap',
+	textAlign: 'left',
 	_hover: { bg: 'gray.a3', color: 'fg.default' },
 })
 
@@ -375,7 +377,8 @@ export function EditorPane() {
 		if (syncId) {
 			setShareCode(syncId)
 			navigator.clipboard.writeText(syncId)
-			appStore.refetchNotes()
+			await editorStore.refreshCurrentNote()
+			setShowShareMenu(true)
 		}
 	}
 
@@ -383,7 +386,7 @@ export function EditorPane() {
 		await window.electronAPI.unshareNote(noteId)
 		setShareCode('')
 		setShowShareMenu(false)
-		appStore.refetchNotes()
+		await editorStore.refreshCurrentNote()
 	}
 
 	async function handleJoin() {
@@ -710,8 +713,8 @@ export function EditorPane() {
 														<button
 															class={exportMenuItem}
 															onClick={() => {
-																handleShare(note().id)
 																setShowShareMenu(false)
+																handleShare(note().id)
 															}}
 														>
 															<LinkIcon class={css({ width: '3.5', height: '3.5', mr: '2' })} />

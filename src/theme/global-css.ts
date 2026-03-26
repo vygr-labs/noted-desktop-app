@@ -22,8 +22,8 @@ export const globalCss = {
       color: 'fg.default',
     },
     '::-webkit-scrollbar': {
-      width: '6px',
-      height: '6px',
+      width: '10px',
+      height: '10px',
     },
     '::-webkit-scrollbar-track': {
       background: 'transparent',

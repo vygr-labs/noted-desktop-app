@@ -91,6 +91,28 @@ function makeTextBlock(type: string, text: string, attrs?: Record<string, unknow
 }
 
 /**
+ * Parse a table cell's text content. Handles checkboxes [ ] / [x] and inline markdown.
+ */
+function parseCellContent(text: string): TipTapNode[] {
+	if (!text) return []
+
+	// Checkbox: [ ] or [x] or [X]
+	const checkMatch = text.match(/^\[([ xX])\]\s*(.*)/)
+	if (checkMatch) {
+		const checked = checkMatch[1].toLowerCase() === 'x'
+		const rest = checkMatch[2]
+		const nodes: TipTapNode[] = [{ type: 'inlineCheckbox', attrs: { checked } }]
+		if (rest) {
+			nodes.push({ type: 'text', text: ' ' })
+			nodes.push(...parseInlineMarkdown(rest))
+		}
+		return nodes
+	}
+
+	return parseInlineMarkdown(text)
+}
+
+/**
  * Check if text contains list-like lines that should be auto-formatted.
  */
 export function hasListPatterns(text: string): boolean {
@@ -150,7 +172,7 @@ export function parseMarkdownTable(lines: string[]): TipTapNode | null {
 				content: [
 					{
 						type: 'paragraph',
-						content: cell ? [{ type: 'text', text: cell }] : undefined,
+						content: cell ? parseCellContent(cell) : undefined,
 					},
 				],
 			})),
@@ -167,7 +189,7 @@ export function parseMarkdownTable(lines: string[]): TipTapNode | null {
 				content: [
 					{
 						type: 'paragraph',
-						content: cell ? [{ type: 'text', text: cell }] : undefined,
+						content: cell ? parseCellContent(cell) : undefined,
 					},
 				],
 			})),

@@ -18,6 +18,7 @@ import { tiptapToPlaintext } from '../../lib/tiptap-to-plaintext'
 import { hasListPatterns, hasTablePattern, hasMarkdownPatterns, parseLinesToNodes, parseMarkdownTable, cleanTipTapContent, alignLeftContent } from '../../lib/text-cleanup'
 import { CodeBlockWithCopy } from './codeblock-with-copy'
 import { DetailsBlock } from './details-block'
+import { InlineCheckbox } from './inline-checkbox'
 import Collaboration from '@tiptap/extension-collaboration'
 import { HocuspocusProvider } from '@hocuspocus/provider'
 import * as Y from 'yjs'
@@ -300,6 +301,7 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 			}),
 			CodeBlockWithCopy,
 			DetailsBlock,
+			InlineCheckbox,
 			TaskList,
 			TaskItem.configure({ nested: true }),
 			Placeholder.configure({ placeholder: 'Start writing...' }),
@@ -328,6 +330,16 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	}
 
 	function createEditorInstance(note: Note) {
+		// Capture current HTML as a placeholder to avoid blank flash
+		let placeholder: HTMLDivElement | null = null
+		if (containerRef && editor) {
+			placeholder = document.createElement('div')
+			placeholder.innerHTML = containerRef.innerHTML
+			placeholder.style.opacity = '0.5'
+			placeholder.style.pointerEvents = 'none'
+			containerRef.appendChild(placeholder)
+		}
+
 		destroyEditor()
 		if (!containerRef) return
 
@@ -369,6 +381,11 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		currentEditor = editor
 		setInTable(editor.isActive('table'))
 		editor.view.dom.spellcheck = !!note.spellcheck
+
+		// Remove the placeholder now that the new editor is ready
+		if (placeholder && containerRef?.contains(placeholder)) {
+			placeholder.remove()
+		}
 
 		// For newly shared notes, push local content to Yjs if the doc is empty
 		if (note.sync_id && ydoc && note.content) {

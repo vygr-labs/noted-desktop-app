@@ -1,4 +1,4 @@
-import { createMemo, Index, Show, createEffect, createSignal, on } from 'solid-js'
+import { createMemo, Index, Show, createEffect, createSignal, on, onMount } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { useAppStore } from '../../stores/app-store'
 import { useEditorStore } from '../../stores/editor-store'
@@ -97,6 +97,12 @@ export function NoteList() {
 		})
 	)
 
+	// Only animate cards on first render, not on refetch
+	const [initialRender, setInitialRender] = createSignal(true)
+	onMount(() => {
+		setTimeout(() => setInitialRender(false), 600)
+	})
+
 	const viewTitle = createMemo(() => {
 		const view = currentView()
 		if (view === 'all') return 'All Notes'
@@ -171,10 +177,10 @@ export function NoteList() {
 							<Index each={pinnedNotes()}>
 								{(note, i) => (
 									<div
-										style={{
+										style={initialRender() ? {
 											'animation-delay': `${i * 30}ms`,
 											'animation-fill-mode': 'both',
-										}}
+										} : {}}
 									>
 										<NoteCard
 											note={note()}
@@ -192,10 +198,10 @@ export function NoteList() {
 						<Index each={unpinnedNotes()}>
 							{(note, i) => (
 								<div
-									style={{
+									style={initialRender() ? {
 										'animation-delay': `${(i + pinnedNotes().length) * 30}ms`,
 										'animation-fill-mode': 'both',
-									}}
+									} : {}}
 								>
 									<NoteCard
 										note={note()}
