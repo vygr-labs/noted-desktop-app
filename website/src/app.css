@@ -1,0 +1,47 @@
+@layer reset, base, tokens, recipes, utilities;
+
+:root {
+  --nav-bg: rgba(253, 253, 252, 0.85);
+}
+
+.dark {
+  --nav-bg: rgba(17, 17, 16, 0.85);
+}
+
+.gradient-text {
+  background-image: linear-gradient(135deg, #ff690a 0%, #ce2100 50%, #7a0d02 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.dark .gradient-text {
+  background-image: linear-gradient(135deg, #ff8533 0%, #ff690a 50%, #ce2100 100%);
+}
+
+@keyframes fade-in-up {
+  from {
+    opacity: 0;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fade-in-up 0.7s ease-out both;
+}
+
+.animate-fade-in-up-delay-1 {
+  animation: fade-in-up 0.7s ease-out 0.1s both;
+}
+
+.animate-fade-in-up-delay-2 {
+  animation: fade-in-up 0.7s ease-out 0.2s both;
+}
+
+.animate-fade-in-up-delay-3 {
+  animation: fade-in-up 0.7s ease-out 0.3s both;
+}
