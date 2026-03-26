@@ -2,11 +2,13 @@ import { ipcMain, BrowserWindow } from 'electron'
 import {
 	fetchAllTodos,
 	fetchTodosByNote,
+	fetchTodosByList,
 	createTodo,
 	updateTodo,
 	deleteTodo,
 	reorderTodos,
 	rolloverTodos,
+	syncTodosFromRemote,
 } from '../database/todo-operations.js'
 
 function broadcastTodosChanged(sender: Electron.WebContents) {
@@ -45,5 +47,12 @@ export function registerTodosHandlers() {
 		const result = rolloverTodos(fromDate, toDate)
 		broadcastTodosChanged(event.sender)
 		return result
+	})
+	ipcMain.handle('todos:fetch-by-list', (_, listId: string) =>
+		fetchTodosByList(listId)
+	)
+	ipcMain.handle('todos:sync-from-remote', (event, listId: string, remoteTodos) => {
+		syncTodosFromRemote(listId, remoteTodos)
+		broadcastTodosChanged(event.sender)
 	})
 }
