@@ -169,7 +169,7 @@ const httpServer = createServer((_req, res) => {
 })
 
 httpServer.on('upgrade', (req, socket, head) => {
-	hocuspocus.handleConnection(req, socket, head)
+	hocuspocus.handleConnection(req, socket as any, head)
 })
 
 httpServer.listen(config.port, () => {
