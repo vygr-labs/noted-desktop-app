@@ -41,6 +41,10 @@ interface SyncStore {
 	saveAllStates: () => Promise<void>
 	/** Pre-load local Yjs state for a doc before connecting */
 	preloadState: (syncId: string) => Promise<Uint8Array | null>
+	/** Signal to all peers that this doc is unshared, then destroy */
+	signalUnshare: (syncId: string) => void
+	/** Register a callback for when a remote peer signals unshare */
+	onUnshare: (callback: (syncId: string) => void) => void
 }
 
 const SyncStoreContext = createContext<SyncStore>()
@@ -58,8 +62,28 @@ export function SyncStoreProvider(props: ParentProps) {
 	const docs = new Map<string, ManagedDoc>()
 	const idleTimers = new Map<string, ReturnType<typeof setTimeout>>()
 	const [peersVersion, setPeersVersion] = createSignal(0)
-	let localUser = { name: 'Anonymous', color: PEER_COLORS[Math.floor(Math.random() * PEER_COLORS.length)] }
+	let localUser = { name: '', color: PEER_COLORS[Math.floor(Math.random() * PEER_COLORS.length)] }
 	let saveTimer: ReturnType<typeof setInterval> | null = null
+	let unshareCallback: ((syncId: string) => void) | null = null
+
+	// Load or generate a persistent device name
+	onMount(async () => {
+		let savedName = await window.electronAPI.getSetting('syncUserName')
+		if (!savedName) {
+			// Generate a name like "User-A3F2"
+			const id = Math.random().toString(36).slice(2, 6).toUpperCase()
+			savedName = `User-${id}`
+			await window.electronAPI.setSetting('syncUserName', savedName)
+		}
+		localUser.name = savedName
+		// Update any already-connected awareness states
+		for (const [, managed] of docs) {
+			managed.awareness.setLocalStateField('user', {
+				name: localUser.name,
+				color: localUser.color,
+			})
+		}
+	})
 
 	function buildAuthToken(syncSecret: string): string {
 		const globalToken = settingsStore.syncToken()
@@ -100,6 +124,15 @@ export function SyncStoreProvider(props: ParentProps) {
 		// Listen for awareness changes to update peers
 		awareness.on('change', () => {
 			setPeersVersion(v => v + 1)
+		})
+
+		// Watch for remote unshare signal via Yjs shared map
+		const meta = ydoc.getMap('_meta')
+		meta.observe((event) => {
+			if (meta.get('unshared') === true && unshareCallback) {
+				unshareCallback(syncId)
+				destroyDoc(syncId)
+			}
 		})
 
 		const managed: ManagedDoc = { ydoc, provider, awareness, lastAccess: Date.now() }
@@ -197,6 +230,23 @@ export function SyncStoreProvider(props: ParentProps) {
 		return window.electronAPI.loadYjsState(syncId)
 	}
 
+	function signalUnshare(syncId: string) {
+		const managed = docs.get(syncId)
+		if (managed) {
+			// Write unshare flag — this syncs to all connected peers via Yjs
+			const meta = managed.ydoc.getMap('_meta')
+			meta.set('unshared', true)
+			// Give a moment for the signal to propagate before destroying
+			setTimeout(() => destroyDoc(syncId), 500)
+		} else {
+			destroyDoc(syncId)
+		}
+	}
+
+	function onUnshare(callback: (syncId: string) => void) {
+		unshareCallback = callback
+	}
+
 	// Periodic save of all Yjs states for offline resilience
 	onMount(() => {
 		saveTimer = setInterval(() => {
@@ -219,6 +269,8 @@ export function SyncStoreProvider(props: ParentProps) {
 		releaseDoc,
 		destroyDoc,
 		getPeers,
+		signalUnshare,
+		onUnshare,
 		peersVersion,
 		setLocalUser,
 		saveAllStates,
