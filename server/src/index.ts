@@ -8,8 +8,7 @@
 //   First connection with a valid secret becomes the owner.
 //   Subsequent connections must provide a registered secret.
 
-import { Hocuspocus } from '@hocuspocus/server'
-import { createServer } from 'node:http'
+import { Server as HocuspocusServer } from '@hocuspocus/server'
 import crypto from 'node:crypto'
 import Database from 'better-sqlite3'
 import * as Y from 'yjs'
@@ -87,7 +86,8 @@ function hashToken(token: string): string {
 
 // ─── Server ──────────────────────────────────────────────
 
-const hocuspocus = new Hocuspocus({
+const server = new HocuspocusServer({
+	port: config.port,
 	quiet: config.quiet,
 
 	async onAuthenticate({ token, documentName }) {
@@ -162,17 +162,7 @@ const hocuspocus = new Hocuspocus({
 	},
 })
 
-// Custom HTTP server — returns 404 for non-WebSocket requests (hides server identity)
-const httpServer = createServer((_req, res) => {
-	res.writeHead(404)
-	res.end()
-})
-
-httpServer.on('upgrade', (req, socket, head) => {
-	hocuspocus.handleConnection(req, socket as any, head)
-})
-
-httpServer.listen(config.port, () => {
+server.listen(config.port, () => {
 	console.log(`Noted sync server running on port ${config.port}`)
 	console.log(`WebSocket: ws://localhost:${config.port}`)
 	console.log(`Auth: ${config.authSecret ? 'global secret + per-document tokens' : 'per-document tokens only'}`)
