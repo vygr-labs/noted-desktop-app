@@ -234,6 +234,27 @@ function runMigrations() {
 		setSchemaVersion(7)
 	}
 
+	if (currentVersion < 8) {
+		const listCols = db.prepare("PRAGMA table_info(lists)").all() as { name: string }[]
+		if (!listCols.some(c => c.name === 'sync_id')) {
+			db.exec(`ALTER TABLE lists ADD COLUMN sync_id TEXT;`)
+		}
+		if (!listCols.some(c => c.name === 'sync_secret')) {
+			db.exec(`ALTER TABLE lists ADD COLUMN sync_secret TEXT;`)
+		}
+		if (!listCols.some(c => c.name === 'is_shared')) {
+			db.exec(`ALTER TABLE lists ADD COLUMN is_shared INTEGER DEFAULT 0;`)
+		}
+		db.exec(`
+			CREATE TABLE IF NOT EXISTS yjs_state (
+				doc_name TEXT PRIMARY KEY,
+				state BLOB NOT NULL,
+				updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			);
+		`)
+		setSchemaVersion(8)
+	}
+
 }
 
 runMigrations()

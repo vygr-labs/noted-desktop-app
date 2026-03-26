@@ -2,6 +2,7 @@ import { Show } from 'solid-js'
 import { AppStoreProvider, useAppStore } from '../stores/app-store'
 import { EditorStoreProvider } from '../stores/editor-store'
 import { SettingsStoreProvider } from '../stores/settings-store'
+import { SyncStoreProvider } from '../stores/sync-store'
 import { AppShell } from './layout/AppShell'
 import { SettingsDialog } from './settings/SettingsDialog'
 import { CommandPalette } from './search/CommandPalette'
@@ -25,7 +26,9 @@ export default function App() {
 		<AppStoreProvider>
 			<EditorStoreProvider>
 				<SettingsStoreProvider>
-					<AppInner />
+					<SyncStoreProvider>
+						<AppInner />
+					</SyncStoreProvider>
 				</SettingsStoreProvider>
 			</EditorStoreProvider>
 		</AppStoreProvider>

@@ -27,6 +27,31 @@ const popoutWindows = new Map<string, BrowserWindow>()
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const store = new ElectronStore()
 
+// Register deep link protocol
+if (process.defaultApp) {
+	if (process.argv.length >= 2) {
+		app.setAsDefaultProtocolClient('noted', process.execPath, [path.resolve(process.argv[1])])
+	}
+} else {
+	app.setAsDefaultProtocolClient('noted')
+}
+
+// Handle deep links on Windows (single instance lock)
+const gotTheLock = app.requestSingleInstanceLock()
+if (!gotTheLock) {
+	app.quit()
+}
+
+app.on('second-instance', (_event, commandLine) => {
+	// Windows: deep link URL is in the command line args
+	const deepLink = commandLine.find(arg => arg.startsWith('noted://'))
+	if (deepLink && appWindow) {
+		appWindow.webContents.send('deep-link', deepLink)
+		if (appWindow.isMinimized()) appWindow.restore()
+		appWindow.focus()
+	}
+})
+
 class AppUpdater {
 	constructor() {
 		log.transports.file.level = 'info'
@@ -221,6 +246,15 @@ app.on('ready', () => {
 	registerAppHandlers()
 	registerGlobalShortcuts()
 	spawnAppWindow()
+
+	// Handle deep links on macOS
+	app.on('open-url', (_event, url) => {
+		if (appWindow) {
+			appWindow.webContents.send('deep-link', url)
+			if (appWindow.isMinimized()) appWindow.restore()
+			appWindow.focus()
+		}
+	})
 })
 
 app.on('will-quit', () => {

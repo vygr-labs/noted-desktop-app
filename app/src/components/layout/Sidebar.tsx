@@ -16,6 +16,8 @@ import {
 	PanelLeftOpenIcon,
 	SunIcon,
 	DownloadIcon,
+	Share2Icon,
+	UsersIcon,
 } from 'lucide-solid'
 
 // ─── Styles ───────────────────────────────────────────────
@@ -385,6 +387,8 @@ export function Sidebar() {
 	const [showInlineInput, setShowInlineInput] = createSignal(false)
 	const [newListName, setNewListName] = createSignal('')
 	const [showBulkExport, setShowBulkExport] = createSignal(false)
+	const [showJoinDialog, setShowJoinDialog] = createSignal(false)
+	const [joinCode, setJoinCode] = createSignal('')
 
 	onMount(() => {
 		function handleClickOutside(e: MouseEvent) {
@@ -440,6 +444,29 @@ export function Sidebar() {
 		}
 	}
 
+	async function handleShareList(e: Event, list: NoteList) {
+		e.stopPropagation()
+		if (list.is_shared && list.sync_id && list.sync_secret) {
+			// Already shared — copy the share code
+			const code = `${list.sync_id}.${list.sync_secret}`
+			navigator.clipboard.writeText(code)
+			return
+		}
+		const code = await window.electronAPI.shareList(list.id)
+		if (code) {
+			navigator.clipboard.writeText(code)
+			store.refetchLists()
+			store.refetchNotes()
+		}
+	}
+
+	async function handleUnshareList(e: Event, listId: string) {
+		e.stopPropagation()
+		await window.electronAPI.unshareList(listId)
+		store.refetchLists()
+		store.refetchNotes()
+	}
+
 	async function handleNewNote() {
 		const view = store.currentView()
 		const listId = typeof view === 'object' ? view.listId : null
@@ -468,6 +495,27 @@ export function Sidebar() {
 		dismissInlineInput()
 		store.setCurrentView({ type: 'list', listId: list.id })
 		store.setSelectedNoteId(null)
+	}
+
+	async function handleJoinFromSidebar() {
+		const code = joinCode().trim()
+		if (!code) return
+		// Try joining as a note first, then as a list
+		const noteId = await window.electronAPI.joinSharedNote(code)
+		if (noteId) {
+			store.refetchNotes()
+			store.setSelectedNoteId(noteId)
+			setJoinCode('')
+			setShowJoinDialog(false)
+			return
+		}
+		const listId = await window.electronAPI.joinSharedList(code)
+		if (listId) {
+			store.refetchLists()
+			store.setCurrentView({ type: 'list', listId })
+			setJoinCode('')
+			setShowJoinDialog(false)
+		}
 	}
 
 	function handleListInputKeyDown(e: KeyboardEvent) {
@@ -592,6 +640,13 @@ export function Sidebar() {
 					</div>
 					<div
 						class={collapsedItem}
+						onClick={() => setShowJoinDialog(true)}
+						title="Join shared note or list"
+					>
+						<UsersIcon class={iconStyle} />
+					</div>
+					<div
+						class={collapsedItem}
 						onClick={() => settingsStore.setShowSettingsDialog(true)}
 						title="Settings"
 					>
@@ -713,14 +768,36 @@ export function Sidebar() {
 									<div class={`nav-indicator ${navIndicator}`} />
 									<FolderIcon class={iconStyle} />
 									<span class={listName}>{list.name}</span>
+									<Show when={list.is_shared}>
+										<Share2Icon class={css({ width: '3', height: '3', color: 'indigo.9', flexShrink: 0 })} />
+									</Show>
 								</div>
+								<Show when={list.is_shared}>
 								<div
 									class={`list-actions ${listActions}`}
-									onClick={(e) => handleDeleteList(e, list.id)}
-									title="Delete list"
+									style={{ opacity: 0.8 }}
+									onClick={(e) => handleUnshareList(e, list.id)}
+									title="Stop sharing list"
 								>
-									<Trash2Icon class={css({ width: '3', height: '3' })} />
+									<Share2Icon class={css({ width: '3', height: '3', color: 'red.9' })} />
 								</div>
+							</Show>
+							<Show when={!list.is_shared}>
+								<div
+									class={`list-actions ${listActions}`}
+									onClick={(e) => handleShareList(e, list)}
+									title="Share list & copy code"
+								>
+									<Share2Icon class={css({ width: '3', height: '3' })} />
+								</div>
+							</Show>
+							<div
+								class={`list-actions ${listActions}`}
+								onClick={(e) => handleDeleteList(e, list.id)}
+								title="Delete list"
+							>
+								<Trash2Icon class={css({ width: '3', height: '3' })} />
+							</div>
 							</div>
 						)}
 					</For>
@@ -756,6 +833,13 @@ export function Sidebar() {
 					<div class={bottomToolbar}>
 						<button class={toolbarBtn} onClick={handleNewNote} title="New Note">
 							<PlusIcon class={smallIcon} />
+						</button>
+						<button
+							class={toolbarBtn}
+							onClick={() => setShowJoinDialog(true)}
+							title="Join shared note or list"
+						>
+							<UsersIcon class={smallIcon} />
 						</button>
 						<button
 							class={toolbarBtn}
@@ -808,6 +892,74 @@ export function Sidebar() {
 					</div>
 				</div>
 			</div>
+
+			{/* Join shared note/list dialog */}
+			<Show when={showJoinDialog()}>
+				<div
+					style={{
+						position: 'fixed', inset: '0', background: 'rgba(0,0,0,0.5)',
+						display: 'flex', 'align-items': 'center', 'justify-content': 'center',
+						'z-index': '50',
+					}}
+					onClick={() => setShowJoinDialog(false)}
+				>
+					<div
+						style={{
+							background: 'var(--colors-gray-2)', 'border-radius': '12px',
+							padding: '24px', width: '380px',
+							'box-shadow': '0 24px 64px -8px rgba(0,0,0,0.4)',
+							border: '1px solid var(--colors-gray-a3)',
+						}}
+						onClick={(e: MouseEvent) => e.stopPropagation()}
+					>
+						<div style={{ 'font-size': '16px', 'font-weight': '600', 'margin-bottom': '4px', color: 'var(--colors-fg-default)' }}>
+							Join shared note or list
+						</div>
+						<div style={{ 'font-size': '13px', color: 'var(--colors-fg-muted)', 'margin-bottom': '16px' }}>
+							Enter a share code to start collaborating
+						</div>
+						<input
+							class={inlineInputField}
+							style={{
+								width: '100%', background: 'var(--colors-gray-a2)',
+								border: '1px solid var(--colors-gray-a4)',
+								'border-radius': '8px', padding: '10px 12px',
+								'font-family': 'monospace', 'margin-bottom': '16px',
+							}}
+							value={joinCode()}
+							onInput={(e) => setJoinCode(e.currentTarget.value)}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter') handleJoinFromSidebar()
+								if (e.key === 'Escape') setShowJoinDialog(false)
+							}}
+							placeholder="Paste share code..."
+							ref={(el) => requestAnimationFrame(() => el.focus())}
+						/>
+						<div style={{ display: 'flex', gap: '8px', 'justify-content': 'flex-end' }}>
+							<button
+								class={css({
+									px: '4', py: '2', borderRadius: 'md', fontSize: '13px',
+									cursor: 'pointer', color: 'fg.muted',
+									_hover: { bg: 'gray.a3' },
+								})}
+								onClick={() => setShowJoinDialog(false)}
+							>
+								Cancel
+							</button>
+							<button
+								class={css({
+									px: '4', py: '2', borderRadius: 'md', fontSize: '13px', fontWeight: '500',
+									cursor: 'pointer', bg: 'indigo.9', color: 'white',
+									_hover: { bg: 'indigo.10' },
+								})}
+								onClick={handleJoinFromSidebar}
+							>
+								Join
+							</button>
+						</div>
+					</div>
+				</div>
+			</Show>
 		</Show>
 	)
 }

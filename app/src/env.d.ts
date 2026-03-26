@@ -28,6 +28,9 @@ interface NoteList {
 	icon: string
 	color: string
 	sort_order: number
+	sync_id: string | null
+	sync_secret: string | null
+	is_shared: number
 	created_at: string
 	updated_at: string
 }
@@ -63,6 +66,12 @@ interface TodoListItem {
 	color: string
 	sort_order: number
 	created_at: string
+}
+
+interface SyncPeer {
+	clientId: number
+	name: string
+	color: string
 }
 
 interface SearchResult {
@@ -192,7 +201,15 @@ interface ElectronAPI {
 	// Sync
 	shareNote: (noteId: string) => Promise<string | null>
 	unshareNote: (noteId: string) => Promise<void>
-	joinSharedNote: (syncId: string) => Promise<string>
+	joinSharedNote: (shareCode: string) => Promise<string>
+	shareList: (listId: string) => Promise<string | null>
+	unshareList: (listId: string) => Promise<void>
+	joinSharedList: (shareCode: string) => Promise<string>
+	getSharedNotes: () => Promise<Note[]>
+	getSharedLists: () => Promise<NoteList[]>
+	saveYjsState: (docName: string, state: Uint8Array) => Promise<void>
+	loadYjsState: (docName: string) => Promise<Uint8Array | null>
+	onDeepLink: (callback: (url: string) => void) => void
 
 	// Export
 	exportNote: (noteId: string, format: string) => Promise<boolean>

@@ -12,7 +12,7 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { Slice } from '@tiptap/pm/model'
 import { useEditorStore } from '../../stores/editor-store'
-import { useSettingsStore } from '../../stores/settings-store'
+import { useSyncStore } from '../../stores/sync-store'
 import { debounce } from '../../lib/debounce'
 import { tiptapToPlaintext } from '../../lib/tiptap-to-plaintext'
 import { hasListPatterns, hasTablePattern, hasMarkdownPatterns, parseLinesToNodes, parseMarkdownTable, cleanTipTapContent, alignLeftContent } from '../../lib/text-cleanup'
@@ -20,7 +20,6 @@ import { CodeBlockWithCopy } from './codeblock-with-copy'
 import { DetailsBlock } from './details-block'
 import { InlineCheckbox } from './inline-checkbox'
 import Collaboration from '@tiptap/extension-collaboration'
-import { HocuspocusProvider } from '@hocuspocus/provider'
 import * as Y from 'yjs'
 
 const editorWrap = css({
@@ -276,12 +275,11 @@ const cursorPositions = new Map<string, { from: number; to: number }>()
 export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	let containerRef: HTMLDivElement | undefined
 	let editor: Editor | null = null
-	let provider: HocuspocusProvider | null = null
-	let ydoc: Y.Doc | null = null
 	const editorStore = useEditorStore()
-	const settingsStore = useSettingsStore()
+	const syncStore = useSyncStore()
 	let isUpdatingContent = false
 	let currentSyncId: string | null = null
+	let activeSyncId: string | null = null // Track which sync doc we're using
 
 	const debouncedSave = debounce(async (jsonContent: string) => {
 		const plainText = tiptapToPlaintext(jsonContent)
@@ -291,13 +289,12 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		})
 	}, 500)
 
-	function getBaseExtensions() {
+	function getBaseExtensions(isCollab: boolean) {
 		return [
 			StarterKit.configure({
 				heading: { levels: [1, 2, 3] },
 				codeBlock: false,
-				// Disable history in collab mode — Yjs handles undo/redo
-				...(currentSyncId ? { history: false } : {}),
+				...(isCollab ? { history: false } : {}),
 			}),
 			CodeBlockWithCopy,
 			DetailsBlock,
@@ -323,8 +320,11 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	}
 
 	function destroyEditor() {
-		if (provider) { provider.destroy(); provider = null }
-		if (ydoc) { ydoc.destroy(); ydoc = null }
+		// Release the sync doc (starts idle timer, doesn't destroy immediately)
+		if (activeSyncId) {
+			syncStore.releaseDoc(activeSyncId)
+			activeSyncId = null
+		}
 		if (editor) { editor.destroy(); editor = null }
 		currentEditor = null
 	}
@@ -344,23 +344,16 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		if (!containerRef) return
 
 		currentSyncId = note.sync_id || null
-		const extensions = getBaseExtensions()
+		const localContent = note.content
+		let hasSynced = !note.sync_id
+		const extensions = getBaseExtensions(!!note.sync_id)
 
-		// If shared, set up Yjs collaboration
-		if (note.sync_id) {
-			ydoc = new Y.Doc()
-
-			// Build auth token: "globalSecret:docSecret" or just "docSecret"
-			const globalToken = settingsStore.syncToken()
-			const docSecret = note.sync_secret || 'anonymous'
-			const authToken = globalToken ? `${globalToken}:${docSecret}` : docSecret
-
-			provider = new HocuspocusProvider({
-				url: settingsStore.syncServerUrl(),
-				name: note.sync_id,
-				document: ydoc,
-				token: authToken,
-			})
+		// If shared, get Yjs doc from sync store (persistent connection pool)
+		let ydoc: Y.Doc | null = null
+		if (note.sync_id && note.sync_secret) {
+			const managed = syncStore.getDoc(note.sync_id, note.sync_secret)
+			ydoc = managed.ydoc
+			activeSyncId = note.sync_id
 			extensions.push(
 				Collaboration.configure({ document: ydoc })
 			)
@@ -369,12 +362,10 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		editor = new Editor({
 			element: containerRef,
 			extensions,
-			// For shared notes, content comes from Yjs (server)
-			// For local notes, content comes from SQLite
 			content: note.sync_id ? undefined : parseContent(note.content),
 			editable: !props.readonly,
 			onUpdate: ({ editor: ed }) => {
-				if (isUpdatingContent) return
+				if (isUpdatingContent || !hasSynced) return
 				editorStore.setLivePreview(ed.getText().slice(0, 160))
 				const json = JSON.stringify(ed.getJSON())
 				debouncedSave(json)
@@ -388,22 +379,31 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		setInTable(editor.isActive('table'))
 		editor.view.dom.spellcheck = !!note.spellcheck
 
-		// Remove the placeholder now that the new editor is ready
 		if (placeholder && containerRef?.contains(placeholder)) {
 			placeholder.remove()
 		}
 
-		// For newly shared notes, push local content to Yjs if the doc is empty
-		if (note.sync_id && ydoc && note.content) {
-			provider?.on('synced', () => {
-				if (editor && ydoc) {
-					const fragment = ydoc.getXmlFragment('default')
-					if (fragment.length === 0 && note.content) {
-						// Document is empty on server — initialize with local content
-						editor.commands.setContent(parseContent(note.content))
-					}
-				}
-			})
+		// For shared notes: initialize content from local SQLite if editor is empty.
+		// This runs synchronously — before any WebSocket events process —
+		// so there's no race condition with the server sync.
+		if (note.sync_id && localContent && editor && !editor.getText().trim()) {
+			isUpdatingContent = true
+			editor.commands.setContent(parseContent(localContent))
+			isUpdatingContent = false
+		}
+
+		// Mark synced once the provider confirms, or after timeout
+		if (note.sync_id && note.sync_secret) {
+			const managed = syncStore.getDoc(note.sync_id, note.sync_secret)
+			if (managed.provider.isSynced) {
+				hasSynced = true
+			} else {
+				const syncTimeout = setTimeout(() => { hasSynced = true }, 5000)
+				managed.provider.on('synced', () => {
+					hasSynced = true
+					clearTimeout(syncTimeout)
+				})
+			}
 		}
 
 		// Prevent task checkboxes from stealing editor focus/cursor
@@ -441,7 +441,6 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		on(
 			() => props.note.id,
 			(newId) => {
-				// Save cursor position for the previous note
 				if (previousNoteId && editor) {
 					const { from, to } = editor.state.selection
 					cursorPositions.set(previousNoteId, { from, to })
@@ -450,12 +449,10 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				const note = props.note
 				const newSyncId = note.sync_id || null
 
-				// If collaboration mode changed, recreate the editor
 				if (newSyncId !== currentSyncId) {
 					debouncedSave.cancel()
 					createEditorInstance(note)
 				} else if (editor) {
-					// Same mode — just swap content
 					debouncedSave.cancel()
 					if (!note.sync_id) {
 						isUpdatingContent = true
@@ -467,7 +464,6 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					}
 				}
 
-				// Restore cursor position for local notes
 				if (!note.sync_id && !editorStore.isNewNote()) {
 					const saved = cursorPositions.get(newId)
 					requestAnimationFrame(() => {
@@ -497,7 +493,7 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 			() => props.note.sync_id,
 			(newSyncId) => {
 				if ((newSyncId || null) !== currentSyncId) {
-					debouncedSave.cancel()
+					debouncedSave.flush()
 					createEditorInstance(props.note)
 				}
 			}

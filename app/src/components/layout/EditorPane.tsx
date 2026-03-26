@@ -2,6 +2,8 @@ import { Show, For, createSignal, createEffect, on, onMount, onCleanup } from 's
 import { css } from '../../../styled-system/css'
 import { useEditorStore } from '../../stores/editor-store'
 import { useAppStore } from '../../stores/app-store'
+import { useSyncStore } from '../../stores/sync-store'
+import QRCode from 'qrcode'
 import { NoteHeader } from '../editor/NoteHeader'
 import { TipTapEditor, getEditorInstance, searchInNote, clearNoteSearch, scrollToSearchMatch, replaceCurrentMatch, replaceAllMatches } from '../editor/TipTapEditor'
 import { PlainTextEditor } from '../editor/PlainTextEditor'
@@ -313,6 +315,9 @@ export function EditorPane() {
 	const [joinCode, setJoinCode] = createSignal('')
 	const [showJoinDialog, setShowJoinDialog] = createSignal(false)
 
+	const syncStore = useSyncStore()
+	const [qrDataUrl, setQrDataUrl] = createSignal('')
+
 	// Session-based unlock tracking (unlocked note IDs persist until app restart)
 	const [unlockedIds, setUnlockedIds] = createSignal<Set<string>>(new Set())
 	const isNoteLocked = (note: Note) =>
@@ -417,11 +422,26 @@ export function EditorPane() {
 		setCurrentMatch(0)
 	}
 
+	async function generateQrCode(code: string) {
+		try {
+			const url = `noted://join/${code}`
+			const dataUrl = await QRCode.toDataURL(url, {
+				width: 160,
+				margin: 1,
+				color: { dark: '#1a1a2e', light: '#ffffff' },
+			})
+			setQrDataUrl(dataUrl)
+		} catch {
+			setQrDataUrl('')
+		}
+	}
+
 	async function handleShare(noteId: string) {
 		const syncId = await window.electronAPI.shareNote(noteId)
 		if (syncId) {
 			setShareCode(syncId)
 			navigator.clipboard.writeText(syncId)
+			generateQrCode(syncId)
 			await editorStore.refreshCurrentNote()
 			setShowShareMenu(true)
 		}
@@ -636,8 +656,15 @@ export function EditorPane() {
 									<button
 										class={controlBtn}
 										onClick={() => {
-											if ((note().is_shared && note().sync_id) || shareCode()) {
-												setShareCode(note().sync_id || shareCode())
+											const existingCode = shareCode()
+											if ((note().is_shared && note().sync_id) || existingCode) {
+												if (!existingCode && note().sync_id && note().sync_secret) {
+													const code = `${note().sync_id}.${note().sync_secret}`
+													setShareCode(code)
+													generateQrCode(code)
+												} else if (existingCode) {
+													generateQrCode(existingCode)
+												}
 											}
 											setShowShareMenu(!showShareMenu())
 										}}
@@ -697,6 +724,42 @@ export function EditorPane() {
 														<CopyIcon class={css({ width: '3', height: '3' })} />
 													</button>
 												</div>
+												<Show when={qrDataUrl()}>
+													<div style={{ padding: '4px 12px 8px', display: 'flex', 'justify-content': 'center' }}>
+														<img src={qrDataUrl()} alt="QR Code" style={{ width: '120px', height: '120px', 'border-radius': '8px' }} />
+													</div>
+												</Show>
+												{(() => {
+													const syncId = note().sync_id
+													if (!syncId) return null
+													// Read peersVersion to trigger reactivity
+													syncStore.peersVersion()
+													const peers = syncStore.getPeers(syncId)
+													if (peers.length === 0) return null
+													return (
+														<div style={{ padding: '4px 12px 8px', 'font-size': '11px', color: 'var(--colors-fg-muted)' }}>
+															<div style={{ display: 'flex', 'align-items': 'center', gap: '4px', 'flex-wrap': 'wrap' }}>
+																<UsersIcon class={css({ width: '3', height: '3' })} />
+																<span>{peers.length} collaborator{peers.length > 1 ? 's' : ''} online</span>
+															</div>
+															<div style={{ display: 'flex', gap: '3px', 'margin-top': '4px' }}>
+																{peers.map(p => (
+																	<div
+																		title={p.name}
+																		style={{
+																			width: '20px', height: '20px', 'border-radius': '50%',
+																			background: p.color, display: 'flex', 'align-items': 'center',
+																			'justify-content': 'center', 'font-size': '10px', color: 'white',
+																			'font-weight': '600',
+																		}}
+																	>
+																		{p.name.charAt(0).toUpperCase()}
+																	</div>
+																))}
+															</div>
+														</div>
+													)
+												})()}
 												<button
 													class={exportMenuItem}
 													style={{ color: 'var(--colors-red-11)' }}
