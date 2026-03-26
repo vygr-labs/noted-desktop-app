@@ -13,6 +13,7 @@ export interface Note {
 	is_trashed: number
 	spellcheck: number
 	sync_id: string | null
+	sync_secret: string | null
 	is_shared: number
 	is_locked: number
 	created_at: string

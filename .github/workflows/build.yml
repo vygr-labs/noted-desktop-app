@@ -1,4 +1,4 @@
-name: Build & Package
+name: Build & Release
 
 on:
   workflow_dispatch:
@@ -6,13 +6,16 @@ on:
       platform:
         description: 'Target platform'
         required: true
-        default: 'windows'
+        default: 'all'
         type: choice
         options:
           - windows
           - macos
           - linux
           - all
+
+permissions:
+  contents: write
 
 jobs:
   build-windows:
@@ -30,15 +33,22 @@ jobs:
           corepack enable
           yarn install --immutable
 
-      - name: Build
+      - name: Build CLI
+        run: yarn cli:build
+
+      - name: Build & package
         run: yarn run build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: noted-windows
-          path: dist/noted-win-*.exe
-          if-no-files-found: error
+          path: |
+            release/*.exe
+            release/*.yml
+          if-no-files-found: warn
 
   build-macos:
     if: ${{ inputs.platform == 'macos' || inputs.platform == 'all' }}
@@ -55,15 +65,23 @@ jobs:
           corepack enable
           yarn install --immutable
 
-      - name: Build
+      - name: Build CLI
+        run: yarn cli:build
+
+      - name: Build & package
         run: yarn run build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          CSC_IDENTITY_AUTO_DISCOVERY: false
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: noted-macos
-          path: dist/*.dmg
-          if-no-files-found: error
+          path: |
+            release/*.dmg
+            release/*.yml
+          if-no-files-found: warn
 
   build-linux:
     if: ${{ inputs.platform == 'linux' || inputs.platform == 'all' }}
@@ -80,12 +98,20 @@ jobs:
           corepack enable
           yarn install --immutable
 
-      - name: Build
+      - name: Build CLI
+        run: yarn cli:build
+
+      - name: Build & package
         run: yarn run build
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
           name: noted-linux
-          path: dist/*.AppImage
-          if-no-files-found: error
+          path: |
+            release/*.AppImage
+            release/*.yml
+          if-no-files-found: warn
+

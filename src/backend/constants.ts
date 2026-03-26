@@ -27,4 +27,38 @@ function createAppPaths(paths: string[]) {
 
 createAppPaths([DB_PATH])
 
-export { __dirname, RESOURCES_PATH, DB_PATH }
+// ─── App config (editable defaults) ──────────────────────
+
+interface AppConfig {
+	syncServerUrl: string
+	syncAuthToken: string
+}
+
+function loadAppConfig(): AppConfig {
+	const defaults: AppConfig = {
+		syncServerUrl: 'wss://noted-sync.fly.dev',
+		syncAuthToken: '',
+	}
+
+	try {
+		// In production: config is in resources; in dev: project root
+		const paths = [
+			path.join(process.resourcesPath || '', 'app.config.json'),
+			path.join(__dirname, '../../app.config.json'),
+		]
+		for (const p of paths) {
+			if (fs.existsSync(p)) {
+				const data = JSON.parse(fs.readFileSync(p, 'utf-8'))
+				return { ...defaults, ...data }
+			}
+		}
+	} catch {
+		// Fall back to defaults
+	}
+
+	return defaults
+}
+
+const APP_CONFIG = loadAppConfig()
+
+export { __dirname, RESOURCES_PATH, DB_PATH, APP_CONFIG }

@@ -100,6 +100,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	getSetting: (key: string) => ipcRenderer.invoke('settings:get', key),
 	setSetting: (key: string, value: string) =>
 		ipcRenderer.invoke('settings:set', key, value),
+	getAppConfig: () => ipcRenderer.invoke('settings:get-app-config'),
 
 	// Daily notes
 	getOrCreateDailyNote: (date: string) =>

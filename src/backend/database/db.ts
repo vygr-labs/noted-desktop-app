@@ -226,6 +226,14 @@ function runMigrations() {
 		setSchemaVersion(6)
 	}
 
+	if (currentVersion < 7) {
+		const cols = db.prepare("PRAGMA table_info(notes)").all() as { name: string }[]
+		if (!cols.some(c => c.name === 'sync_secret')) {
+			db.exec(`ALTER TABLE notes ADD COLUMN sync_secret TEXT;`)
+		}
+		setSchemaVersion(7)
+	}
+
 }
 
 runMigrations()

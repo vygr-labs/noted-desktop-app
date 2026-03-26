@@ -1,0 +1,6 @@
+{
+	"port": 9090,
+	"authSecret": "change-me-to-a-random-secret",
+	"maxConnections": 100,
+	"quiet": false
+}

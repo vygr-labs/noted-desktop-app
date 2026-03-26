@@ -531,7 +531,7 @@ export function SettingsDialog() {
 								class={settingInput}
 								value={settings.syncServerUrl()}
 								onInput={(e) => settings.setSyncServerUrl(e.currentTarget.value)}
-								placeholder="ws://localhost:9090"
+								placeholder="wss://your-sync-server.com"
 							/>
 						</div>
 

@@ -57,7 +57,7 @@ export function SettingsStoreProvider(props: ParentProps) {
 	const [showSettingsDialog, setShowSettingsDialog] = createSignal(false)
 	const [theme, _setTheme] = createSignal<AppTheme>('system')
 	const [popoutSkipTaskbar, _setPopoutSkipTaskbar] = createSignal(false)
-	const [syncServerUrl, _setSyncServerUrl] = createSignal('ws://localhost:9090')
+	const [syncServerUrl, _setSyncServerUrl] = createSignal('')
 	const [syncToken, _setSyncToken] = createSignal('')
 
 	onMount(async () => {
@@ -77,11 +77,12 @@ export function SettingsStoreProvider(props: ParentProps) {
 			_setPopoutSkipTaskbar(true)
 		}
 
+		const appConfig = await window.electronAPI.getAppConfig()
 		const savedSyncUrl = await window.electronAPI.getSetting('syncServerUrl')
-		if (savedSyncUrl) _setSyncServerUrl(savedSyncUrl)
+		_setSyncServerUrl(savedSyncUrl || appConfig.syncServerUrl)
 
 		const savedSyncToken = await window.electronAPI.getSetting('syncToken')
-		if (savedSyncToken) _setSyncToken(savedSyncToken)
+		_setSyncToken(savedSyncToken || appConfig.syncAuthToken)
 	})
 
 	function setDefaultNoteType(v: 'rich' | 'plain') {

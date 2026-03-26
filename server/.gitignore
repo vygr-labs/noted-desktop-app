@@ -3,3 +3,4 @@ dist/
 data/*.sqlite
 data/*.sqlite-wal
 data/*.sqlite-shm
+config.json

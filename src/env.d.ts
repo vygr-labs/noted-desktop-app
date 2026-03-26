@@ -15,6 +15,7 @@ interface Note {
 	is_trashed: number
 	spellcheck: number
 	sync_id: string | null
+	sync_secret: string | null
 	is_shared: number
 	is_locked: number
 	created_at: string
@@ -205,6 +206,7 @@ interface ElectronAPI {
 	// Settings
 	getSetting: (key: string) => Promise<string | null>
 	setSetting: (key: string, value: string) => Promise<void>
+	getAppConfig: () => Promise<{ syncServerUrl: string; syncAuthToken: string }>
 
 	// Daily notes
 	getOrCreateDailyNote: (date: string) => Promise<Note>

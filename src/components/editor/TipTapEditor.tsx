@@ -349,11 +349,17 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		// If shared, set up Yjs collaboration
 		if (note.sync_id) {
 			ydoc = new Y.Doc()
+
+			// Build auth token: "globalSecret:docSecret" or just "docSecret"
+			const globalToken = settingsStore.syncToken()
+			const docSecret = note.sync_secret || 'anonymous'
+			const authToken = globalToken ? `${globalToken}:${docSecret}` : docSecret
+
 			provider = new HocuspocusProvider({
 				url: settingsStore.syncServerUrl(),
 				name: note.sync_id,
 				document: ydoc,
-				token: settingsStore.syncToken() || 'anonymous',
+				token: authToken,
 			})
 			extensions.push(
 				Collaboration.configure({ document: ydoc })
