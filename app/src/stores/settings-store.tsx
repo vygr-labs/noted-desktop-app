@@ -25,6 +25,7 @@ interface SettingsStore {
 	setSyncServerUrl: (v: string) => void
 	syncToken: () => string
 	setSyncToken: (v: string) => void
+	syncReady: () => boolean
 }
 
 const SettingsStoreContext = createContext<SettingsStore>()
@@ -59,6 +60,7 @@ export function SettingsStoreProvider(props: ParentProps) {
 	const [popoutSkipTaskbar, _setPopoutSkipTaskbar] = createSignal(false)
 	const [syncServerUrl, _setSyncServerUrl] = createSignal('')
 	const [syncToken, _setSyncToken] = createSignal('')
+	const [syncReady, _setSyncReady] = createSignal(false)
 
 	onMount(async () => {
 		const savedType = await window.electronAPI.getSetting('defaultNoteType')
@@ -83,6 +85,7 @@ export function SettingsStoreProvider(props: ParentProps) {
 
 		const savedSyncToken = await window.electronAPI.getSetting('syncToken')
 		_setSyncToken(savedSyncToken || appConfig.syncAuthToken)
+		_setSyncReady(true)
 	})
 
 	function setDefaultNoteType(v: 'rich' | 'plain') {
@@ -136,6 +139,7 @@ export function SettingsStoreProvider(props: ParentProps) {
 		setSyncServerUrl,
 		syncToken,
 		setSyncToken,
+		syncReady,
 	}
 
 	return (

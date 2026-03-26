@@ -354,6 +354,22 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 			const managed = syncStore.getDoc(note.sync_id, note.sync_secret)
 			ydoc = managed.ydoc
 			activeSyncId = note.sync_id
+
+			// If the Yjs doc is empty AND we have local content, seed it BEFORE
+			// creating the editor. This ensures a single Yjs history — no merge
+			// duplication when the provider syncs with an empty server doc.
+			if (localContent && !managed.provider.isSynced) {
+				const fragment = ydoc.getXmlFragment('default')
+				if (fragment.length === 0) {
+					// Temporarily create a minimal editor to convert JSON → Yjs
+					const tempExtensions = getBaseExtensions(true)
+					tempExtensions.push(Collaboration.configure({ document: ydoc }))
+					const tempEditor = new Editor({ extensions: tempExtensions })
+					tempEditor.commands.setContent(parseContent(localContent))
+					tempEditor.destroy()
+				}
+			}
+
 			extensions.push(
 				Collaboration.configure({ document: ydoc })
 			)
@@ -383,15 +399,6 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 			placeholder.remove()
 		}
 
-		// For shared notes: initialize content from local SQLite if editor is empty.
-		// This runs synchronously — before any WebSocket events process —
-		// so there's no race condition with the server sync.
-		if (note.sync_id && localContent && editor && !editor.getText().trim()) {
-			isUpdatingContent = true
-			editor.commands.setContent(parseContent(localContent))
-			isUpdatingContent = false
-		}
-
 		// Mark synced once the provider confirms, or after timeout
 		if (note.sync_id && note.sync_secret) {
 			const managed = syncStore.getDoc(note.sync_id, note.sync_secret)
@@ -402,6 +409,13 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				managed.provider.on('synced', () => {
 					hasSynced = true
 					clearTimeout(syncTimeout)
+					// If the editor is still empty after sync (server had nothing,
+					// and Yjs seeding didn't happen), set content as fallback
+					if (editor && !editor.getText().trim() && localContent) {
+						isUpdatingContent = true
+						editor.commands.setContent(parseContent(localContent))
+						isUpdatingContent = false
+					}
 				})
 			}
 		}
