@@ -194,14 +194,112 @@ function readStdin() {
     });
 }
 // ─── Commands ────────────────────────────────────────────
+function textToTipTapJson(text) {
+    const lines = text.split('\n');
+    const content = [];
+    let i = 0;
+    while (i < lines.length) {
+        const line = lines[i];
+        // Code block
+        if (/^\s*```/.test(line)) {
+            const codeLines = [];
+            i++;
+            while (i < lines.length && !/^\s*```/.test(lines[i])) {
+                codeLines.push(lines[i]);
+                i++;
+            }
+            if (i < lines.length)
+                i++;
+            content.push({
+                type: 'codeBlock',
+                content: codeLines.length > 0
+                    ? [{ type: 'text', text: codeLines.join('\n') }]
+                    : undefined,
+            });
+            continue;
+        }
+        // Heading
+        const hm = line.match(/^(#{1,3})\s+(.+)/);
+        if (hm) {
+            content.push({
+                type: 'heading',
+                attrs: { level: hm[1].length },
+                content: [{ type: 'text', text: hm[2].trim() }],
+            });
+            i++;
+            continue;
+        }
+        // Horizontal rule
+        if (/^\s*(---+|\*\*\*+|___+)\s*$/.test(line)) {
+            content.push({ type: 'horizontalRule' });
+            i++;
+            continue;
+        }
+        // Blockquote
+        if (/^\s*>\s+/.test(line)) {
+            const quoteLines = [];
+            while (i < lines.length && /^\s*>\s?/.test(lines[i])) {
+                quoteLines.push(lines[i].replace(/^\s*>\s?/, ''));
+                i++;
+            }
+            const inner = textToTipTapJson(quoteLines.join('\n'));
+            const parsed = JSON.parse(inner);
+            content.push({ type: 'blockquote', content: parsed.content || [] });
+            continue;
+        }
+        // Bullet list
+        if (/^\s*[-*•]\s+/.test(line) && !/^\s*[-*•]\s+\[[ xX]\]/.test(line)) {
+            const items = [];
+            while (i < lines.length) {
+                const m = lines[i].match(/^\s*[-*•]\s+(.*)/);
+                if (!m || /^\s*[-*•]\s+\[[ xX]\]/.test(lines[i]))
+                    break;
+                items.push({
+                    type: 'listItem',
+                    content: [{ type: 'paragraph', content: m[1].trim() ? [{ type: 'text', text: m[1].trim() }] : undefined }],
+                });
+                i++;
+            }
+            content.push({ type: 'bulletList', content: items });
+            continue;
+        }
+        // Ordered list
+        if (/^\s*\d+[.)]\s+/.test(line)) {
+            const items = [];
+            while (i < lines.length) {
+                const m = lines[i].match(/^\s*\d+[.)]\s+(.*)/);
+                if (!m)
+                    break;
+                items.push({
+                    type: 'listItem',
+                    content: [{ type: 'paragraph', content: m[1].trim() ? [{ type: 'text', text: m[1].trim() }] : undefined }],
+                });
+                i++;
+            }
+            content.push({ type: 'orderedList', content: items });
+            continue;
+        }
+        // Regular line
+        const trimmed = line.trim();
+        if (trimmed) {
+            content.push({ type: 'paragraph', content: [{ type: 'text', text: trimmed }] });
+        }
+        else if (content.length > 0) {
+            content.push({ type: 'paragraph' });
+        }
+        i++;
+    }
+    return JSON.stringify({ type: 'doc', content });
+}
 function cmdCreate(db, args, flags, stdinContent) {
     const title = flags.title || args[0] || 'Untitled';
-    let content = flags.content || stdinContent || '';
-    const noteType = flags.type === 'rich' ? 'rich' : 'plain';
+    const content = flags.content || stdinContent || '';
+    const noteType = flags.type === 'plain' ? 'plain' : 'rich';
     const listId = flags.list || null;
-    // For plain notes, store content in both fields
     const contentPlain = content || null;
-    const contentJson = noteType === 'plain' ? content : null;
+    const contentJson = noteType === 'rich' && content
+        ? textToTipTapJson(content)
+        : (noteType === 'plain' ? content : null);
     const id = crypto.randomUUID();
     db.prepare(`INSERT INTO notes (id, title, content, content_plain, note_type, list_id)
 		 VALUES (?, ?, ?, ?, ?, ?)`).run(id, title, contentJson, contentPlain, noteType, listId);

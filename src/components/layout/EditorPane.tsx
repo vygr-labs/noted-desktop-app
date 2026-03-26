@@ -30,6 +30,7 @@ import {
 	UsersIcon,
 	LockIcon,
 	UnlockIcon,
+	TypeIcon,
 } from 'lucide-solid'
 
 const editorContainer = css({
@@ -119,12 +120,10 @@ const emptyKbd = css({
 })
 
 const controlsRow = css({
-	position: 'absolute',
-	top: '3',
-	right: '3',
 	display: 'flex',
 	alignItems: 'center',
 	gap: '0.5',
+	flexShrink: 0,
 	zIndex: 5,
 })
 
@@ -328,6 +327,11 @@ export function EditorPane() {
 		onConfirm: (pin: string) => void | Promise<void>
 	} | null>(null)
 
+	async function convertToRich(noteId: string) {
+		await window.electronAPI.updateNote(noteId, { note_type: 'rich' })
+		await editorStore.refreshCurrentNote()
+	}
+
 	async function toggleLock(noteId: string) {
 		const hasPin = await window.electronAPI.hasLockPin()
 		if (!hasPin) {
@@ -526,7 +530,7 @@ export function EditorPane() {
 	}
 
 	return (
-		<div class={editorContainer} style={{ position: 'relative' }}>
+		<div class={editorContainer}>
 			<Show
 				when={editorStore.currentNote()}
 				fallback={
@@ -556,18 +560,184 @@ export function EditorPane() {
 			>
 				{(note) => (
 					<>
-						{/* Top toolbar */}
-						<Show
-							when={
-								showToolbar(note()) &&
-								toolbarPosition() === 'top'
-							}
+						{/* Top bar: toolbar (if top position) + controls */}
+						<div
+							style={{
+								display: 'flex',
+								'align-items': 'flex-start',
+								'flex-shrink': '0',
+								'border-bottom': (showToolbar(note()) && toolbarPosition() === 'top') ? '1px solid var(--colors-gray-a2)' : 'none',
+								'box-shadow': (showToolbar(note()) && toolbarPosition() === 'top' && isScrolled()) ? '0 2px 12px -3px rgba(0,0,0,0.1)' : 'none',
+								'z-index': '2',
+								transition: 'box-shadow 0.2s ease',
+							}}
 						>
-							<EditorToolbar
-								scrolled={isScrolled()}
-								position="top"
-							/>
-						</Show>
+							<Show
+								when={
+									showToolbar(note()) &&
+									toolbarPosition() === 'top'
+								}
+							>
+								<div style={{ flex: '1', 'min-width': '0' }}>
+									<EditorToolbar
+										scrolled={false}
+										position="top"
+									/>
+								</div>
+							</Show>
+							<div class={controlsRow} style={{ 'margin-left': 'auto', padding: '8px 12px' }}>
+							<Show when={appStore.noteListCollapsed() && !appStore.focusMode()}>
+								<button
+									class={controlBtn}
+									onClick={() => appStore.setNoteListCollapsed(false)}
+									title="Expand note list (Ctrl+[)"
+								>
+									<PanelLeftOpenIcon class={controlIconSize} />
+								</button>
+							</Show>
+							<button
+								class={controlBtn}
+								onClick={() => toggleLock(note().id)}
+								title={note().is_locked ? 'Unlock note' : 'Lock note'}
+								style={note().is_locked ? { color: 'var(--colors-orange-11)', opacity: '1' } : {}}
+							>
+								<Show when={note().is_locked} fallback={<UnlockIcon class={controlIconSize} />}>
+									<LockIcon class={controlIconSize} />
+								</Show>
+							</button>
+							<div style={{ position: 'relative' }} data-export-menu>
+								<button
+									class={controlBtn}
+									onClick={() => setShowExportMenu(!showExportMenu())}
+									title="Export note"
+								>
+									<DownloadIcon class={controlIconSize} />
+								</button>
+								<Show when={showExportMenu()}>
+									<div class={exportMenu}>
+										<For each={NOTE_EXPORT_FORMATS}>
+											{(fmt) => (
+												<button
+													class={exportMenuItem}
+													onClick={() => {
+														setShowExportMenu(false)
+														window.electronAPI.exportNote(note().id, fmt.key)
+													}}
+												>
+													{fmt.label}
+												</button>
+											)}
+										</For>
+									</div>
+								</Show>
+							</div>
+							<Show when={note().note_type === 'rich' && !isTrash()}>
+								<div style={{ position: 'relative' }} data-share-menu>
+									<button
+										class={controlBtn}
+										onClick={() => {
+											if ((note().is_shared && note().sync_id) || shareCode()) {
+												setShareCode(note().sync_id || shareCode())
+											}
+											setShowShareMenu(!showShareMenu())
+										}}
+										title={(shareCode() || note().is_shared) ? 'Sharing active' : 'Share note'}
+										style={(shareCode() || note().is_shared) ? { color: 'var(--colors-indigo-11)', opacity: '1' } : {}}
+									>
+										<Share2Icon class={controlIconSize} />
+									</button>
+									<Show when={showShareMenu()}>
+										<div class={exportMenu}>
+											<Show
+												when={shareCode() || note().is_shared}
+												fallback={
+													<>
+														<button
+															class={exportMenuItem}
+															onClick={() => {
+																setShowShareMenu(false)
+																handleShare(note().id)
+															}}
+														>
+															<LinkIcon class={css({ width: '3.5', height: '3.5', mr: '2' })} />
+															Share &amp; copy code
+														</button>
+														<button
+															class={exportMenuItem}
+															onClick={() => {
+																setShowShareMenu(false)
+																setShowJoinDialog(true)
+															}}
+														>
+															<UsersIcon class={css({ width: '3.5', height: '3.5', mr: '2' })} />
+															Join shared note
+														</button>
+													</>
+												}
+											>
+												<div style={{ padding: '8px 12px', 'font-size': '11px', color: 'var(--colors-fg-subtle)' }}>
+													Share code:
+												</div>
+												<div style={{ padding: '0 12px 8px', display: 'flex', gap: '4px' }}>
+													<input
+														class={css({
+															flex: 1, bg: 'gray.a2', border: '1px solid', borderColor: 'gray.a4',
+															borderRadius: 'sm', px: '2', py: '1', fontSize: '11px', color: 'fg.default',
+															fontFamily: 'mono', outline: 'none',
+														})}
+														value={shareCode()}
+														readOnly
+													/>
+													<button
+														class={exportMenuItem}
+														style={{ padding: '4px 8px', width: 'auto' }}
+														onClick={() => navigator.clipboard.writeText(shareCode())}
+														title="Copy"
+													>
+														<CopyIcon class={css({ width: '3', height: '3' })} />
+													</button>
+												</div>
+												<button
+													class={exportMenuItem}
+													style={{ color: 'var(--colors-red-11)' }}
+													onClick={() => handleUnshare(note().id)}
+												>
+													Stop sharing
+												</button>
+											</Show>
+										</div>
+									</Show>
+								</div>
+							</Show>
+							<Show when={note().note_type === 'plain' && !isTrash()}>
+								<button
+									class={controlBtn}
+									onClick={() => convertToRich(note().id)}
+									title="Convert to rich text"
+								>
+									<TypeIcon class={controlIconSize} />
+								</button>
+							</Show>
+							<Show when={showToolbar(note())}>
+								<button
+									class={controlBtn}
+									onClick={cycleToolbarPosition}
+									title={`Move toolbar to ${nextPositionLabel()}`}
+								>
+									<ToolbarPositionIcon position={toolbarPosition()} />
+								</button>
+							</Show>
+							<button
+								class={controlBtn}
+								onClick={() => appStore.setFocusMode(!appStore.focusMode())}
+								title={appStore.focusMode() ? 'Exit focus mode' : 'Focus mode'}
+							>
+								<Show when={appStore.focusMode()} fallback={<MaximizeIcon class={controlIconSize} />}>
+									<MinimizeIcon class={controlIconSize} />
+								</Show>
+							</button>
+						</div>
+						</div>
 
 						{/* In-note search bar */}
 						<Show when={appStore.noteSearchOpen()}>
@@ -700,167 +870,6 @@ export function EditorPane() {
 							<EditorToolbar position="bottom" />
 						</Show>
 
-						{/* Controls: expand list + toolbar position + focus mode */}
-						<div class={controlsRow}>
-							<Show when={appStore.noteListCollapsed() && !appStore.focusMode()}>
-								<button
-									class={controlBtn}
-									onClick={() => appStore.setNoteListCollapsed(false)}
-									title="Expand note list (Ctrl+[)"
-								>
-									<PanelLeftOpenIcon class={controlIconSize} />
-								</button>
-							</Show>
-							<button
-								class={controlBtn}
-								onClick={() => toggleLock(note().id)}
-								title={note().is_locked ? 'Unlock note' : 'Lock note'}
-								style={note().is_locked ? { color: 'var(--colors-orange-11)', opacity: '1' } : {}}
-							>
-								<Show when={note().is_locked} fallback={<UnlockIcon class={controlIconSize} />}>
-									<LockIcon class={controlIconSize} />
-								</Show>
-							</button>
-							<div style={{ position: 'relative' }} data-export-menu>
-								<button
-									class={controlBtn}
-									onClick={() => setShowExportMenu(!showExportMenu())}
-									title="Export note"
-								>
-									<DownloadIcon class={controlIconSize} />
-								</button>
-								<Show when={showExportMenu()}>
-									<div class={exportMenu}>
-										<For each={NOTE_EXPORT_FORMATS}>
-											{(fmt) => (
-												<button
-													class={exportMenuItem}
-													onClick={() => {
-														setShowExportMenu(false)
-														window.electronAPI.exportNote(note().id, fmt.key)
-													}}
-												>
-													{fmt.label}
-												</button>
-											)}
-										</For>
-									</div>
-								</Show>
-							</div>
-							<Show when={note().note_type === 'rich' && !isTrash()}>
-								<div style={{ position: 'relative' }} data-share-menu>
-									<button
-										class={controlBtn}
-										onClick={() => {
-											if (note().is_shared && note().sync_id) {
-												setShareCode(note().sync_id!)
-											}
-											setShowShareMenu(!showShareMenu())
-										}}
-										title={note().is_shared ? 'Sharing active' : 'Share note'}
-										style={note().is_shared ? { color: 'var(--colors-indigo-11)', opacity: '1' } : {}}
-									>
-										<Share2Icon class={controlIconSize} />
-									</button>
-									<Show when={showShareMenu()}>
-										<div class={exportMenu}>
-											<Show
-												when={note().is_shared}
-												fallback={
-													<>
-														<button
-															class={exportMenuItem}
-															onClick={() => {
-																setShowShareMenu(false)
-																handleShare(note().id)
-															}}
-														>
-															<LinkIcon class={css({ width: '3.5', height: '3.5', mr: '2' })} />
-															Share &amp; copy code
-														</button>
-														<button
-															class={exportMenuItem}
-															onClick={() => {
-																setShowShareMenu(false)
-																setShowJoinDialog(true)
-															}}
-														>
-															<UsersIcon class={css({ width: '3.5', height: '3.5', mr: '2' })} />
-															Join shared note
-														</button>
-													</>
-												}
-											>
-												<div style={{ padding: '8px 12px', 'font-size': '11px', color: 'var(--colors-fg-subtle)' }}>
-													Share code:
-												</div>
-												<div style={{ padding: '0 12px 8px', display: 'flex', gap: '4px' }}>
-													<input
-														class={css({
-															flex: 1, bg: 'gray.a2', border: '1px solid', borderColor: 'gray.a4',
-															borderRadius: 'sm', px: '2', py: '1', fontSize: '11px', color: 'fg.default',
-															fontFamily: 'mono', outline: 'none',
-														})}
-														value={shareCode()}
-														readOnly
-													/>
-													<button
-														class={exportMenuItem}
-														style={{ padding: '4px 8px', width: 'auto' }}
-														onClick={() => navigator.clipboard.writeText(shareCode())}
-														title="Copy"
-													>
-														<CopyIcon class={css({ width: '3', height: '3' })} />
-													</button>
-												</div>
-												<button
-													class={exportMenuItem}
-													style={{ color: 'var(--colors-red-11)' }}
-													onClick={() => handleUnshare(note().id)}
-												>
-													Stop sharing
-												</button>
-											</Show>
-										</div>
-									</Show>
-								</div>
-							</Show>
-							<Show when={showToolbar(note())}>
-								<button
-									class={controlBtn}
-									onClick={cycleToolbarPosition}
-									title={`Move toolbar to ${nextPositionLabel()}`}
-								>
-									<ToolbarPositionIcon
-										position={toolbarPosition()}
-									/>
-								</button>
-							</Show>
-							<button
-								class={controlBtn}
-								onClick={() =>
-									appStore.setFocusMode(
-										!appStore.focusMode()
-									)
-								}
-								title={
-									appStore.focusMode()
-										? 'Exit focus mode'
-										: 'Focus mode'
-								}
-							>
-								<Show
-									when={appStore.focusMode()}
-									fallback={
-										<MaximizeIcon
-											class={controlIconSize}
-										/>
-									}
-								>
-									<MinimizeIcon class={controlIconSize} />
-								</Show>
-							</button>
-						</div>
 					</>
 				)}
 			</Show>

@@ -112,13 +112,8 @@ export function EditorToolbar(props: {
 		if (pos === 'top' || pos === 'bottom') {
 			base['flex-direction'] = 'row'
 			base['flex-wrap'] = 'wrap'
-			base.padding = '8px 180px 8px 24px'
-			if (pos === 'top') {
-				base['border-bottom'] = '1px solid var(--colors-gray-a2)'
-				base['box-shadow'] = props.scrolled
-					? '0 2px 12px -3px rgba(0, 0, 0, 0.1)'
-					: 'none'
-			} else {
+			base.padding = '8px 24px'
+			if (pos === 'bottom') {
 				base['border-top'] = '1px solid var(--colors-gray-a2)'
 			}
 		} else {
