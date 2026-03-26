@@ -16,6 +16,7 @@ interface Note {
 	spellcheck: number
 	sync_id: string | null
 	is_shared: number
+	is_locked: number
 	created_at: string
 	updated_at: string
 }
@@ -177,6 +178,15 @@ interface ElectronAPI {
 
 	// Search
 	searchNotes: (query: string) => Promise<SearchResult[]>
+
+	// Lock
+	hasLockPin: () => Promise<boolean>
+	setLockPin: (pin: string) => Promise<boolean>
+	removeLockPin: () => Promise<boolean>
+	verifyLockPin: (pin: string) => Promise<boolean>
+	toggleNoteLock: (noteId: string) => Promise<boolean>
+	biometricAvailable: () => Promise<boolean>
+	biometricAuthenticate: () => Promise<boolean>
 
 	// Sync
 	shareNote: (noteId: string) => Promise<string | null>

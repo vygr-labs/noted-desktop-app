@@ -7,6 +7,7 @@ import { TipTapEditor, getEditorInstance, searchInNote, clearNoteSearch, scrollT
 import { PlainTextEditor } from '../editor/PlainTextEditor'
 import { TagsBar } from '../editor/TagsBar'
 import { EditorToolbar, type ToolbarPosition } from '../editor/EditorToolbar'
+import { LockOverlay } from '../editor/LockOverlay'
 import {
 	MaximizeIcon,
 	MinimizeIcon,
@@ -26,6 +27,8 @@ import {
 	LinkIcon,
 	CopyIcon,
 	UsersIcon,
+	LockIcon,
+	UnlockIcon,
 } from 'lucide-solid'
 
 const editorContainer = css({
@@ -309,6 +312,34 @@ export function EditorPane() {
 	const [shareCode, setShareCode] = createSignal('')
 	const [joinCode, setJoinCode] = createSignal('')
 	const [showJoinDialog, setShowJoinDialog] = createSignal(false)
+
+	// Session-based unlock tracking (unlocked note IDs persist until app restart)
+	const [unlockedIds, setUnlockedIds] = createSignal<Set<string>>(new Set())
+	const isNoteLocked = (note: Note) =>
+		note.is_locked && !unlockedIds().has(note.id)
+
+	function unlockNote(noteId: string) {
+		setUnlockedIds((prev) => new Set([...prev, noteId]))
+	}
+
+	async function toggleLock(noteId: string) {
+		const hasPin = await window.electronAPI.hasLockPin()
+		if (!hasPin) {
+			// Prompt to set a PIN first
+			const pin = prompt('Set a lock PIN (used for all locked notes):')
+			if (!pin || pin.trim().length < 4) {
+				alert('PIN must be at least 4 characters.')
+				return
+			}
+			await window.electronAPI.setLockPin(pin.trim())
+		}
+		const isNowLocked = await window.electronAPI.toggleNoteLock(noteId)
+		if (!isNowLocked) {
+			// If unlocking, add to session unlocked set
+			unlockNote(noteId)
+		}
+		await editorStore.refreshCurrentNote()
+	}
 	const [searchMatches, setSearchMatches] = createSignal(0)
 	const [currentMatch, setCurrentMatch] = createSignal(0)
 	let searchInputRef: HTMLInputElement | undefined
@@ -605,8 +636,15 @@ export function EditorPane() {
 							<div
 								class={editorContent}
 								onScroll={handleScroll}
+								style={{ position: 'relative' }}
 							>
-								<div class={contentInner}>
+								<Show when={isNoteLocked(note())}>
+									<LockOverlay onUnlock={() => unlockNote(note().id)} />
+								</Show>
+								<div
+									class={contentInner}
+									style={isNoteLocked(note()) ? { filter: 'blur(8px)', 'pointer-events': 'none', 'user-select': 'none' } : {}}
+								>
 									<NoteHeader
 										note={note()}
 										readonly={isTrash()}
@@ -663,6 +701,16 @@ export function EditorPane() {
 									<PanelLeftOpenIcon class={controlIconSize} />
 								</button>
 							</Show>
+							<button
+								class={controlBtn}
+								onClick={() => toggleLock(note().id)}
+								title={note().is_locked ? 'Unlock note' : 'Lock note'}
+								style={note().is_locked ? { color: 'var(--colors-orange-11)', opacity: '1' } : {}}
+							>
+								<Show when={note().is_locked} fallback={<UnlockIcon class={controlIconSize} />}>
+									<LockIcon class={controlIconSize} />
+								</Show>
+							</button>
 							<div style={{ position: 'relative' }} data-export-menu>
 								<button
 									class={controlBtn}

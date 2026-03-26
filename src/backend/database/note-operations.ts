@@ -14,6 +14,7 @@ export interface Note {
 	spellcheck: number
 	sync_id: string | null
 	is_shared: number
+	is_locked: number
 	created_at: string
 	updated_at: string
 }

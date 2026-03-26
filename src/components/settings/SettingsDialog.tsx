@@ -16,6 +16,7 @@ import {
 	ExternalLinkIcon,
 	TerminalIcon,
 	RefreshCwIcon,
+	ShieldIcon,
 } from 'lucide-solid'
 
 // ─── Overlay + shell ──────────────────────────────────────
@@ -294,10 +295,31 @@ const footer = css({
 export function SettingsDialog() {
 	const settings = useSettingsStore()
 	const [cliInstalled, setCliInstalled] = createSignal(false)
+	const [hasPinSet, setHasPinSet] = createSignal(false)
 
 	onMount(async () => {
 		setCliInstalled(await window.electronAPI.isCliInstalled())
+		setHasPinSet(await window.electronAPI.hasLockPin())
 	})
+
+	async function toggleLockPin() {
+		if (hasPinSet()) {
+			const pin = prompt('Enter current PIN to remove it:')
+			if (!pin) return
+			const valid = await window.electronAPI.verifyLockPin(pin)
+			if (!valid) { alert('Incorrect PIN.'); return }
+			await window.electronAPI.removeLockPin()
+			setHasPinSet(false)
+		} else {
+			const pin = prompt('Set a lock PIN (min 4 characters):')
+			if (!pin || pin.trim().length < 4) {
+				if (pin) alert('PIN must be at least 4 characters.')
+				return
+			}
+			await window.electronAPI.setLockPin(pin.trim())
+			setHasPinSet(true)
+		}
+	}
 
 	async function toggleCli() {
 		if (cliInstalled()) {
@@ -422,6 +444,32 @@ export function SettingsDialog() {
 									Plain Text
 								</div>
 							</div>
+						</div>
+
+						<div class={sectionDivider} />
+
+						{/* Security section */}
+						<div class={sectionTitle}>
+							<ShieldIcon class={sectionIcon} />
+							Security
+						</div>
+
+						<div class={settingRow}>
+							<div class={settingInfo}>
+								<div class={settingLabel}>Lock PIN</div>
+								<div class={settingDesc}>
+									{hasPinSet()
+										? 'A PIN is set. Locked notes require this PIN to view.'
+										: 'Set a PIN to enable note locking. Lock individual notes from the editor controls.'}
+								</div>
+							</div>
+							<button
+								class={toggleTrack}
+								data-active={hasPinSet()}
+								onClick={toggleLockPin}
+							>
+								<div class={toggleThumb} />
+							</button>
 						</div>
 
 						<div class={sectionDivider} />

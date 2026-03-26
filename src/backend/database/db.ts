@@ -218,6 +218,14 @@ function runMigrations() {
 		setSchemaVersion(5)
 	}
 
+	if (currentVersion < 6) {
+		const cols = db.prepare("PRAGMA table_info(notes)").all() as { name: string }[]
+		if (!cols.some(c => c.name === 'is_locked')) {
+			db.exec(`ALTER TABLE notes ADD COLUMN is_locked INTEGER DEFAULT 0;`)
+		}
+		setSchemaVersion(6)
+	}
+
 }
 
 runMigrations()

@@ -2,7 +2,7 @@ import { Show, For, createSignal } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { formatCreatedDate, formatRelativeEdited } from '../../lib/date-utils'
 import { useEditorStore } from '../../stores/editor-store'
-import { PinIcon, EllipsisIcon } from 'lucide-solid'
+import { PinIcon, EllipsisIcon, LockIcon } from 'lucide-solid'
 import { NoteCardMenu, type MenuPosition } from './NoteCardMenu'
 
 const TAG_COLOR_MAP: Record<string, string> = {
@@ -168,6 +168,7 @@ export function NoteCard(props: {
 	}
 
 	const preview = () => {
+		if (props.note.is_locked) return 'Locked'
 		if (props.isActive) {
 			const live = editorStore.livePreview()
 			if (live !== null) return live
@@ -203,6 +204,9 @@ export function NoteCard(props: {
 				<div class={`card-indicator ${indicator}`} />
 				<div class={titleRow}>
 					<span class={titleText}>{title()}</span>
+					<Show when={props.note.is_locked}>
+						<LockIcon class={pinStyle} style={{ color: 'var(--colors-orange-9)' }} />
+					</Show>
 					<Show when={props.note.is_pinned}>
 						<PinIcon class={pinStyle} />
 					</Show>

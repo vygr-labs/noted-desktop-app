@@ -77,6 +77,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	exportNote: (noteId: string, format: string) => ipcRenderer.invoke('export:note', noteId, format),
 	exportAllNotes: (format: string) => ipcRenderer.invoke('export:all', format),
 
+	// Lock
+	hasLockPin: () => ipcRenderer.invoke('lock:has-pin'),
+	setLockPin: (pin: string) => ipcRenderer.invoke('lock:set-pin', pin),
+	removeLockPin: () => ipcRenderer.invoke('lock:remove-pin'),
+	verifyLockPin: (pin: string) => ipcRenderer.invoke('lock:verify-pin', pin),
+	toggleNoteLock: (noteId: string) => ipcRenderer.invoke('lock:toggle-note', noteId),
+	biometricAvailable: () => ipcRenderer.invoke('lock:biometric-available'),
+	biometricAuthenticate: () => ipcRenderer.invoke('lock:biometric-authenticate'),
+
 	// Sync
 	shareNote: (noteId: string) => ipcRenderer.invoke('sync:share-note', noteId),
 	unshareNote: (noteId: string) => ipcRenderer.invoke('sync:unshare-note', noteId),
