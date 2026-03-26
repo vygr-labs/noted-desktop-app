@@ -333,11 +333,10 @@ export function parseLinesToNodes(lines: string[]): TipTapNode[] {
 		}
 
 		// Regular text line — parse inline markdown
+		// Skip blank lines — block elements already have CSS margins
 		const trimmed = line.trim()
 		if (trimmed) {
 			nodes.push(makeTextBlock('paragraph', trimmed))
-		} else if (nodes.length > 0) {
-			nodes.push({ type: 'paragraph' })
 		}
 		i++
 	}

@@ -321,12 +321,10 @@ function textToTipTapJson(text: string): string {
 			continue
 		}
 
-		// Regular line
+		// Regular line — skip blank lines (blocks have CSS margins)
 		const trimmed = line.trim()
 		if (trimmed) {
 			content.push({ type: 'paragraph', content: [{ type: 'text', text: trimmed }] })
-		} else if (content.length > 0) {
-			content.push({ type: 'paragraph' })
 		}
 		i++
 	}
@@ -334,11 +332,28 @@ function textToTipTapJson(text: string): string {
 	return JSON.stringify({ type: 'doc', content })
 }
 
+function resolveListId(db: Database.Database, listRef: string): string {
+	// Try by ID first
+	const byId = db.prepare('SELECT id FROM lists WHERE id = ?').get(listRef) as { id: string } | undefined
+	if (byId) return byId.id
+
+	// Try by name (case-insensitive)
+	const byName = db.prepare('SELECT id FROM lists WHERE LOWER(name) = LOWER(?)').get(listRef) as { id: string } | undefined
+	if (byName) return byName.id
+
+	// Auto-create the list
+	const id = crypto.randomUUID()
+	db.prepare('INSERT INTO lists (id, name) VALUES (?, ?)').run(id, listRef)
+	console.log(`Created list: ${listRef}`)
+	return id
+}
+
 function cmdCreate(db: Database.Database, args: string[], flags: Record<string, string | true>, stdinContent: string): void {
 	const title = (flags.title as string) || args[0] || 'Untitled'
 	const content = (flags.content as string) || stdinContent || ''
 	const noteType = (flags.type as string) === 'plain' ? 'plain' : 'rich'
-	const listId = (flags.list as string) || null
+	const listRef = (flags.list as string) || null
+	const listId = listRef ? resolveListId(db, listRef) : null
 
 	const contentPlain = content || null
 	const contentJson = noteType === 'rich' && content
@@ -357,7 +372,54 @@ function cmdCreate(db: Database.Database, args: string[], flags: Record<string, 
 	).run(id, title, contentPlain || '')
 
 	const note = db.prepare('SELECT * FROM notes WHERE id = ?').get(id) as Note
-	console.log(JSON.stringify({ created: true, id: note.id, title: note.title }, null, 2))
+	console.log(JSON.stringify({ created: true, id: note.id, title: note.title, list_id: listId }, null, 2))
+}
+
+function cmdCreateList(db: Database.Database, args: string[], flags: Record<string, string | true>): void {
+	const name = (flags.name as string) || args[0]
+	if (!name) {
+		console.error('Usage: noted-cli create-list --name "List Name"')
+		process.exit(1)
+	}
+
+	// Check if it already exists
+	const existing = db.prepare('SELECT id, name FROM lists WHERE LOWER(name) = LOWER(?)').get(name) as { id: string; name: string } | undefined
+	if (existing) {
+		console.log(JSON.stringify({ exists: true, id: existing.id, name: existing.name }, null, 2))
+		return
+	}
+
+	const id = crypto.randomUUID()
+	const color = (flags.color as string) || 'gray'
+	db.prepare('INSERT INTO lists (id, name, color) VALUES (?, ?, ?)').run(id, name, color)
+	console.log(JSON.stringify({ created: true, id, name }, null, 2))
+}
+
+function cmdMove(db: Database.Database, args: string[], flags: Record<string, string | true>): void {
+	const noteId = args[0]
+	const listRef = (flags.list as string) || args[1]
+
+	if (!noteId) {
+		console.error('Usage: noted-cli move <note-id> --list "List Name"')
+		process.exit(1)
+	}
+
+	const note = db.prepare('SELECT id, title FROM notes WHERE id = ?').get(noteId) as Note | undefined
+	if (!note) {
+		console.error(`Note not found: ${noteId}`)
+		process.exit(1)
+	}
+
+	if (!listRef) {
+		// Remove from list
+		db.prepare('UPDATE notes SET list_id = NULL, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(noteId)
+		console.log(`Removed "${note.title}" from its list`)
+		return
+	}
+
+	const listId = resolveListId(db, listRef)
+	db.prepare('UPDATE notes SET list_id = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(listId, noteId)
+	console.log(`Moved "${note.title}" to list`)
 }
 
 function cmdList(db: Database.Database, flags: Record<string, string | true>): void {
@@ -494,37 +556,47 @@ USAGE
   noted-cli <command> [options]
 
 COMMANDS
-  create    Create a new note
-  list      List all notes
-  get       Get a note by ID
-  search    Search notes
-  delete    Move a note to trash
-  lists     Show all lists
-  tags      Show all tags
-  help      Show this help message
+  create       Create a new note
+  create-list  Create a new list
+  move         Move a note to a list
+  list         List all notes
+  get          Get a note by ID
+  search       Search notes
+  delete       Move a note to trash
+  lists        Show all lists
+  tags         Show all tags
+  help         Show this help message
 
 CREATE OPTIONS
-  --title <text>      Note title (default: "Untitled")
-  --content <text>    Note content
-  --type <rich|plain> Note type (default: "plain")
-  --list <list-id>    Add to a specific list
-  (stdin)             Pipe content from stdin
+  --title <text>       Note title (default: "Untitled")
+  --content <text>     Note content
+  --type <rich|plain>  Note type (default: "rich")
+  --list <name|id>     Add to a list (creates the list if it doesn't exist)
+  (stdin)              Pipe content from stdin
+
+CREATE-LIST OPTIONS
+  --name <text>        List name (required)
+  --color <color>      List color (default: "gray")
+
+MOVE OPTIONS
+  --list <name|id>     Target list (creates if needed). Omit to remove from list.
 
 LIST OPTIONS
-  --limit <n>         Max notes to show (default: 50)
+  --limit <n>          Max notes to show (default: 50)
 
 GET OPTIONS
-  --json              Output full note as JSON
+  --json               Output full note as JSON
 
 SEARCH OPTIONS
-  --limit <n>         Max results (default: 20)
+  --limit <n>          Max results (default: 20)
 
 EXAMPLES
-  noted-cli create --title "Meeting Notes" --content "Discuss Q4 roadmap"
-  echo "Quick thought" | noted-cli create --title "Idea"
-  cat document.md | noted-cli create --title "Imported Doc"
+  noted-cli create --title "Meeting Notes" --content "# Agenda" --list "Work"
+  echo "Quick thought" | noted-cli create --title "Idea" --list "Personal"
+  cat report.md | noted-cli create --title "Report" --list "Reports"
+  noted-cli create-list --name "Projects" --color "indigo"
+  noted-cli move abc123 --list "Archive"
   noted-cli list
-  noted-cli get abc123
   noted-cli search "roadmap"
   noted-cli delete abc123
 
@@ -565,6 +637,12 @@ async function main() {
 			case 'delete':
 			case 'rm':
 				cmdDelete(db, args)
+				break
+			case 'create-list':
+				cmdCreateList(db, args, flags)
+				break
+			case 'move':
+				cmdMove(db, args, flags)
 				break
 			case 'lists':
 				cmdLists(db)

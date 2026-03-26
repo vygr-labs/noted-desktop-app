@@ -326,7 +326,22 @@ export default function PopoutView() {
 		}
 	)
 
-	onMount(() => {
+	onMount(async () => {
+		// Apply the saved theme
+		const theme = await window.electronAPI.getSetting('appTheme')
+		const html = document.documentElement
+		html.removeAttribute('data-theme')
+		if (theme === 'warm' || theme === 'slate') {
+			html.setAttribute('data-theme', theme)
+		}
+		if (theme === 'dark') {
+			window.electronAPI.darkModeUpdate('dark')
+		} else if (theme === 'light' || theme === 'warm' || theme === 'slate') {
+			window.electronAPI.darkModeUpdate('light')
+		} else {
+			window.electronAPI.darkModeSystem()
+		}
+
 		window.electronAPI.onPopoutTodosChanged(() => {
 			if (isTodos) refetchTodos()
 			else if (isSingleNote) refetchNote()

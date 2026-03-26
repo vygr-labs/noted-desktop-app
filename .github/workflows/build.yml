@@ -33,6 +33,9 @@ jobs:
           corepack enable
           yarn install --immutable
 
+      - name: Generate PandaCSS
+        run: yarn prepare
+
       - name: Build CLI
         run: yarn cli:build
 
@@ -64,6 +67,9 @@ jobs:
         run: |
           corepack enable
           yarn install --immutable
+
+      - name: Generate PandaCSS
+        run: yarn prepare
 
       - name: Build CLI
         run: yarn cli:build
@@ -97,6 +103,9 @@ jobs:
         run: |
           corepack enable
           yarn install --immutable
+
+      - name: Generate PandaCSS
+        run: yarn prepare
 
       - name: Build CLI
         run: yarn cli:build
