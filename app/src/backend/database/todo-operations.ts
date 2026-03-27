@@ -155,17 +155,18 @@ export function syncTodosFromRemote(listId: string, remoteTodos: {
 
 		// Upsert remote todos
 		for (const remote of remoteTodos) {
-			if (localMap.has(remote.id)) {
-				db.prepare(
-					`UPDATE todos SET text = ?, description = ?, is_completed = ?, due_date = ?, sort_order = ?,
-					 updated_at = CURRENT_TIMESTAMP WHERE id = ?`
-				).run(remote.text, remote.description, remote.is_completed, remote.due_date, remote.sort_order, remote.id)
-			} else {
-				db.prepare(
-					`INSERT INTO todos (id, text, description, is_completed, due_date, todo_list_id, sort_order)
-					 VALUES (?, ?, ?, ?, ?, ?, ?)`
-				).run(remote.id, remote.text, remote.description, remote.is_completed, remote.due_date, listId, remote.sort_order)
-			}
+			db.prepare(
+				`INSERT INTO todos (id, text, description, is_completed, due_date, todo_list_id, sort_order)
+				 VALUES (?, ?, ?, ?, ?, ?, ?)
+				 ON CONFLICT(id) DO UPDATE SET
+				   text = excluded.text,
+				   description = excluded.description,
+				   is_completed = excluded.is_completed,
+				   due_date = excluded.due_date,
+				   todo_list_id = excluded.todo_list_id,
+				   sort_order = excluded.sort_order,
+				   updated_at = CURRENT_TIMESTAMP`
+			).run(remote.id, remote.text, remote.description, remote.is_completed, remote.due_date, listId, remote.sort_order)
 		}
 	})
 	transaction()

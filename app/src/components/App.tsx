@@ -19,6 +19,7 @@ function AppInner() {
 	// Handle remote unshare signals
 	onMount(() => {
 		syncStore.onUnshare(async (syncId: string) => {
+			// Check notes
 			const notes = store.notes() || []
 			const note = notes.find(n => n.sync_id === syncId)
 			if (note) {
@@ -28,6 +29,24 @@ function AppInner() {
 				if (current?.id === note.id) {
 					await editorStore.refreshCurrentNote()
 				}
+				return
+			}
+
+			// Check todo lists
+			const todoLists = store.todoLists() || []
+			const todoList = todoLists.find(l => l.sync_id === syncId)
+			if (todoList) {
+				await window.electronAPI.unshareTodoList(todoList.id)
+				store.refetchTodoLists()
+				return
+			}
+
+			// Check note lists
+			const lists = store.lists() || []
+			const list = lists.find(l => l.sync_id === syncId)
+			if (list) {
+				await window.electronAPI.unshareList(list.id)
+				store.refetchLists()
 			}
 		})
 	})
@@ -107,6 +126,23 @@ function AppInner() {
 					sync_secret: n.sync_secret!,
 					title: n.title,
 				})))
+			}
+		},
+		{ defer: true }
+	))
+
+	// When todos change, push updated state to all shared todo lists
+	createEffect(on(
+		() => store.todos(),
+		(todos) => {
+			if (!todos) return
+			const todoLists = store.todoLists() || []
+			for (const list of todoLists) {
+				if (!list.is_shared || !list.sync_id || !list.is_owner) continue
+				const todoSync = activeTodoListSyncs.get(list.sync_id)
+				if (!todoSync) continue
+				const listTodos = todos.filter(t => t.todo_list_id === list.id)
+				todoSync.pushLocal(listTodos)
 			}
 		},
 		{ defer: true }

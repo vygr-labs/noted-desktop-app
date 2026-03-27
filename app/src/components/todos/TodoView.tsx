@@ -592,6 +592,10 @@ export function TodoView() {
 
 	async function handleUnshareTodoList(e: Event, listId: string) {
 		e.stopPropagation()
+		const list = allTodoLists().find(l => l.id === listId)
+		if (list?.sync_id) {
+			syncStore.signalUnshare(list.sync_id)
+		}
 		await window.electronAPI.unshareTodoList(listId)
 		store.refetchTodoLists()
 	}
