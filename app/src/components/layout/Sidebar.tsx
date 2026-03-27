@@ -18,6 +18,7 @@ import {
 	DownloadIcon,
 	Share2Icon,
 	UsersIcon,
+	ArrowDownLeftIcon,
 } from 'lucide-solid'
 
 // ─── Styles ───────────────────────────────────────────────
@@ -787,8 +788,11 @@ export function Sidebar() {
 									>
 										<span class={listName}>{list.name}</span>
 									</Show>
-									<Show when={list.is_shared}>
-										<Share2Icon class={css({ width: '3', height: '3', color: 'indigo.9', flexShrink: 0 })} />
+									<Show when={list.is_shared && list.is_owner}>
+										<Share2Icon class={css({ width: '3', height: '3', color: 'indigo.9', flexShrink: 0 })} title="Shared by you" />
+									</Show>
+									<Show when={list.is_shared && !list.is_owner}>
+										<ArrowDownLeftIcon class={css({ width: '3', height: '3', color: 'green.9', flexShrink: 0 })} title="Shared with you" />
 									</Show>
 								</div>
 								<Show when={list.is_shared}>

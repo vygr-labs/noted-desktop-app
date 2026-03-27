@@ -17,6 +17,7 @@ interface Note {
 	sync_id: string | null
 	sync_secret: string | null
 	is_shared: number
+	is_owner: number
 	is_locked: number
 	created_at: string
 	updated_at: string
@@ -31,6 +32,7 @@ interface NoteList {
 	sync_id: string | null
 	sync_secret: string | null
 	is_shared: number
+	is_owner: number
 	created_at: string
 	updated_at: string
 }
@@ -69,6 +71,7 @@ interface TodoListItem {
 	sync_id: string | null
 	sync_secret: string | null
 	is_shared: number
+	is_owner: number
 	created_at: string
 }
 

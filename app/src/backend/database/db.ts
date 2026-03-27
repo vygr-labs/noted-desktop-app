@@ -277,6 +277,17 @@ function runMigrations() {
 		setSchemaVersion(10)
 	}
 
+	if (currentVersion < 11) {
+		// Add is_owner column to track sender vs recipient for shared items
+		for (const table of ['notes', 'lists', 'todo_lists']) {
+			const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
+			if (!cols.some(c => c.name === 'is_owner')) {
+				db.exec(`ALTER TABLE ${table} ADD COLUMN is_owner INTEGER DEFAULT 1;`)
+			}
+		}
+		setSchemaVersion(11)
+	}
+
 }
 
 runMigrations()

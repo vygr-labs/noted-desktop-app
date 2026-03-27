@@ -15,7 +15,7 @@ import {
 	ExternalLinkIcon,
 	Share2Icon,
 	UnlinkIcon,
-	LoaderIcon,
+	ArrowDownLeftIcon,
 } from 'lucide-solid'
 
 const container = css({
@@ -388,21 +388,37 @@ export function TodoView() {
 			// Called when remote changes arrive — refetch todos
 			setSyncLoading(false)
 			store.refetchTodos()
+		}, (meta) => {
+			// Remote metadata changed — update local list
+			window.electronAPI.updateTodoList(listId, meta).then(() => {
+				store.refetchTodoLists()
+			})
 		})
 
-		// Seed Yjs with local todos if Yjs is empty
-		if (activeTodoSync.isEmpty()) {
+		if (list.is_owner) {
+			// Owner — push metadata and local todos
+			activeTodoSync.pushMeta(list.name, list.color)
 			if (localTodos.length > 0) {
 				activeTodoSync.pushLocal(localTodos)
 			}
 		} else {
-			// Yjs has data — apply remote state to local
-			const remoteTodos = activeTodoSync.getRemoteTodos()
-			if (remoteTodos.length > 0) {
-				window.electronAPI.syncTodosFromRemote(listId, remoteTodos).then(() => {
-					setSyncLoading(false)
-					store.refetchTodos()
-				})
+			// Joiner — apply remote metadata and todos
+			if (activeTodoSync.hasMeta()) {
+				const meta = activeTodoSync.getRemoteMeta()
+				if (meta) {
+					window.electronAPI.updateTodoList(listId, meta).then(() => {
+						store.refetchTodoLists()
+					})
+				}
+			}
+			if (!activeTodoSync.isEmpty()) {
+				const remoteTodos = activeTodoSync.getRemoteTodos()
+				if (remoteTodos.length > 0) {
+					window.electronAPI.syncTodosFromRemote(listId, remoteTodos).then(() => {
+						setSyncLoading(false)
+						store.refetchTodos()
+					})
+				}
 			}
 		}
 	}))
@@ -662,7 +678,20 @@ export function TodoView() {
 									class={tabDot}
 									style={{ background: `var(--colors-${list.color}-9)` }}
 								/>
-								{list.name}
+								<Show
+									when={!(list.is_shared && !list.is_owner && list.name === 'Shared Todos')}
+									fallback={
+										<span class={css({ width: '60px', height: '13px', borderRadius: 'sm', bg: 'gray.a3', animation: 'pulse 1.5s ease-in-out infinite' })} />
+									}
+								>
+									{list.name}
+								</Show>
+								<Show when={list.is_shared && !list.is_owner}>
+									<ArrowDownLeftIcon class={css({ width: '3', height: '3', color: 'green.9', flexShrink: 0 })} title="Shared with you" />
+								</Show>
+								<Show when={list.is_shared && list.is_owner}>
+									<Share2Icon class={css({ width: '3', height: '3', color: 'indigo.9', flexShrink: 0 })} title="Shared by you" />
+								</Show>
 								<span class={tabCount}>
 									{countForList(list.id)}
 								</span>

@@ -43,24 +43,30 @@ function setYmapFromTodo(ymap: Y.Map<unknown>, todo: SyncTodo) {
 
 /**
  * Manages bidirectional sync between local SQLite todos and a Yjs Y.Array
- * for a shared todo list.
+ * for a shared todo list. Also syncs list metadata (name, color).
  */
 export class TodoListSync {
 	private todosArray: Y.Array<Y.Map<unknown>>
+	private meta: Y.Map<unknown>
 	private listId: string
 	private isApplyingRemote = false
 	private isApplyingLocal = false
 	private observer: ((event: Y.YArrayEvent<Y.Map<unknown>>) => void) | null = null
+	private metaObserver: (() => void) | null = null
 	private onRemoteChange: (() => void) | null = null
+	private onMetaChange: ((meta: { name: string; color: string }) => void) | null = null
 
 	constructor(
 		private ydoc: Y.Doc,
 		listId: string,
 		onChange: () => void,
+		onMetaChange?: (meta: { name: string; color: string }) => void,
 	) {
 		this.listId = listId
 		this.todosArray = ydoc.getArray('todos')
+		this.meta = ydoc.getMap('list_meta')
 		this.onRemoteChange = onChange
+		this.onMetaChange = onMetaChange || null
 
 		// Watch for remote changes
 		this.observer = () => {
@@ -70,6 +76,39 @@ export class TodoListSync {
 			this.isApplyingRemote = false
 		}
 		this.todosArray.observeDeep(this.observer)
+
+		// Watch for remote metadata changes
+		this.metaObserver = () => {
+			if (this.isApplyingLocal) return
+			const name = this.meta.get('name') as string
+			const color = this.meta.get('color') as string
+			if (name && this.onMetaChange) {
+				this.onMetaChange({ name, color: color || 'gray' })
+			}
+		}
+		this.meta.observe(this.metaObserver)
+	}
+
+	/** Push list metadata to Yjs */
+	pushMeta(name: string, color: string) {
+		this.isApplyingLocal = true
+		this.ydoc.transact(() => {
+			if (this.meta.get('name') !== name) this.meta.set('name', name)
+			if (this.meta.get('color') !== color) this.meta.set('color', color)
+		})
+		this.isApplyingLocal = false
+	}
+
+	/** Get remote metadata */
+	getRemoteMeta(): { name: string; color: string } | null {
+		const name = this.meta.get('name') as string
+		if (!name) return null
+		return { name, color: (this.meta.get('color') as string) || 'gray' }
+	}
+
+	/** Check if Yjs has metadata */
+	hasMeta(): boolean {
+		return !!this.meta.get('name')
 	}
 
 	/** Push local todos to Yjs. Call after local SQLite changes. */
@@ -155,6 +194,11 @@ export class TodoListSync {
 			this.todosArray.unobserveDeep(this.observer)
 			this.observer = null
 		}
+		if (this.metaObserver) {
+			this.meta.unobserve(this.metaObserver)
+			this.metaObserver = null
+		}
 		this.onRemoteChange = null
+		this.onMetaChange = null
 	}
 }
