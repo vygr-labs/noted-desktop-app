@@ -14,6 +14,8 @@ import {
 	SparklesIcon,
 	ExternalLinkIcon,
 	Share2Icon,
+	UnlinkIcon,
+	LoaderIcon,
 } from 'lucide-solid'
 
 const container = css({
@@ -347,6 +349,7 @@ export function TodoView() {
 	const [selectedListId, setSelectedListId] = createSignal<string | null>(null)
 	const [showNewList, setShowNewList] = createSignal(false)
 	const [newListName, setNewListName] = createSignal('')
+	const [syncLoading, setSyncLoading] = createSignal(false)
 
 	const allTodos = () => store.todos() || []
 	const allTodoLists = () => store.todoLists() || []
@@ -357,7 +360,7 @@ export function TodoView() {
 	const selectedList = createMemo(() => {
 		const id = selectedListId()
 		if (!id) return null
-		return (store.lists() || []).find(l => l.id === id) || null
+		return allTodoLists().find(l => l.id === id) || null
 	})
 
 	// Connect/disconnect todo sync when selected list changes
@@ -367,23 +370,28 @@ export function TodoView() {
 			activeTodoSync.destroy()
 			activeTodoSync = null
 		}
+		setSyncLoading(false)
 
 		if (!listId) return
 
 		// Find the list to check if it's shared
-		const list = (store.lists() || []).find(l => l.id === listId)
+		const list = allTodoLists().find(l => l.id === listId)
 		if (!list?.sync_id || !list?.sync_secret) return
+
+		// Show loading if this is a joined list with no local data
+		const localTodos = allTodos().filter(t => t.todo_list_id === listId)
+		if (localTodos.length === 0) setSyncLoading(true)
 
 		// Connect to the Yjs doc for this shared list
 		const managed = syncStore.getDoc(list.sync_id, list.sync_secret)
 		activeTodoSync = new TodoListSync(managed.ydoc, listId, () => {
 			// Called when remote changes arrive — refetch todos
+			setSyncLoading(false)
 			store.refetchTodos()
 		})
 
 		// Seed Yjs with local todos if Yjs is empty
 		if (activeTodoSync.isEmpty()) {
-			const localTodos = allTodos().filter(t => t.todo_list_id === listId)
 			if (localTodos.length > 0) {
 				activeTodoSync.pushLocal(localTodos)
 			}
@@ -392,6 +400,7 @@ export function TodoView() {
 			const remoteTodos = activeTodoSync.getRemoteTodos()
 			if (remoteTodos.length > 0) {
 				window.electronAPI.syncTodosFromRemote(listId, remoteTodos).then(() => {
+					setSyncLoading(false)
 					store.refetchTodos()
 				})
 			}
@@ -675,6 +684,13 @@ export function TodoView() {
 								>
 									<Share2Icon class={css({ width: '3', height: '3' })} />
 								</div>
+								<div
+									class={deleteTabBtn}
+									onClick={(e) => handleUnshareTodoList(e, list.id)}
+									title="Stop sharing"
+								>
+									<UnlinkIcon class={css({ width: '3', height: '3' })} />
+								</div>
 							</Show>
 							<div
 								class={deleteTabBtn}
@@ -734,15 +750,33 @@ export function TodoView() {
 				</div>
 
 				{/* Todo sections */}
+				<Show when={syncLoading()}>
+					<div class={css({
+						display: 'flex', flexDirection: 'column', gap: '3',
+						py: '4', animation: 'pulse 1.5s ease-in-out infinite',
+					})}>
+						<div class={css({ height: '14px', bg: 'gray.a3', borderRadius: 'md', width: '60%' })} />
+						<div class={css({ height: '48px', bg: 'gray.a2', borderRadius: 'md', width: '100%' })} />
+						<div class={css({ height: '48px', bg: 'gray.a2', borderRadius: 'md', width: '100%' })} />
+						<div class={css({ height: '48px', bg: 'gray.a2', borderRadius: 'md', width: '85%' })} />
+						<div style={{ 'text-align': 'center', 'padding-top': '8px' }}>
+							<span class={css({ fontSize: '13px', color: 'fg.muted' })}>
+								Syncing todos...
+							</span>
+						</div>
+					</div>
+				</Show>
 				<Show
 					when={hasTodos()}
 					fallback={
-						<EmptyState
-							icon={SparklesIcon}
-							title="All clear!"
-							description="Your to-do list is empty. Add something above to get started."
-							hint="Press Enter to add quickly"
-						/>
+						<Show when={!syncLoading()}>
+							<EmptyState
+								icon={SparklesIcon}
+								title="All clear!"
+								description="Your to-do list is empty. Add something above to get started."
+								hint="Press Enter to add quickly"
+							/>
+						</Show>
 					}
 				>
 					<div class={activeTodosSection}>

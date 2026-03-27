@@ -4,6 +4,7 @@ import { EditorStoreProvider, useEditorStore } from '../stores/editor-store'
 import { SettingsStoreProvider } from '../stores/settings-store'
 import { SyncStoreProvider, useSyncStore } from '../stores/sync-store'
 import { NoteListSync } from '../lib/list-sync'
+import { TodoListSync } from '../lib/todo-sync'
 import { AppShell } from './layout/AppShell'
 import { SettingsDialog } from './settings/SettingsDialog'
 import { CommandPalette } from './search/CommandPalette'
@@ -13,6 +14,7 @@ function AppInner() {
 	const editorStore = useEditorStore()
 	const syncStore = useSyncStore()
 	const activeListSyncs = new Map<string, NoteListSync>()
+	const activeTodoListSyncs = new Map<string, TodoListSync>()
 
 	// Handle remote unshare signals
 	onMount(() => {
@@ -110,11 +112,60 @@ function AppInner() {
 		{ defer: true }
 	))
 
+	// Sync shared todo lists — connect to Yjs for each shared todo list on startup
+	createEffect(on(
+		() => store.todoLists(),
+		(todoLists) => {
+			if (!todoLists) return
+			const sharedLists = todoLists.filter(l => l.is_shared && l.sync_id && l.sync_secret)
+			const activeSyncIds = new Set(sharedLists.map(l => l.sync_id!))
+
+			// Cleanup syncs for lists that are no longer shared
+			for (const [syncId, sync] of activeTodoListSyncs) {
+				if (!activeSyncIds.has(syncId)) {
+					sync.destroy()
+					syncStore.releaseDoc(syncId)
+					activeTodoListSyncs.delete(syncId)
+				}
+			}
+
+			// Connect syncs for newly shared lists
+			for (const list of sharedLists) {
+				if (activeTodoListSyncs.has(list.sync_id!)) continue
+
+				const managed = syncStore.getDoc(list.sync_id!, list.sync_secret!)
+				const todoSync = new TodoListSync(managed.ydoc, list.id, () => {
+					store.refetchTodos()
+				})
+				activeTodoListSyncs.set(list.sync_id!, todoSync)
+
+				// If we have local todos, push them (we're the owner)
+				if (list.name !== 'Shared Todos') {
+					window.electronAPI.fetchTodosByList(list.id).then(todos => {
+						if (todos.length > 0) todoSync.pushLocal(todos)
+					})
+				} else if (!todoSync.isEmpty()) {
+					// We joined — apply remote state
+					const remoteTodos = todoSync.getRemoteTodos()
+					if (remoteTodos.length > 0) {
+						window.electronAPI.syncTodosFromRemote(list.id, remoteTodos).then(() => {
+							store.refetchTodos()
+						})
+					}
+				}
+			}
+		}
+	))
+
 	onCleanup(() => {
 		for (const [, sync] of activeListSyncs) {
 			sync.destroy()
 		}
 		activeListSyncs.clear()
+		for (const [, sync] of activeTodoListSyncs) {
+			sync.destroy()
+		}
+		activeTodoListSyncs.clear()
 	})
 
 	return (
