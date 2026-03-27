@@ -520,7 +520,7 @@ export default function PopoutView() {
 					</Show>
 				</div>
 			}>
-				<div class={noteViewContent}>
+				<div class={noteViewContent} style={{ 'user-select': 'text' }}>
 					<Show when={isPlainNote()} fallback={
 						<div class="tiptap popup" innerHTML={noteHtml()} />
 					}>

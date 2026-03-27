@@ -1,4 +1,4 @@
-import { ipcMain } from 'electron'
+import { ipcMain, BrowserWindow } from 'electron'
 import {
 	fetchAllNotes,
 	fetchNoteById,
@@ -12,6 +12,14 @@ import {
 	deleteNotePermanently,
 } from '../database/note-operations.js'
 
+function broadcastNotesChanged(sender: Electron.WebContents) {
+	for (const win of BrowserWindow.getAllWindows()) {
+		if (win.webContents !== sender && !win.isDestroyed()) {
+			win.webContents.send('popout:todos-changed')
+		}
+	}
+}
+
 export function registerNotesHandlers() {
 	ipcMain.handle('notes:fetch-all', (_, sort?: string) => fetchAllNotes(sort as any))
 	ipcMain.handle('notes:fetch', (_, id: string) => fetchNoteById(id))
@@ -23,9 +31,11 @@ export function registerNotesHandlers() {
 		fetchDailyNote(date)
 	)
 	ipcMain.handle('notes:create', (_, data) => createNote(data))
-	ipcMain.handle('notes:update', (_, id: string, data) =>
-		updateNote(id, data)
-	)
+	ipcMain.handle('notes:update', (event, id: string, data) => {
+		const result = updateNote(id, data)
+		broadcastNotesChanged(event.sender)
+		return result
+	})
 	ipcMain.handle('notes:trash', (_, id: string) => trashNote(id))
 	ipcMain.handle('notes:restore', (_, id: string) => restoreNote(id))
 	ipcMain.handle('notes:delete-permanently', (_, id: string) =>
