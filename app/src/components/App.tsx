@@ -136,21 +136,37 @@ function AppInner() {
 				const managed = syncStore.getDoc(list.sync_id!, list.sync_secret!)
 				const todoSync = new TodoListSync(managed.ydoc, list.id, () => {
 					store.refetchTodos()
+				}, (meta) => {
+					// Remote metadata changed — update local list
+					window.electronAPI.updateTodoList(list.id, meta).then(() => {
+						store.refetchTodoLists()
+					})
 				})
 				activeTodoListSyncs.set(list.sync_id!, todoSync)
 
-				// If we have local todos, push them (we're the owner)
-				if (list.name !== 'Shared Todos') {
+				if (list.is_owner) {
+					// Owner — push metadata and local todos
+					todoSync.pushMeta(list.name, list.color)
 					window.electronAPI.fetchTodosByList(list.id).then(todos => {
 						if (todos.length > 0) todoSync.pushLocal(todos)
 					})
-				} else if (!todoSync.isEmpty()) {
-					// We joined — apply remote state
-					const remoteTodos = todoSync.getRemoteTodos()
-					if (remoteTodos.length > 0) {
-						window.electronAPI.syncTodosFromRemote(list.id, remoteTodos).then(() => {
-							store.refetchTodos()
-						})
+				} else {
+					// Joiner — apply remote metadata and todos
+					if (todoSync.hasMeta()) {
+						const meta = todoSync.getRemoteMeta()
+						if (meta) {
+							window.electronAPI.updateTodoList(list.id, meta).then(() => {
+								store.refetchTodoLists()
+							})
+						}
+					}
+					if (!todoSync.isEmpty()) {
+						const remoteTodos = todoSync.getRemoteTodos()
+						if (remoteTodos.length > 0) {
+							window.electronAPI.syncTodosFromRemote(list.id, remoteTodos).then(() => {
+								store.refetchTodos()
+							})
+						}
 					}
 				}
 			}

@@ -69,8 +69,8 @@ export function registerSyncHandlers() {
 		const title = opts?.title || 'Shared Note'
 		const id = generateId()
 		db.prepare(
-			`INSERT INTO notes (id, title, note_type, list_id, sync_id, sync_secret, is_shared)
-			 VALUES (?, ?, 'rich', ?, ?, ?, 1)`
+			`INSERT INTO notes (id, title, note_type, list_id, sync_id, sync_secret, is_shared, is_owner)
+			 VALUES (?, ?, 'rich', ?, ?, ?, 1, 0)`
 		).run(id, title, opts?.list_id || null, parsed.syncId, parsed.docSecret)
 
 		db.prepare(
@@ -132,8 +132,8 @@ export function registerSyncHandlers() {
 
 		const id = generateId()
 		db.prepare(
-			`INSERT INTO lists (id, name, icon, color, sort_order, sync_id, sync_secret, is_shared)
-			 VALUES (?, 'Shared List', 'folder', 'gray', (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM lists), ?, ?, 1)`
+			`INSERT INTO lists (id, name, icon, color, sort_order, sync_id, sync_secret, is_shared, is_owner)
+			 VALUES (?, 'Shared List', 'folder', 'gray', (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM lists), ?, ?, 1, 0)`
 		).run(id, parsed.syncId, parsed.docSecret)
 
 		return id
@@ -176,8 +176,8 @@ export function registerSyncHandlers() {
 
 		const id = generateId()
 		db.prepare(
-			`INSERT INTO todo_lists (id, name, color, sort_order, sync_id, sync_secret, is_shared)
-			 VALUES (?, 'Shared Todos', 'gray', (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM todo_lists), ?, ?, 1)`
+			`INSERT INTO todo_lists (id, name, color, sort_order, sync_id, sync_secret, is_shared, is_owner)
+			 VALUES (?, 'Shared Todos', 'gray', (SELECT COALESCE(MAX(sort_order), -1) + 1 FROM todo_lists), ?, ?, 1, 0)`
 		).run(id, parsed.syncId, parsed.docSecret)
 
 		return id

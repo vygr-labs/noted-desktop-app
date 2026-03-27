@@ -33,6 +33,7 @@ import {
 	LockIcon,
 	UnlockIcon,
 	TypeIcon,
+	ArrowDownLeftIcon,
 } from 'lucide-solid'
 
 const editorContainer = css({
@@ -687,10 +688,12 @@ export function EditorPane() {
 											}
 											setShowShareMenu(!showShareMenu())
 										}}
-										title={(shareCode() || note().is_shared) ? 'Sharing active' : 'Share note'}
-										style={(shareCode() || note().is_shared) ? { color: 'var(--colors-indigo-11)', opacity: '1' } : {}}
+										title={note().is_shared && !note().is_owner ? 'Shared with you' : (shareCode() || note().is_shared) ? 'Shared by you' : 'Share note'}
+										style={(shareCode() || note().is_shared) ? { color: note().is_owner ? 'var(--colors-indigo-11)' : 'var(--colors-green-11)', opacity: '1' } : {}}
 									>
-										<Share2Icon class={controlIconSize} />
+										<Show when={note().is_shared && !note().is_owner} fallback={<Share2Icon class={controlIconSize} />}>
+											<ArrowDownLeftIcon class={controlIconSize} />
+										</Show>
 									</button>
 									<Show when={showShareMenu()}>
 										<div class={exportMenu}>
