@@ -381,11 +381,13 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		setupCheckboxHandler()
 
 		// Persist synced content to DB so note.content gets populated
-		// (clears "Syncing" state for joined notes)
+		// (clears "Syncing" skeleton for joined notes)
 		if (editor.getText().trim()) {
 			const json = JSON.stringify(editor.getJSON())
 			const plainText = tiptapToPlaintext(json)
-			editorStore.saveNote({ content: json, content_plain: plainText })
+			editorStore.saveNote({ content: json, content_plain: plainText }).then(() => {
+				editorStore.refreshCurrentNote()
+			})
 		}
 	}
 

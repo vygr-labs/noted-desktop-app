@@ -171,7 +171,6 @@ export function NoteCard(props: {
 
 	const preview = () => {
 		if (props.note.is_locked) return 'Locked'
-		if (isSyncing()) return 'Syncing...'
 		if (props.isActive) {
 			const live = editorStore.livePreview()
 			if (live !== null) return live
@@ -206,7 +205,11 @@ export function NoteCard(props: {
 			>
 				<div class={`card-indicator ${indicator}`} />
 				<div class={titleRow}>
-					<span class={titleText}>{title()}</span>
+					<Show when={!isSyncing()} fallback={
+						<span class={css({ height: '14px', width: '60%', borderRadius: 'sm', bg: 'gray.a4', animation: 'pulse 1.5s ease-in-out infinite' })} />
+					}>
+						<span class={titleText}>{title()}</span>
+					</Show>
 					<Show when={props.note.is_shared}>
 						<Share2Icon class={pinStyle} style={{ color: 'var(--colors-indigo-9)' }} />
 					</Show>
@@ -224,7 +227,13 @@ export function NoteCard(props: {
 						<EllipsisIcon class={ellipsisIcon} />
 					</button>
 				</div>
-				<Show when={preview()}>
+				<Show when={isSyncing()}>
+					<div class={css({ display: 'flex', flexDirection: 'column', gap: '1.5', mt: '1', animation: 'pulse 1.5s ease-in-out infinite' })}>
+						<div class={css({ height: '10px', width: '90%', borderRadius: 'xs', bg: 'gray.a3' })} />
+						<div class={css({ height: '10px', width: '65%', borderRadius: 'xs', bg: 'gray.a3' })} />
+					</div>
+				</Show>
+				<Show when={!isSyncing() && preview()}>
 					<div class={previewText}>{preview()}</div>
 				</Show>
 				<div class={metaRow}>

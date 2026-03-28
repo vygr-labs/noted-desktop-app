@@ -105,14 +105,22 @@ function AppInner() {
 							sync_secret: n.sync_secret!,
 							title: n.title,
 						})))
-					} else if (listSync.hasMeta()) {
-						// We joined this list — apply remote metadata
-						const meta = listSync.getRemoteMeta()
-						if (meta) {
-							window.electronAPI.updateList(list.id, meta).then(() => {
-								store.refetchLists()
-							})
+
+						// Re-trigger the notes effect so it can seed Yjs docs
+						// (it skipped earlier because the list sync wasn't created yet)
+						store.refetchNotes()
+					} else {
+						// We joined this list — apply remote metadata and notes
+						if (listSync.hasMeta()) {
+							const meta = listSync.getRemoteMeta()
+							if (meta) {
+								window.electronAPI.updateList(list.id, meta).then(() => {
+									store.refetchLists()
+								})
+							}
 						}
+						// Apply notes already in the Yjs doc (arrived before observers were set up)
+						listSync.applyInitialNotes()
 					}
 				}).catch(err => {
 					pendingListConnects.delete(syncId)

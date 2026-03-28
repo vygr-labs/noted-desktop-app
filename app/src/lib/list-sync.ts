@@ -152,6 +152,18 @@ export class NoteListSync {
 		}
 	}
 
+	/** Check if Yjs has any note entries */
+	hasNotes(): boolean {
+		return this.notesArray.length > 0
+	}
+
+	/** Apply notes already present in the Yjs doc (for initial sync after async getDoc) */
+	applyInitialNotes() {
+		if (this.notesArray.length > 0) {
+			this.applyRemoteNotes()
+		}
+	}
+
 	/** Get remote metadata */
 	getRemoteMeta(): { name: string; color: string; icon: string } | null {
 		const name = this.meta.get('name') as string
