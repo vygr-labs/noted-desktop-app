@@ -191,16 +191,22 @@ export function NoteHeader(props: { note: Note; readonly?: boolean }) {
 		appStore.setSelectedNoteId(null)
 	}
 
+	const isSyncing = () => props.note.is_shared && !props.note.content && !props.note.content_plain
+
 	return (
 		<div class={headerStyle}>
-			<input
-				ref={titleInputRef}
-				class={titleInput}
-				value={localTitle()}
-				onInput={(e) => handleTitleChange(e.currentTarget.value)}
-				placeholder="Untitled"
-				disabled={props.readonly}
-			/>
+			<Show when={!isSyncing()} fallback={
+				<div class={css({ height: '32px', width: '50%', borderRadius: 'md', bg: 'gray.a3', mt: '1', animation: 'pulse 1.5s ease-in-out infinite' })} />
+			}>
+				<input
+					ref={titleInputRef}
+					class={titleInput}
+					value={localTitle()}
+					onInput={(e) => handleTitleChange(e.currentTarget.value)}
+					placeholder="Untitled"
+					disabled={props.readonly}
+				/>
+			</Show>
 			<div class={metaRow}>
 				<span class={metaText}>
 					{formatCreatedDate(props.note.created_at)}

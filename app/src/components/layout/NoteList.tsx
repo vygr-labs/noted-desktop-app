@@ -53,10 +53,11 @@ export function NoteList() {
 	const isToday = () => currentView() === 'today'
 	const isTrash = () => currentView() === 'trash'
 
-	// Load list-specific notes or trashed notes
+	// Load list-specific notes or trashed notes.
+	// Also re-fetch when the global notes signal changes (e.g. new notes joined via list sync).
 	createEffect(
 		on(
-			() => ({ view: store.currentView(), sort: store.noteSort() }),
+			() => ({ view: store.currentView(), sort: store.noteSort(), _: store.notes() }),
 			async ({ view, sort }) => {
 				if (typeof view === 'object' && view.type === 'list') {
 					const notes = await window.electronAPI.fetchNotesByList(
