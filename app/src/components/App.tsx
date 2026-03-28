@@ -16,6 +16,9 @@ function AppInner() {
 	const syncStore = useSyncStore()
 	const activeListSyncs = new Map<string, NoteListSync>()
 	const activeTodoListSyncs = new Map<string, TodoListSync>()
+	// Track pending async getDoc calls so we can ignore stale results
+	const pendingListConnects = new Set<string>()
+	const pendingTodoConnects = new Set<string>()
 
 	// Handle remote unshare signals
 	onMount(() => {
@@ -72,37 +75,49 @@ function AppInner() {
 
 			// Connect syncs for newly shared lists
 			for (const list of sharedLists) {
-				if (activeListSyncs.has(list.sync_id!)) continue
+				if (activeListSyncs.has(list.sync_id!) || pendingListConnects.has(list.sync_id!)) continue
 
-				const managed = syncStore.getDoc(list.sync_id!, list.sync_secret!)
-				const listSync = new NoteListSync(managed.ydoc, list.id, () => {
-					store.refetchLists()
-					store.refetchNotes()
-				})
-				activeListSyncs.set(list.sync_id!, listSync)
+				const syncId = list.sync_id!
+				pendingListConnects.add(syncId)
 
-				// If we have metadata, push it (we're the owner or have local data)
-				if (list.name && list.name !== 'Shared List') {
-					listSync.pushMeta(list.name, list.color, list.icon)
+				syncStore.getDoc(syncId, list.sync_secret!).then(handle => {
+					pendingListConnects.delete(syncId)
 
-					// Push note membership
-					const notes = (store.notes() || []).filter(
-						n => n.list_id === list.id && n.sync_id && n.sync_secret && !n.is_trashed
-					)
-					listSync.pushNotes(notes.map(n => ({
-						sync_id: n.sync_id!,
-						sync_secret: n.sync_secret!,
-						title: n.title,
-					})))
-				} else if (listSync.hasMeta()) {
-					// We joined this list — apply remote metadata
-					const meta = listSync.getRemoteMeta()
-					if (meta) {
-						window.electronAPI.updateList(list.id, meta).then(() => {
-							store.refetchLists()
-						})
+					// Stale guard: list may have been unshared while we waited
+					if (activeListSyncs.has(syncId)) return
+
+					const listSync = new NoteListSync(handle.ydoc, list.id, () => {
+						store.refetchLists()
+						store.refetchNotes()
+					})
+					activeListSyncs.set(syncId, listSync)
+
+					// If we have metadata, push it (we're the owner or have local data)
+					if (list.name && list.name !== 'Shared List') {
+						listSync.pushMeta(list.name, list.color, list.icon)
+
+						// Push note membership
+						const notes = (store.notes() || []).filter(
+							n => n.list_id === list.id && n.sync_id && n.sync_secret && !n.is_trashed
+						)
+						listSync.pushNotes(notes.map(n => ({
+							sync_id: n.sync_id!,
+							sync_secret: n.sync_secret!,
+							title: n.title,
+						})))
+					} else if (listSync.hasMeta()) {
+						// We joined this list — apply remote metadata
+						const meta = listSync.getRemoteMeta()
+						if (meta) {
+							window.electronAPI.updateList(list.id, meta).then(() => {
+								store.refetchLists()
+							})
+						}
 					}
-				}
+				}).catch(err => {
+					pendingListConnects.delete(syncId)
+					console.error(`[app] Failed to connect list sync for ${syncId}:`, err)
+				})
 			}
 		}
 	))
@@ -134,10 +149,15 @@ function AppInner() {
 				for (const note of listNotes) {
 					if (!note.content || !note.is_owner || seededNotes.has(note.sync_id!)) continue
 					seededNotes.add(note.sync_id!)
-					const managed = syncStore.getDoc(note.sync_id!, note.sync_secret!)
-					seedYjsWithContent(managed.ydoc, note.content)
-					// Release after seeding — idle timer keeps connection alive briefly
-					syncStore.releaseDoc(note.sync_id!)
+					const noteSyncId = note.sync_id!
+
+					syncStore.getDoc(noteSyncId, note.sync_secret!).then(handle => {
+						seedYjsWithContent(handle.ydoc, note.content!)
+						// Release after seeding — idle timer keeps connection alive briefly
+						syncStore.releaseDoc(noteSyncId)
+					}).catch(err => {
+						console.error(`[app] Failed to seed note ${noteSyncId}:`, err)
+					})
 				}
 			}
 		},
@@ -180,44 +200,56 @@ function AppInner() {
 
 			// Connect syncs for newly shared lists
 			for (const list of sharedLists) {
-				if (activeTodoListSyncs.has(list.sync_id!)) continue
+				if (activeTodoListSyncs.has(list.sync_id!) || pendingTodoConnects.has(list.sync_id!)) continue
 
-				const managed = syncStore.getDoc(list.sync_id!, list.sync_secret!)
-				const todoSync = new TodoListSync(managed.ydoc, list.id, () => {
-					store.refetchTodos()
-				}, (meta) => {
-					// Remote metadata changed — update local list
-					window.electronAPI.updateTodoList(list.id, meta).then(() => {
-						store.refetchTodoLists()
+				const syncId = list.sync_id!
+				pendingTodoConnects.add(syncId)
+
+				syncStore.getDoc(syncId, list.sync_secret!).then(handle => {
+					pendingTodoConnects.delete(syncId)
+
+					// Stale guard
+					if (activeTodoListSyncs.has(syncId)) return
+
+					const todoSync = new TodoListSync(handle.ydoc, list.id, () => {
+						store.refetchTodos()
+					}, (meta) => {
+						// Remote metadata changed — update local list
+						window.electronAPI.updateTodoList(list.id, meta).then(() => {
+							store.refetchTodoLists()
+						})
 					})
+					activeTodoListSyncs.set(syncId, todoSync)
+
+					if (list.is_owner) {
+						// Owner — push metadata and local todos
+						todoSync.pushMeta(list.name, list.color)
+						window.electronAPI.fetchTodosByList(list.id).then((todos: Todo[]) => {
+							if (todos.length > 0) todoSync.pushLocal(todos)
+						})
+					} else {
+						// Joiner — apply remote metadata and todos
+						if (todoSync.hasMeta()) {
+							const meta = todoSync.getRemoteMeta()
+							if (meta) {
+								window.electronAPI.updateTodoList(list.id, meta).then(() => {
+									store.refetchTodoLists()
+								})
+							}
+						}
+						if (!todoSync.isEmpty()) {
+							const remoteTodos = todoSync.getRemoteTodos()
+							if (remoteTodos.length > 0) {
+								window.electronAPI.syncTodosFromRemote(list.id, remoteTodos).then(() => {
+									store.refetchTodos()
+								})
+							}
+						}
+					}
+				}).catch(err => {
+					pendingTodoConnects.delete(syncId)
+					console.error(`[app] Failed to connect todo sync for ${syncId}:`, err)
 				})
-				activeTodoListSyncs.set(list.sync_id!, todoSync)
-
-				if (list.is_owner) {
-					// Owner — push metadata and local todos
-					todoSync.pushMeta(list.name, list.color)
-					window.electronAPI.fetchTodosByList(list.id).then(todos => {
-						if (todos.length > 0) todoSync.pushLocal(todos)
-					})
-				} else {
-					// Joiner — apply remote metadata and todos
-					if (todoSync.hasMeta()) {
-						const meta = todoSync.getRemoteMeta()
-						if (meta) {
-							window.electronAPI.updateTodoList(list.id, meta).then(() => {
-								store.refetchTodoLists()
-							})
-						}
-					}
-					if (!todoSync.isEmpty()) {
-						const remoteTodos = todoSync.getRemoteTodos()
-						if (remoteTodos.length > 0) {
-							window.electronAPI.syncTodosFromRemote(list.id, remoteTodos).then(() => {
-								store.refetchTodos()
-							})
-						}
-					}
-				}
 			}
 		}
 	))

@@ -41,18 +41,22 @@ function setYmapFromTodo(ymap: Y.Map<unknown>, todo: SyncTodo) {
 	if (ymap.get('sort_order') !== todo.sort_order) ymap.set('sort_order', todo.sort_order)
 }
 
+const LOCAL_ORIGIN = Symbol('todo-sync-local')
+
 /**
  * Manages bidirectional sync between local SQLite todos and a Yjs Y.Array
  * for a shared todo list. Also syncs list metadata (name, color).
+ *
+ * Uses Yjs transaction origins (Symbol) instead of boolean flags
+ * to safely distinguish local vs remote changes across async boundaries.
  */
 export class TodoListSync {
 	private todosArray: Y.Array<Y.Map<unknown>>
 	private meta: Y.Map<unknown>
 	private listId: string
-	private isApplyingRemote = false
-	private isApplyingLocal = false
-	private observer: ((event: Y.YArrayEvent<Y.Map<unknown>>) => void) | null = null
-	private metaObserver: (() => void) | null = null
+	private applyingRemote = false // guard for re-entrant remote apply
+	private observer: ((events: Y.YEvent<any>[]) => void) | null = null
+	private metaObserver: ((event: Y.YMapEvent<unknown>) => void) | null = null
 	private onRemoteChange: (() => void) | null = null
 	private onMetaChange: ((meta: { name: string; color: string }) => void) | null = null
 
@@ -68,18 +72,17 @@ export class TodoListSync {
 		this.onRemoteChange = onChange
 		this.onMetaChange = onMetaChange || null
 
-		// Watch for remote changes
-		this.observer = () => {
-			if (this.isApplyingLocal) return
-			this.isApplyingRemote = true
+		// Watch for remote changes — use transaction origin to filter local
+		this.observer = (events) => {
+			const isLocal = events.some(e => e.transaction.origin === LOCAL_ORIGIN)
+			if (isLocal) return
 			this.applyRemoteToLocal()
-			this.isApplyingRemote = false
 		}
 		this.todosArray.observeDeep(this.observer)
 
 		// Watch for remote metadata changes
-		this.metaObserver = () => {
-			if (this.isApplyingLocal) return
+		this.metaObserver = (event) => {
+			if (event.transaction.origin === LOCAL_ORIGIN) return
 			const name = this.meta.get('name') as string
 			const color = this.meta.get('color') as string
 			if (name && this.onMetaChange) {
@@ -91,12 +94,10 @@ export class TodoListSync {
 
 	/** Push list metadata to Yjs */
 	pushMeta(name: string, color: string) {
-		this.isApplyingLocal = true
 		this.ydoc.transact(() => {
 			if (this.meta.get('name') !== name) this.meta.set('name', name)
 			if (this.meta.get('color') !== color) this.meta.set('color', color)
-		})
-		this.isApplyingLocal = false
+		}, LOCAL_ORIGIN)
 	}
 
 	/** Get remote metadata */
@@ -113,9 +114,8 @@ export class TodoListSync {
 
 	/** Push local todos to Yjs. Call after local SQLite changes. */
 	pushLocal(todos: Todo[]) {
-		if (this.isApplyingRemote) return
+		if (this.applyingRemote) return
 
-		this.isApplyingLocal = true
 		this.ydoc.transact(() => {
 			const localMap = new Map(todos.map(t => [t.id, todoToSync(t)]))
 			const yjsMap = new Map<string, { index: number; ymap: Y.Map<unknown> }>()
@@ -151,26 +151,33 @@ export class TodoListSync {
 					this.todosArray.push([ymap])
 				}
 			}
-		})
-		this.isApplyingLocal = false
+		}, LOCAL_ORIGIN)
 	}
 
 	/** Apply remote Yjs state to local SQLite. Called when Yjs changes from remote. */
-	private applyRemoteToLocal() {
-		const remoteTodos: SyncTodo[] = []
-		for (let i = 0; i < this.todosArray.length; i++) {
-			const ymap = this.todosArray.get(i)
-			const id = ymap.get('id') as string
-			if (id) {
-				const todo = ymapToSync(ymap)
-				todo.sort_order = i
-				remoteTodos.push(todo)
-			}
-		}
+	private async applyRemoteToLocal() {
+		if (this.applyingRemote) return
+		this.applyingRemote = true
 
-		window.electronAPI.syncTodosFromRemote(this.listId, remoteTodos).then(() => {
+		try {
+			const remoteTodos: SyncTodo[] = []
+			for (let i = 0; i < this.todosArray.length; i++) {
+				const ymap = this.todosArray.get(i)
+				const id = ymap.get('id') as string
+				if (id) {
+					const todo = ymapToSync(ymap)
+					todo.sort_order = i
+					remoteTodos.push(todo)
+				}
+			}
+
+			await window.electronAPI.syncTodosFromRemote(this.listId, remoteTodos)
 			this.onRemoteChange?.()
-		})
+		} catch (err) {
+			console.error(`[todo-sync] Failed to sync remote todos for list ${this.listId}:`, err)
+		} finally {
+			this.applyingRemote = false
+		}
 	}
 
 	/** Get current Yjs todos (for initial merge check) */

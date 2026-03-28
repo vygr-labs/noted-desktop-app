@@ -6,19 +6,24 @@ interface SyncNoteMember {
 	title: string
 }
 
+const LOCAL_ORIGIN = Symbol('list-sync-local')
+
 /**
  * Syncs note list metadata (name, color, icon) and note membership
  * via a Yjs document. When the owner updates the list or adds/removes
  * notes, the changes propagate to all collaborators.
+ *
+ * Uses Yjs transaction origins (Symbol) instead of a boolean flag
+ * to safely distinguish local vs remote changes across async boundaries.
  */
 export class NoteListSync {
 	private meta: Y.Map<unknown>
 	private notesArray: Y.Array<Y.Map<unknown>>
 	private listId: string
-	private isApplyingLocal = false
-	private metaObserver: (() => void) | null = null
-	private notesObserver: (() => void) | null = null
+	private metaObserver: ((event: Y.YMapEvent<unknown>) => void) | null = null
+	private notesObserver: ((events: Y.YEvent<any>[]) => void) | null = null
 	private onRemoteChange: (() => void) | null = null
+	private applyingRemoteNotes = false // dedup guard for concurrent applyRemoteNotes
 
 	constructor(
 		private ydoc: Y.Doc,
@@ -31,15 +36,16 @@ export class NoteListSync {
 		this.onRemoteChange = onChange
 
 		// Watch for remote metadata changes
-		this.metaObserver = () => {
-			if (this.isApplyingLocal) return
+		this.metaObserver = (event) => {
+			if (event.transaction.origin === LOCAL_ORIGIN) return
 			this.applyRemoteMeta()
 		}
 		this.meta.observe(this.metaObserver)
 
 		// Watch for remote note membership changes
-		this.notesObserver = () => {
-			if (this.isApplyingLocal) return
+		this.notesObserver = (events) => {
+			const isLocal = events.some(e => e.transaction.origin === LOCAL_ORIGIN)
+			if (isLocal) return
 			this.applyRemoteNotes()
 		}
 		this.notesArray.observeDeep(this.notesObserver)
@@ -47,18 +53,15 @@ export class NoteListSync {
 
 	/** Push list metadata to Yjs */
 	pushMeta(name: string, color: string, icon: string) {
-		this.isApplyingLocal = true
 		this.ydoc.transact(() => {
 			if (this.meta.get('name') !== name) this.meta.set('name', name)
 			if (this.meta.get('color') !== color) this.meta.set('color', color)
 			if (this.meta.get('icon') !== icon) this.meta.set('icon', icon)
-		})
-		this.isApplyingLocal = false
+		}, LOCAL_ORIGIN)
 	}
 
 	/** Push note membership to Yjs */
 	pushNotes(notes: { sync_id: string; sync_secret: string; title: string }[]) {
-		this.isApplyingLocal = true
 		this.ydoc.transact(() => {
 			// Build map of existing Yjs entries
 			const yjsMap = new Map<string, { index: number; ymap: Y.Map<unknown> }>()
@@ -93,8 +96,7 @@ export class NoteListSync {
 					this.notesArray.push([ymap])
 				}
 			}
-		})
-		this.isApplyingLocal = false
+		}, LOCAL_ORIGIN)
 	}
 
 	/** Apply remote metadata to local DB */
@@ -105,36 +107,49 @@ export class NoteListSync {
 		if (name) {
 			window.electronAPI.updateList(this.listId, { name, color, icon }).then(() => {
 				this.onRemoteChange?.()
+			}).catch((err: unknown) => {
+				console.error(`[list-sync] Failed to apply remote meta for list ${this.listId}:`, err)
 			})
 		}
 	}
 
 	/** Apply remote note membership — create local note entries for new shared notes */
-	private applyRemoteNotes() {
-		const remoteNotes: SyncNoteMember[] = []
-		for (let i = 0; i < this.notesArray.length; i++) {
-			const ymap = this.notesArray.get(i)
-			const syncId = ymap.get('sync_id') as string
-			const syncSecret = ymap.get('sync_secret') as string
-			const title = ymap.get('title') as string
-			if (syncId && syncSecret) {
-				remoteNotes.push({ sync_id: syncId, sync_secret: syncSecret, title: title || 'Shared Note' })
-			}
-		}
+	private async applyRemoteNotes() {
+		// Dedup: if already processing, skip this invocation
+		if (this.applyingRemoteNotes) return
+		this.applyingRemoteNotes = true
 
-		// For each remote note, join it and link to this list
-		if (remoteNotes.length === 0) return
-		Promise.all(remoteNotes.map(async (note) => {
-			const code = `n:${note.sync_id}.${note.sync_secret}`
-			await window.electronAPI.joinSharedNote(code, {
-				list_id: this.listId,
-				title: note.title,
-			})
-		})).then(() => {
+		try {
+			const remoteNotes: SyncNoteMember[] = []
+			for (let i = 0; i < this.notesArray.length; i++) {
+				const ymap = this.notesArray.get(i)
+				const syncId = ymap.get('sync_id') as string
+				const syncSecret = ymap.get('sync_secret') as string
+				const title = ymap.get('title') as string
+				if (syncId && syncSecret) {
+					remoteNotes.push({ sync_id: syncId, sync_secret: syncSecret, title: title || 'Shared Note' })
+				}
+			}
+
+			if (remoteNotes.length === 0) return
+
+			// Process sequentially to avoid duplicate join race conditions
+			for (const note of remoteNotes) {
+				const code = `n:${note.sync_id}.${note.sync_secret}`
+				try {
+					await window.electronAPI.joinSharedNote(code, {
+						list_id: this.listId,
+						title: note.title,
+					})
+				} catch (err) {
+					console.error(`[list-sync] Failed to join shared note ${note.sync_id}:`, err)
+				}
+			}
+
 			this.onRemoteChange?.()
-		}).catch(() => {
-			this.onRemoteChange?.()
-		})
+		} finally {
+			this.applyingRemoteNotes = false
+		}
 	}
 
 	/** Get remote metadata */

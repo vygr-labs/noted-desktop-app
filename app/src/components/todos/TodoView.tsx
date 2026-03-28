@@ -355,6 +355,8 @@ export function TodoView() {
 	const allTodoLists = () => store.todoLists() || []
 	let dragTodoId: string | null = null
 	let activeTodoSync: TodoListSync | null = null
+	let activeTodoSyncId: string | null = null
+	let todoSyncGeneration = 0
 
 	// Get the currently selected list object
 	const selectedList = createMemo(() => {
@@ -365,10 +367,14 @@ export function TodoView() {
 
 	// Connect/disconnect todo sync when selected list changes
 	createEffect(on(selectedListId, (listId) => {
+		const gen = ++todoSyncGeneration
+
 		// Cleanup previous sync
 		if (activeTodoSync) {
+			if (activeTodoSyncId) syncStore.releaseDoc(activeTodoSyncId)
 			activeTodoSync.destroy()
 			activeTodoSync = null
+			activeTodoSyncId = null
 		}
 		setSyncLoading(false)
 
@@ -382,54 +388,68 @@ export function TodoView() {
 		const localTodos = allTodos().filter(t => t.todo_list_id === listId)
 		if (localTodos.length === 0) setSyncLoading(true)
 
-		// Connect to the Yjs doc for this shared list
-		const managed = syncStore.getDoc(list.sync_id, list.sync_secret)
-		activeTodoSync = new TodoListSync(managed.ydoc, listId, () => {
-			// Called when remote changes arrive — refetch todos
-			setSyncLoading(false)
-			store.refetchTodos()
-		}, (meta) => {
-			// Remote metadata changed — update local list
-			window.electronAPI.updateTodoList(listId, meta).then(() => {
-				store.refetchTodoLists()
-			})
-		})
+		// Connect to the Yjs doc for this shared list (async — waits for ready)
+		syncStore.getDoc(list.sync_id, list.sync_secret).then(handle => {
+			// Stale guard: user switched lists while we were waiting
+			if (gen !== todoSyncGeneration) {
+				syncStore.releaseDoc(list.sync_id!)
+				return
+			}
 
-		if (list.is_owner) {
-			// Owner — push metadata and local todos
-			activeTodoSync.pushMeta(list.name, list.color)
-			if (localTodos.length > 0) {
-				activeTodoSync.pushLocal(localTodos)
-			}
-		} else {
-			// Joiner — apply remote metadata and todos
-			if (activeTodoSync.hasMeta()) {
-				const meta = activeTodoSync.getRemoteMeta()
-				if (meta) {
-					window.electronAPI.updateTodoList(listId, meta).then(() => {
-						store.refetchTodoLists()
-					})
+			activeTodoSyncId = list.sync_id!
+			activeTodoSync = new TodoListSync(handle.ydoc, listId, () => {
+				// Called when remote changes arrive — refetch todos
+				setSyncLoading(false)
+				store.refetchTodos()
+			}, (meta) => {
+				// Remote metadata changed — update local list
+				window.electronAPI.updateTodoList(listId, meta).then(() => {
+					store.refetchTodoLists()
+				})
+			})
+
+			if (list.is_owner) {
+				// Owner — push metadata and local todos
+				activeTodoSync.pushMeta(list.name, list.color)
+				if (localTodos.length > 0) {
+					activeTodoSync.pushLocal(localTodos)
+				}
+			} else {
+				// Joiner — apply remote metadata and todos
+				if (activeTodoSync.hasMeta()) {
+					const meta = activeTodoSync.getRemoteMeta()
+					if (meta) {
+						window.electronAPI.updateTodoList(listId, meta).then(() => {
+							store.refetchTodoLists()
+						})
+					}
+				}
+				if (!activeTodoSync.isEmpty()) {
+					const remoteTodos = activeTodoSync.getRemoteTodos()
+					if (remoteTodos.length > 0) {
+						window.electronAPI.syncTodosFromRemote(listId, remoteTodos).then(() => {
+							setSyncLoading(false)
+							store.refetchTodos()
+						})
+					}
 				}
 			}
-			if (!activeTodoSync.isEmpty()) {
-				const remoteTodos = activeTodoSync.getRemoteTodos()
-				if (remoteTodos.length > 0) {
-					window.electronAPI.syncTodosFromRemote(listId, remoteTodos).then(() => {
-						setSyncLoading(false)
-						store.refetchTodos()
-					})
-				}
-			}
-		}
+
+			setSyncLoading(false)
+		}).catch(err => {
+			if (gen !== todoSyncGeneration) return
+			console.error(`[todo-view] Sync failed for ${list.sync_id}:`, err)
+			setSyncLoading(false)
+		})
 	}))
 
 	onCleanup(() => {
 		if (activeTodoSync) {
 			// Release the Yjs doc back to the sync store (starts idle timer)
-			const list = selectedList()
-			if (list?.sync_id) syncStore.releaseDoc(list.sync_id)
+			if (activeTodoSyncId) syncStore.releaseDoc(activeTodoSyncId)
 			activeTodoSync.destroy()
 			activeTodoSync = null
+			activeTodoSyncId = null
 		}
 	})
 
