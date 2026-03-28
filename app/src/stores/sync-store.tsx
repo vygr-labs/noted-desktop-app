@@ -42,7 +42,7 @@ interface SyncStore {
 	/** Pre-load local Yjs state for a doc before connecting */
 	preloadState: (syncId: string) => Promise<Uint8Array | null>
 	/** Signal to all peers that this doc is unshared, then destroy */
-	signalUnshare: (syncId: string) => void
+	signalUnshare: (syncId: string) => Promise<void>
 	/** Register a callback for when a remote peer signals unshare */
 	onUnshare: (callback: (syncId: string) => void) => void
 }
@@ -230,14 +230,15 @@ export function SyncStoreProvider(props: ParentProps) {
 		return window.electronAPI.loadYjsState(syncId)
 	}
 
-	function signalUnshare(syncId: string) {
+	async function signalUnshare(syncId: string): Promise<void> {
 		const managed = docs.get(syncId)
 		if (managed) {
 			// Write unshare flag — this syncs to all connected peers via Yjs
 			const meta = managed.ydoc.getMap('_meta')
 			meta.set('unshared', true)
-			// Give a moment for the signal to propagate before destroying
-			setTimeout(() => destroyDoc(syncId), 500)
+			// Wait for the signal to propagate before destroying
+			await new Promise(resolve => setTimeout(resolve, 1000))
+			destroyDoc(syncId)
 		} else {
 			destroyDoc(syncId)
 		}

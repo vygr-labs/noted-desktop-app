@@ -5,6 +5,7 @@ import { SettingsStoreProvider } from '../stores/settings-store'
 import { SyncStoreProvider, useSyncStore } from '../stores/sync-store'
 import { NoteListSync } from '../lib/list-sync'
 import { TodoListSync } from '../lib/todo-sync'
+import { seedYjsWithContent } from '../lib/seed-yjs-note'
 import { AppShell } from './layout/AppShell'
 import { SettingsDialog } from './settings/SettingsDialog'
 import { CommandPalette } from './search/CommandPalette'
@@ -107,6 +108,8 @@ function AppInner() {
 	))
 
 	// When notes change, push updated membership to all shared lists
+	// and seed Yjs docs with content for owned notes not open in the editor
+	const seededNotes = new Set<string>()
 	createEffect(on(
 		() => store.notes(),
 		(notes) => {
@@ -116,7 +119,7 @@ function AppInner() {
 				if (!list.is_shared || !list.sync_id) continue
 				const listSync = activeListSyncs.get(list.sync_id)
 				if (!listSync) continue
-				if (list.name === 'Shared List') continue // Don't push from joiner
+				if (!list.is_owner) continue
 
 				const listNotes = notes.filter(
 					n => n.list_id === list.id && n.sync_id && n.sync_secret && !n.is_trashed
@@ -126,6 +129,16 @@ function AppInner() {
 					sync_secret: n.sync_secret!,
 					title: n.title,
 				})))
+
+				// Seed Yjs docs with content for owned notes
+				for (const note of listNotes) {
+					if (!note.content || !note.is_owner || seededNotes.has(note.sync_id!)) continue
+					seededNotes.add(note.sync_id!)
+					const managed = syncStore.getDoc(note.sync_id!, note.sync_secret!)
+					seedYjsWithContent(managed.ydoc, note.content)
+					// Release after seeding — idle timer keeps connection alive briefly
+					syncStore.releaseDoc(note.sync_id!)
+				}
 			}
 		},
 		{ defer: true }

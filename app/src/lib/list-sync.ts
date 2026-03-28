@@ -123,6 +123,7 @@ export class NoteListSync {
 		}
 
 		// For each remote note, join it and link to this list
+		if (remoteNotes.length === 0) return
 		Promise.all(remoteNotes.map(async (note) => {
 			const code = `n:${note.sync_id}.${note.sync_secret}`
 			await window.electronAPI.joinSharedNote(code, {
@@ -130,6 +131,8 @@ export class NoteListSync {
 				title: note.title,
 			})
 		})).then(() => {
+			this.onRemoteChange?.()
+		}).catch(() => {
 			this.onRemoteChange?.()
 		})
 	}

@@ -466,7 +466,7 @@ export function EditorPane() {
 		const note = editorStore.currentNote()
 		// Signal unshare to remote peers before cleaning up locally
 		if (note?.sync_id) {
-			syncStore.signalUnshare(note.sync_id)
+			await syncStore.signalUnshare(note.sync_id)
 		}
 		await window.electronAPI.unshareNote(noteId)
 		setShareCode('')
@@ -919,7 +919,7 @@ export function EditorPane() {
 										readonly={isTrash()}
 									/>
 									<Show
-										when={!(note().is_shared && !note().content && !note().content_plain)}
+										when={note().sync_id || !(note().is_shared && !note().content && !note().content_plain)}
 										fallback={
 											<div class={syncSkeleton}>
 												<div class={skeletonLine} style={{ width: '90%' }} />

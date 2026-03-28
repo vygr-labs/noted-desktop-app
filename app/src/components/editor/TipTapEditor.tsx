@@ -416,6 +416,13 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 						editor.commands.setContent(parseContent(localContent))
 						isUpdatingContent = false
 					}
+					// Persist synced content to DB so note.content gets populated
+					// (clears "Syncing" state for joined notes)
+					if (editor && editor.getText().trim()) {
+						const json = JSON.stringify(editor.getJSON())
+						const plainText = tiptapToPlaintext(json)
+						editorStore.saveNote({ content: json, content_plain: plainText })
+					}
 				})
 			}
 		}
