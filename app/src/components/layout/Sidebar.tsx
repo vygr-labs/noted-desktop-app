@@ -3,6 +3,7 @@ import { css } from '../../../styled-system/css'
 import { useAppStore } from '../../stores/app-store'
 import { useEditorStore } from '../../stores/editor-store'
 import { useSettingsStore } from '../../stores/settings-store'
+import { useSyncStore } from '../../stores/sync-store'
 import {
 	FileTextIcon,
 	CalendarIcon,
@@ -385,6 +386,7 @@ export function Sidebar() {
 	const store = useAppStore()
 	const editorStore = useEditorStore()
 	const settingsStore = useSettingsStore()
+	const syncStore = useSyncStore()
 	const [showInlineInput, setShowInlineInput] = createSignal(false)
 	const [newListName, setNewListName] = createSignal('')
 	const [showBulkExport, setShowBulkExport] = createSignal(false)
@@ -466,6 +468,10 @@ export function Sidebar() {
 
 	async function handleUnshareList(e: Event, listId: string) {
 		e.stopPropagation()
+		const list = (store.lists() || []).find(l => l.id === listId)
+		if (list?.sync_id) {
+			await syncStore.signalUnshare(list.sync_id)
+		}
 		await window.electronAPI.unshareList(listId)
 		store.refetchLists()
 		store.refetchNotes()
