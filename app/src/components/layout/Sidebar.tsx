@@ -518,6 +518,7 @@ export function Sidebar() {
 			const noteId = await window.electronAPI.joinSharedNote(code)
 			if (noteId) {
 				store.refetchNotes()
+				store.setCurrentView('all')
 				store.setSelectedNoteId(noteId)
 			}
 		} else if (type === 'l') {
