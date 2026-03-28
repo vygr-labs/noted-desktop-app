@@ -4,6 +4,9 @@ import type { Awareness } from 'y-protocols/awareness'
 
 export type DocState = 'loading' | 'syncing' | 'ready' | 'idle' | 'error' | 'destroyed'
 
+/** Transaction origin used when the owner signals unshare — the local observer should ignore this. */
+export const UNSHARE_ORIGIN = Symbol('unshare-local')
+
 type StateListener = (state: DocState, prev: DocState) => void
 
 export interface DocStateMachineConfig {
@@ -303,7 +306,9 @@ export class DocStateMachine {
 
 	private setupUnshareListener(): void {
 		const meta = this.ydoc.getMap('_meta')
-		const observer = () => {
+		const observer = (event: Y.YMapEvent<unknown>) => {
+			// Ignore the owner's own unshare signal (uses UNSHARE_ORIGIN)
+			if (event.transaction.origin === UNSHARE_ORIGIN) return
 			if (meta.get('unshared') === true) {
 				this.config.onUnshare(this.config.syncId)
 				this.destroy()

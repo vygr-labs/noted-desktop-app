@@ -10,7 +10,7 @@ import type { HocuspocusProvider } from '@hocuspocus/provider'
 import * as Y from 'yjs'
 import type { Awareness } from 'y-protocols/awareness'
 import { useSettingsStore } from './settings-store'
-import { DocStateMachine, type DocState } from '../lib/doc-state-machine'
+import { DocStateMachine, UNSHARE_ORIGIN, type DocState } from '../lib/doc-state-machine'
 
 interface SyncPeer {
 	clientId: number
@@ -213,21 +213,25 @@ export function SyncStoreProvider(props: ParentProps) {
 		const machine = machines.get(syncId)
 		if (!machine || machine.state === 'destroyed') return
 
-		// Write unshare flag — this syncs to all connected peers via Yjs
+		// Write unshare flag — this syncs to all connected peers via Yjs.
+		// Use UNSHARE_ORIGIN so the local observer ignores this (only peers react).
 		const meta = machine.ydoc.getMap('_meta')
-		meta.set('unshared', true)
+		machine.ydoc.transact(() => {
+			meta.set('unshared', true)
+		}, UNSHARE_ORIGIN)
 
 		// Wait for the change to propagate (provider reports no unsynced changes)
 		if (machine.provider && machine.provider.hasUnsyncedChanges) {
 			await new Promise<void>((resolve) => {
 				const timeout = setTimeout(resolve, 5000) // max wait 5s
-				const unsub = machine.provider!.on('unsyncedChanges', () => {
+				const handler = () => {
 					if (!machine.provider?.hasUnsyncedChanges) {
 						clearTimeout(timeout)
-						unsub?.()
+						machine.provider?.off('unsyncedChanges', handler)
 						resolve()
 					}
-				})
+				}
+				machine.provider!.on('unsyncedChanges', handler)
 			})
 		}
 

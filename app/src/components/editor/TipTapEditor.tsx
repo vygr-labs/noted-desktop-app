@@ -415,6 +415,35 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		})
 	}
 
+	/** Sync the note title between owner and receiver via Yjs _meta map */
+	function syncNoteTitle(note: Note, ydoc: Y.Doc) {
+		const meta = ydoc.getMap('_meta')
+		if (note.is_owner) {
+			// Owner: push title to Yjs so receivers can pick it up
+			if (meta.get('title') !== note.title) {
+				meta.set('title', note.title)
+			}
+		} else {
+			// Receiver: if we have the default title, use the owner's title
+			const remoteTitle = meta.get('title') as string | undefined
+			if (remoteTitle && note.title === 'Shared Note') {
+				editorStore.saveNote({ title: remoteTitle }).then(() => {
+					editorStore.refreshCurrentNote()
+				})
+			}
+			// Also watch for future title changes from the owner
+			meta.observe((event) => {
+				if (event.transaction.origin === 'local') return
+				const updated = meta.get('title') as string | undefined
+				if (updated) {
+					editorStore.saveNote({ title: updated }).then(() => {
+						editorStore.refreshCurrentNote()
+					})
+				}
+			})
+		}
+	}
+
 	/**
 	 * Two-phase editor creation for shared notes:
 	 * Phase 1: Show local content in readonly mode immediately (no blank flash)
@@ -480,6 +509,9 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 
 			// Create the collaborative editor
 			createCollabEditor(note, handle.ydoc)
+
+			// Sync note title via Yjs _meta map
+			syncNoteTitle(note, handle.ydoc)
 		} catch (err) {
 			// Sync failed — fall back to local-only editing
 			console.error(`[editor] Sync failed for ${note.sync_id}:`, err)
@@ -559,6 +591,23 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					createEditorInstance(props.note)
 				}
 			}
+		)
+	)
+
+	// Owner: push title updates to Yjs _meta when the note title changes
+	createEffect(
+		on(
+			() => props.note.title,
+			(title) => {
+				if (!activeSyncId || !props.note.is_owner) return
+				const machine = syncStore.getDocSync(activeSyncId)
+				if (!machine || !machine.isReady) return
+				const meta = machine.ydoc.getMap('_meta')
+				if (meta.get('title') !== title) {
+					meta.set('title', title)
+				}
+			},
+			{ defer: true }
 		)
 	)
 

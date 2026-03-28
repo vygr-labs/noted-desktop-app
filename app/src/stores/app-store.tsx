@@ -114,7 +114,7 @@ export function AppStoreProvider(props: ParentProps) {
 
 			if (type === 'n') {
 				const noteId = await window.electronAPI.joinSharedNote(shareCode)
-				if (noteId) { refetchNotes(); setSelectedNoteId(noteId) }
+				if (noteId) { refetchNotes(); setCurrentView('all'); setSelectedNoteId(noteId) }
 			} else if (type === 'l') {
 				const listId = await window.electronAPI.joinSharedList(shareCode)
 				if (listId) { refetchLists(); setCurrentView({ type: 'list', listId }) }

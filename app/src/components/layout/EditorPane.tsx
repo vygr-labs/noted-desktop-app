@@ -333,6 +333,20 @@ export function EditorPane() {
 	const syncStore = useSyncStore()
 	const [qrDataUrl, setQrDataUrl] = createSignal('')
 
+	// Clear share UI state when the note is no longer shared
+	// (handles remote unshare signals from the owner)
+	createEffect(
+		on(
+			() => editorStore.currentNote()?.is_shared,
+			(isShared) => {
+				if (!isShared) {
+					setShareCode('')
+					setQrDataUrl('')
+				}
+			}
+		)
+	)
+
 	// Session-based unlock tracking (unlocked note IDs persist until app restart)
 	const [unlockedIds, setUnlockedIds] = createSignal<Set<string>>(new Set())
 	const isNoteLocked = (note: Note) =>
@@ -469,9 +483,12 @@ export function EditorPane() {
 			await syncStore.signalUnshare(note.sync_id)
 		}
 		await window.electronAPI.unshareNote(noteId)
-		setShareCode('')
-		setShowShareMenu(false)
+		// Refresh note data BEFORE clearing UI state so the reactive
+		// condition (note().is_shared) sees the updated value
 		await editorStore.refreshCurrentNote()
+		setShareCode('')
+		setQrDataUrl('')
+		setShowShareMenu(false)
 	}
 
 	async function handleJoin() {
@@ -480,6 +497,8 @@ export function EditorPane() {
 		const noteId = await window.electronAPI.joinSharedNote(code)
 		if (noteId) {
 			appStore.refetchNotes()
+			// Switch to All Notes so the joined note is visible
+			appStore.setCurrentView('all')
 			appStore.setSelectedNoteId(noteId)
 			setJoinCode('')
 			setShowJoinDialog(false)
