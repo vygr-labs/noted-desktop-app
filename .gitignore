@@ -32,3 +32,6 @@ app/src/backend/build/
 app/release/
 out/
 **/.yarn/install-state.gz
+
+# personal notes
+personal/

@@ -280,6 +280,8 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	let isUpdatingContent = false
 	let currentSyncId: string | null = null
 	let activeSyncId: string | null = null // Track which sync doc we're using
+	// Generation counter to detect stale async results after navigation
+	let editorGeneration = 0
 
 	const debouncedSave = debounce(async (jsonContent: string) => {
 		const plainText = tiptapToPlaintext(jsonContent)
@@ -329,59 +331,16 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		currentEditor = null
 	}
 
-	function createEditorInstance(note: Note) {
-		// Capture current HTML as a placeholder to avoid blank flash
-		let placeholder: HTMLDivElement | null = null
-		if (containerRef && editor) {
-			placeholder = document.createElement('div')
-			placeholder.innerHTML = containerRef.innerHTML
-			placeholder.style.opacity = '0.5'
-			placeholder.style.pointerEvents = 'none'
-			containerRef.appendChild(placeholder)
-		}
-
-		destroyEditor()
-		if (!containerRef) return
-
-		currentSyncId = note.sync_id || null
-		const localContent = note.content
-		let hasSynced = !note.sync_id
-		const extensions = getBaseExtensions(!!note.sync_id)
-
-		// If shared, get Yjs doc from sync store (persistent connection pool)
-		let ydoc: Y.Doc | null = null
-		if (note.sync_id && note.sync_secret) {
-			const managed = syncStore.getDoc(note.sync_id, note.sync_secret)
-			ydoc = managed.ydoc
-			activeSyncId = note.sync_id
-
-			// If the Yjs doc is empty AND we have local content, seed it BEFORE
-			// creating the editor. This ensures a single Yjs history — no merge
-			// duplication when the provider syncs with an empty server doc.
-			if (localContent && !managed.provider.isSynced) {
-				const fragment = ydoc.getXmlFragment('default')
-				if (fragment.length === 0) {
-					// Temporarily create a minimal editor to convert JSON → Yjs
-					const tempExtensions = getBaseExtensions(true)
-					tempExtensions.push(Collaboration.configure({ document: ydoc }))
-					const tempEditor = new Editor({ extensions: tempExtensions })
-					tempEditor.commands.setContent(parseContent(localContent))
-					tempEditor.destroy()
-				}
-			}
-
-			extensions.push(
-				Collaboration.configure({ document: ydoc })
-			)
-		}
-
+	/** Create a local-only editor (non-shared note, or placeholder while sync loads) */
+	function createLocalEditor(note: Note, opts?: { readonly?: boolean }) {
+		const extensions = getBaseExtensions(false)
 		editor = new Editor({
-			element: containerRef,
+			element: containerRef!,
 			extensions,
-			content: note.sync_id ? undefined : parseContent(note.content),
-			editable: !props.readonly,
+			content: parseContent(note.content),
+			editable: opts?.readonly ? false : !props.readonly,
 			onUpdate: ({ editor: ed }) => {
-				if (isUpdatingContent || !hasSynced) return
+				if (isUpdatingContent) return
 				editorStore.setLivePreview(ed.getText().slice(0, 160))
 				const json = JSON.stringify(ed.getJSON())
 				debouncedSave(json)
@@ -390,45 +349,49 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				setInTable(ed.isActive('table'))
 			},
 		})
-
 		currentEditor = editor
 		setInTable(editor.isActive('table'))
 		editor.view.dom.spellcheck = !!note.spellcheck
+		setupCheckboxHandler()
+	}
 
-		if (placeholder && containerRef?.contains(placeholder)) {
-			placeholder.remove()
+	/** Create a collaborative editor backed by a synced Yjs doc */
+	function createCollabEditor(note: Note, ydoc: Y.Doc) {
+		const extensions = getBaseExtensions(true)
+		extensions.push(Collaboration.configure({ document: ydoc }))
+
+		editor = new Editor({
+			element: containerRef!,
+			extensions,
+			content: undefined, // content comes from Yjs
+			editable: !props.readonly,
+			onUpdate: ({ editor: ed }) => {
+				if (isUpdatingContent) return
+				editorStore.setLivePreview(ed.getText().slice(0, 160))
+				const json = JSON.stringify(ed.getJSON())
+				debouncedSave(json)
+			},
+			onTransaction: ({ editor: ed }) => {
+				setInTable(ed.isActive('table'))
+			},
+		})
+		currentEditor = editor
+		setInTable(editor.isActive('table'))
+		editor.view.dom.spellcheck = !!note.spellcheck
+		setupCheckboxHandler()
+
+		// Persist synced content to DB so note.content gets populated
+		// (clears "Syncing" state for joined notes)
+		if (editor.getText().trim()) {
+			const json = JSON.stringify(editor.getJSON())
+			const plainText = tiptapToPlaintext(json)
+			editorStore.saveNote({ content: json, content_plain: plainText })
 		}
+	}
 
-		// Mark synced once the provider confirms, or after timeout
-		if (note.sync_id && note.sync_secret) {
-			const managed = syncStore.getDoc(note.sync_id, note.sync_secret)
-			if (managed.provider.isSynced) {
-				hasSynced = true
-			} else {
-				const syncTimeout = setTimeout(() => { hasSynced = true }, 5000)
-				managed.provider.on('synced', () => {
-					hasSynced = true
-					clearTimeout(syncTimeout)
-					// If the editor is still empty after sync (server had nothing,
-					// and Yjs seeding didn't happen), set content as fallback
-					if (editor && !editor.getText().trim() && localContent) {
-						isUpdatingContent = true
-						editor.commands.setContent(parseContent(localContent))
-						isUpdatingContent = false
-					}
-					// Persist synced content to DB so note.content gets populated
-					// (clears "Syncing" state for joined notes)
-					if (editor && editor.getText().trim()) {
-						const json = JSON.stringify(editor.getJSON())
-						const plainText = tiptapToPlaintext(json)
-						editorStore.saveNote({ content: json, content_plain: plainText })
-					}
-				})
-			}
-		}
-
+	function setupCheckboxHandler() {
 		// Prevent task checkboxes from stealing editor focus/cursor
-		containerRef.addEventListener('mousedown', (e) => {
+		containerRef!.addEventListener('mousedown', (e) => {
 			const target = e.target as HTMLElement
 			if (target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox') {
 				e.preventDefault()
@@ -450,6 +413,84 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				}
 			}
 		})
+	}
+
+	/**
+	 * Two-phase editor creation for shared notes:
+	 * Phase 1: Show local content in readonly mode immediately (no blank flash)
+	 * Phase 2: Once sync is ready, recreate with Collaboration extension
+	 *
+	 * For non-shared notes, creates the editor synchronously.
+	 */
+	async function createEditorInstance(note: Note) {
+		const gen = ++editorGeneration
+
+		destroyEditor()
+		if (!containerRef) return
+
+		currentSyncId = note.sync_id || null
+
+		// Non-shared note: create editor synchronously
+		if (!note.sync_id || !note.sync_secret) {
+			createLocalEditor(note)
+			return
+		}
+
+		// -- Shared note: two-phase approach --
+
+		// Phase 1: Show local content as readonly placeholder while sync loads
+		createLocalEditor(note, { readonly: true })
+
+		// Phase 2: Wait for sync doc to be ready
+		try {
+			const handle = await syncStore.getDoc(note.sync_id, note.sync_secret)
+
+			// Stale guard: user navigated away while we were waiting
+			if (gen !== editorGeneration) {
+				syncStore.releaseDoc(note.sync_id)
+				return
+			}
+
+			activeSyncId = note.sync_id
+
+			// Seed if needed — safe because doc is in 'ready' state (post-sync).
+			// If the server had content, fragment.length > 0 and we skip.
+			// If the server was empty, we seed with local content.
+			if (note.content) {
+				const fragment = handle.ydoc.getXmlFragment('default')
+				if (fragment.length === 0) {
+					const tempExtensions = getBaseExtensions(true)
+					tempExtensions.push(Collaboration.configure({ document: handle.ydoc }))
+					const tempEditor = new Editor({ extensions: tempExtensions })
+					tempEditor.commands.setContent(parseContent(note.content))
+					tempEditor.destroy()
+				}
+			}
+
+			// Destroy the placeholder editor (but NOT the sync doc)
+			if (editor) { editor.destroy(); editor = null }
+			currentEditor = null
+
+			// Stale guard again after editor destruction
+			if (gen !== editorGeneration || !containerRef) {
+				syncStore.releaseDoc(note.sync_id)
+				activeSyncId = null
+				return
+			}
+
+			// Create the collaborative editor
+			createCollabEditor(note, handle.ydoc)
+		} catch (err) {
+			// Sync failed — fall back to local-only editing
+			console.error(`[editor] Sync failed for ${note.sync_id}:`, err)
+
+			if (gen !== editorGeneration) return
+
+			// Make the placeholder editor editable as fallback
+			if (editor) {
+				editor.setEditable(!props.readonly)
+			}
+		}
 	}
 
 	onMount(() => {
