@@ -4,7 +4,7 @@
   "version": "1.0.0",
   "description": "A minimal, distraction-free note-taking app",
   "author": "Voyager Technologies Limited",
-  "license": "CC-BY-NC-4.0",
+  "license": "AGPL-3.0-only",
   "main": "src/backend/build/main.js",
   "scripts": {
     "prepare": "panda codegen",

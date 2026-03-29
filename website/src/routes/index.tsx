@@ -437,7 +437,7 @@ function EditorCard(props: { staggerRef?: (el: HTMLElement) => void }) {
       </Flex>
       <h3 class={css({ fontSize: 'lg', fontWeight: 'bold', color: 'fg.default', mb: '2' })}>Rich Text Editor</h3>
       <p class={css({ fontSize: 'sm', lineHeight: 'relaxed' })} style={{ color: 'var(--on-surface-variant)' }}>
-        Headings, lists, code blocks, tables, and task lists — all with a distraction-free interface.
+        Headings, lists, code blocks, tables, and task lists — all in a distraction-free interface.
       </p>
       {/* Decorative formatting pills */}
       <Flex gap="2" mt="5">
@@ -579,7 +579,7 @@ function PlatformCard(props: { staggerRef?: (el: HTMLElement) => void }) {
         </For>
       </Flex>
       <p class={css({ fontSize: 'sm', lineHeight: 'relaxed' })} style={{ color: 'var(--on-surface-variant)' }}>
-        Native feel on every platform you use.
+        Available on macOS, Windows, and Linux.
       </p>
     </BentoCard>
   )
@@ -623,7 +623,7 @@ function SyncCard(props: { staggerRef?: (el: HTMLElement) => void }) {
         </Flex>
         <h3 class={css({ fontSize: 'lg', fontWeight: 'bold', color: 'fg.default', mb: '2' })}>Real-time Sync</h3>
         <p class={css({ fontSize: 'sm', lineHeight: 'relaxed', mb: '6' })} style={{ color: 'var(--on-surface-variant)' }}>
-          Share notes with anyone. Collaborate in real-time with conflict-free editing powered by Yjs.
+          Sync your notes across devices in real-time. Conflict-free collaborative editing powered by Yjs.
         </p>
       </Box>
 
@@ -672,11 +672,12 @@ function SyncCard(props: { staggerRef?: (el: HTMLElement) => void }) {
               style={{ 'background-color': 'var(--surface-high)' }}
             >
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-                <rect x="5" y="2" width="14" height="20" rx="2" ry="2" />
-                <line x1="12" y1="18" x2="12.01" y2="18" />
+                <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
+                <line x1="8" y1="21" x2="16" y2="21" />
+                <line x1="12" y1="17" x2="12" y2="21" />
               </svg>
             </Box>
-            <span style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)', 'font-size': '0.5625rem' }}>MOBILE</span>
+            <span style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)', 'font-size': '0.5625rem' }}>LAPTOP</span>
           </Flex>
         </Flex>
       </Box>

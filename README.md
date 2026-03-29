@@ -103,4 +103,4 @@ installer/           NSIS installer customization
 
 ## License
 
-CC-BY-NC-4.0
+AGPL-3.0 — See [LICENSE](LICENSE) for details.
