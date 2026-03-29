@@ -1,9 +1,6 @@
-import { createMemo, For, Show, createSignal, createEffect, on, onCleanup } from 'solid-js'
+import { createMemo, For, Show, createSignal, createEffect, on } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { useAppStore } from '../../stores/app-store'
-import { useSyncStore } from '../../stores/sync-store'
-import { TodoListSync } from '../../lib/todo-sync'
-import { syncLog } from '../../lib/sync-log'
 import { TodoItem } from './TodoItem'
 import { TodoList } from './TodoList'
 import { getTodayDate, isOverdue, isToday } from '../../lib/date-utils'
@@ -14,9 +11,6 @@ import {
 	XIcon,
 	SparklesIcon,
 	ExternalLinkIcon,
-	Share2Icon,
-	UnlinkIcon,
-	ArrowDownLeftIcon,
 } from 'lucide-solid'
 
 const container = css({
@@ -345,19 +339,14 @@ function ProgressRingSVG(props: { pct: number }) {
 
 export function TodoView() {
 	const store = useAppStore()
-	const syncStore = useSyncStore()
 	const [newTodoText, setNewTodoText] = createSignal('')
 	const [selectedListId, setSelectedListId] = createSignal<string | null>(null)
 	const [showNewList, setShowNewList] = createSignal(false)
 	const [newListName, setNewListName] = createSignal('')
-	const [syncLoading, setSyncLoading] = createSignal(false)
 
 	const allTodos = () => store.todos() || []
 	const allTodoLists = () => store.todoLists() || []
 	let dragTodoId: string | null = null
-	let activeTodoSync: TodoListSync | null = null
-	let activeTodoSyncId: string | null = null
-	let todoSyncGeneration = 0
 
 	// Get the currently selected list object
 	const selectedList = createMemo(() => {
@@ -365,110 +354,6 @@ export function TodoView() {
 		if (!id) return null
 		return allTodoLists().find(l => l.id === id) || null
 	})
-
-	// Connect/disconnect todo sync when selected list changes
-	createEffect(on(selectedListId, (listId) => {
-		const gen = ++todoSyncGeneration
-
-		// Cleanup previous sync
-		if (activeTodoSync) {
-			if (activeTodoSyncId) syncStore.releaseDoc(activeTodoSyncId)
-			activeTodoSync.destroy()
-			activeTodoSync = null
-			activeTodoSyncId = null
-		}
-		setSyncLoading(false)
-
-		if (!listId) return
-
-		// Find the list to check if it's shared
-		const list = allTodoLists().find(l => l.id === listId)
-		if (!list?.sync_id || !list?.sync_secret) return
-
-		// Show loading if this is a joined list with no local data
-		const localTodos = allTodos().filter(t => t.todo_list_id === listId)
-		if (localTodos.length === 0) setSyncLoading(true)
-
-		// Connect to the Yjs doc for this shared list (async — waits for ready)
-		syncStore.getDoc(list.sync_id, list.sync_secret).then(handle => {
-			// Stale guard: user switched lists while we were waiting
-			if (gen !== todoSyncGeneration) {
-				syncStore.releaseDoc(list.sync_id!)
-				return
-			}
-
-			activeTodoSyncId = list.sync_id!
-			activeTodoSync = new TodoListSync(handle.ydoc, listId, () => {
-				// Called when remote changes arrive — refetch todos
-				setSyncLoading(false)
-				store.refetchTodos()
-			}, (meta) => {
-				// Remote metadata changed — update local list
-				window.electronAPI.updateTodoList(listId, meta).then(() => {
-					store.refetchTodoLists()
-				})
-			})
-
-			if (list.is_owner) {
-				// Owner — push metadata and local todos
-				activeTodoSync.pushMeta(list.name, list.color)
-				if (localTodos.length > 0) {
-					activeTodoSync.pushLocal(localTodos)
-				}
-			} else {
-				// Joiner — apply remote metadata and todos
-				if (activeTodoSync.hasMeta()) {
-					const meta = activeTodoSync.getRemoteMeta()
-					if (meta) {
-						window.electronAPI.updateTodoList(listId, meta).then(() => {
-							store.refetchTodoLists()
-						})
-					}
-				}
-				if (!activeTodoSync.isEmpty()) {
-					const remoteTodos = activeTodoSync.getRemoteTodos()
-					if (remoteTodos.length > 0) {
-						window.electronAPI.syncTodosFromRemote(listId, remoteTodos).then(() => {
-							setSyncLoading(false)
-							store.refetchTodos()
-						})
-					}
-				}
-			}
-
-			setSyncLoading(false)
-		}).catch(err => {
-			if (gen !== todoSyncGeneration) return
-			syncLog.error('todo-view', `Sync failed for ${list.sync_id}:`, err)
-			setSyncLoading(false)
-		})
-	}))
-
-	onCleanup(() => {
-		if (activeTodoSync) {
-			// Release the Yjs doc back to the sync store (starts idle timer)
-			if (activeTodoSyncId) syncStore.releaseDoc(activeTodoSyncId)
-			activeTodoSync.destroy()
-			activeTodoSync = null
-			activeTodoSyncId = null
-		}
-	})
-
-	// Push local state to Yjs after any todo mutation
-	function pushToSync() {
-		if (!activeTodoSync) return
-		const listId = selectedListId()
-		if (!listId) return
-		const todos = allTodos().filter(t => t.todo_list_id === listId)
-		activeTodoSync.pushLocal(todos)
-	}
-
-	// Auto-push to sync whenever todos change (catches all mutations from TodoItem too)
-	createEffect(on(
-		() => allTodos(),
-		() => pushToSync(),
-		{ defer: true }
-	))
 
 	function makeDragHandlers(todos: () => Todo[]) {
 		return {
@@ -557,7 +442,6 @@ export function TodoView() {
 		})
 		setNewTodoText('')
 		await store.refetchTodos()
-		pushToSync()
 	}
 
 	function handleKeyDown(e: KeyboardEvent) {
@@ -591,34 +475,6 @@ export function TodoView() {
 		if (selectedListId() === listId) {
 			setSelectedListId(null)
 		}
-	}
-
-	const [todoListShareCode, setTodoListShareCode] = createSignal('')
-
-	async function handleShareTodoList(e: Event, list: TodoListItem) {
-		e.stopPropagation()
-		if (list.is_shared && list.sync_id && list.sync_secret) {
-			const code = `t:${list.sync_id}.${list.sync_secret}`
-			navigator.clipboard.writeText(code)
-			setTodoListShareCode(code)
-			return
-		}
-		const code = await window.electronAPI.shareTodoList(list.id)
-		if (code) {
-			navigator.clipboard.writeText(code)
-			setTodoListShareCode(code)
-			store.refetchTodoLists()
-		}
-	}
-
-	async function handleUnshareTodoList(e: Event, listId: string) {
-		e.stopPropagation()
-		const list = allTodoLists().find(l => l.id === listId)
-		if (list?.sync_id) {
-			await syncStore.signalUnshare(list.sync_id)
-		}
-		await window.electronAPI.unshareTodoList(listId)
-		store.refetchTodoLists()
 	}
 
 	const hasTodos = () => filteredTodos().length > 0
@@ -703,49 +559,10 @@ export function TodoView() {
 									class={tabDot}
 									style={{ background: `var(--colors-${list.color}-9)` }}
 								/>
-								<Show
-									when={!(list.is_shared && !list.is_owner && list.name === 'Shared Todos')}
-									fallback={
-										<span class={css({ width: '60px', height: '13px', borderRadius: 'sm', bg: 'gray.a3', animation: 'pulse 1.5s ease-in-out infinite' })} />
-									}
-								>
-									{list.name}
-								</Show>
-								<Show when={list.is_shared && !list.is_owner}>
-									<ArrowDownLeftIcon class={css({ width: '3', height: '3', color: 'green.9', flexShrink: 0 })} title="Shared with you" />
-								</Show>
-								<Show when={list.is_shared && list.is_owner}>
-									<Share2Icon class={css({ width: '3', height: '3', color: 'indigo.9', flexShrink: 0 })} title="Shared by you" />
-								</Show>
+								{list.name}
 								<span class={tabCount}>
 									{countForList(list.id)}
 								</span>
-								<Show when={!list.is_shared}>
-								<div
-									class={deleteTabBtn}
-									onClick={(e) => handleShareTodoList(e, list)}
-									title="Share list"
-								>
-									<Share2Icon class={css({ width: '3', height: '3' })} />
-								</div>
-							</Show>
-							<Show when={list.is_shared}>
-								<div
-									class={deleteTabBtn}
-									style={{ color: 'var(--colors-indigo-11)', opacity: '0.8' }}
-									onClick={(e) => handleShareTodoList(e, list)}
-									title="Copy share code"
-								>
-									<Share2Icon class={css({ width: '3', height: '3' })} />
-								</div>
-								<div
-									class={deleteTabBtn}
-									onClick={(e) => handleUnshareTodoList(e, list.id)}
-									title="Stop sharing"
-								>
-									<UnlinkIcon class={css({ width: '3', height: '3' })} />
-								</div>
-							</Show>
 							<div
 								class={deleteTabBtn}
 								onClick={(e) => {
@@ -804,33 +621,15 @@ export function TodoView() {
 				</div>
 
 				{/* Todo sections */}
-				<Show when={syncLoading()}>
-					<div class={css({
-						display: 'flex', flexDirection: 'column', gap: '3',
-						py: '4', animation: 'pulse 1.5s ease-in-out infinite',
-					})}>
-						<div class={css({ height: '14px', bg: 'gray.a3', borderRadius: 'md', width: '60%' })} />
-						<div class={css({ height: '48px', bg: 'gray.a2', borderRadius: 'md', width: '100%' })} />
-						<div class={css({ height: '48px', bg: 'gray.a2', borderRadius: 'md', width: '100%' })} />
-						<div class={css({ height: '48px', bg: 'gray.a2', borderRadius: 'md', width: '85%' })} />
-						<div style={{ 'text-align': 'center', 'padding-top': '8px' }}>
-							<span class={css({ fontSize: '13px', color: 'fg.muted' })}>
-								Syncing todos...
-							</span>
-						</div>
-					</div>
-				</Show>
 				<Show
 					when={hasTodos()}
 					fallback={
-						<Show when={!syncLoading()}>
-							<EmptyState
-								icon={SparklesIcon}
-								title="All clear!"
-								description="Your to-do list is empty. Add something above to get started."
-								hint="Press Enter to add quickly"
-							/>
-						</Show>
+						<EmptyState
+							icon={SparklesIcon}
+							title="All clear!"
+							description="Your to-do list is empty. Add something above to get started."
+							hint="Press Enter to add quickly"
+						/>
 					}
 				>
 					<div class={activeTodosSection}>
@@ -915,56 +714,6 @@ export function TodoView() {
 					</Show>
 				</Show>
 			</div>
-			{/* Share code dialog */}
-			<Show when={todoListShareCode()}>
-				<div
-					style={{
-						position: 'fixed', inset: '0', background: 'rgba(0,0,0,0.5)',
-						display: 'flex', 'align-items': 'center', 'justify-content': 'center',
-						'z-index': '50',
-					}}
-					onClick={() => setTodoListShareCode('')}
-				>
-					<div
-						style={{
-							background: 'var(--colors-gray-2)', 'border-radius': '12px',
-							padding: '24px', width: '380px',
-							'box-shadow': '0 24px 64px -8px rgba(0,0,0,0.4)',
-							border: '1px solid var(--colors-gray-a3)',
-						}}
-						onClick={(e: MouseEvent) => e.stopPropagation()}
-					>
-						<div style={{ 'font-size': '16px', 'font-weight': '600', 'margin-bottom': '4px', color: 'var(--colors-fg-default)' }}>
-							Todo list shared
-						</div>
-						<div style={{ 'font-size': '13px', color: 'var(--colors-fg-muted)', 'margin-bottom': '16px' }}>
-							Share this code with collaborators. It's been copied to your clipboard.
-						</div>
-						<input
-							class={css({
-								width: '100%', bg: 'gray.a2', border: '1px solid', borderColor: 'gray.a4',
-								borderRadius: 'md', px: '3', py: '2.5', fontSize: '13px', color: 'fg.default',
-								fontFamily: 'mono', outline: 'none', mb: '4',
-							})}
-							value={todoListShareCode()}
-							readOnly
-							onClick={(e) => (e.target as HTMLInputElement).select()}
-						/>
-						<div style={{ display: 'flex', 'justify-content': 'flex-end' }}>
-							<button
-								class={css({
-									px: '4', py: '2', borderRadius: 'md', fontSize: '13px', fontWeight: '500',
-									cursor: 'pointer', bg: 'indigo.9', color: 'white',
-									_hover: { bg: 'indigo.10' },
-								})}
-								onClick={() => setTodoListShareCode('')}
-							>
-								Done
-							</button>
-						</div>
-					</div>
-				</div>
-			</Show>
 		</div>
 	)
 }

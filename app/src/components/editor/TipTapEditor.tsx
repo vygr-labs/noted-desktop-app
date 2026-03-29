@@ -12,16 +12,12 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { Slice } from '@tiptap/pm/model'
 import { useEditorStore } from '../../stores/editor-store'
-import { useSyncStore } from '../../stores/sync-store'
-import { syncLog } from '../../lib/sync-log'
 import { debounce } from '../../lib/debounce'
 import { tiptapToPlaintext } from '../../lib/tiptap-to-plaintext'
 import { hasListPatterns, hasTablePattern, hasMarkdownPatterns, parseLinesToNodes, parseMarkdownTable, cleanTipTapContent, alignLeftContent } from '../../lib/text-cleanup'
 import { CodeBlockWithCopy } from './codeblock-with-copy'
 import { DetailsBlock } from './details-block'
 import { InlineCheckbox } from './inline-checkbox'
-import { ySyncPlugin, ySyncPluginKey } from 'y-prosemirror'
-import * as Y from 'yjs'
 
 const editorWrap = css({
 	minHeight: '200px',
@@ -284,15 +280,8 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	let containerRef: HTMLDivElement | undefined
 	let editor: Editor | null = null
 	const editorStore = useEditorStore()
-	const syncStore = useSyncStore()
 	let isUpdatingContent = false
-	let currentSyncId: string | null = null
-	let activeSyncId: string | null = null // Track which sync doc we're using
-	// Generation counter to detect stale async results after navigation
-	let editorGeneration = 0
 
-	// Debounced save — serializes the editor state lazily when the timer fires,
-	// NOT synchronously in onUpdate. This keeps onUpdate fast (no JSON.stringify blocking paint).
 	const debouncedSave = debounce(() => {
 		if (!editor) return
 		editorStore.setLivePreview(editor.getText().slice(0, 160))
@@ -301,14 +290,11 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		editorStore.saveNote({ content: json, content_plain: plainText })
 	}, 500)
 
-	function getBaseExtensions(isCollab: boolean) {
+	function getBaseExtensions() {
 		return [
 			StarterKit.configure({
 				heading: { levels: [1, 2, 3] },
 				codeBlock: false,
-				// StarterKit v3 includes Underline — don't add it separately
-				// StarterKit v3 uses 'undoRedo' (not 'history') — disable for collab
-				...(isCollab ? { undoRedo: false } : {}),
 			}),
 			CodeBlockWithCopy,
 			DetailsBlock,
@@ -333,23 +319,19 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	}
 
 	function destroyEditor() {
-		// Release the sync doc (starts idle timer, doesn't destroy immediately)
-		if (activeSyncId) {
-			syncStore.releaseDoc(activeSyncId)
-			activeSyncId = null
-		}
 		if (editor) { editor.destroy(); editor = null }
 		currentEditor = null
 	}
 
-	/** Create a local-only editor (non-shared note, or placeholder while sync loads) */
-	function createLocalEditor(note: Note, opts?: { readonly?: boolean }) {
-		const extensions = getBaseExtensions(false)
+	function createEditorInstance(note: Note) {
+		destroyEditor()
+		if (!containerRef) return
+
 		editor = new Editor({
-			element: containerRef!,
-			extensions,
+			element: containerRef,
+			extensions: getBaseExtensions(),
 			content: parseContent(note.content),
-			editable: opts?.readonly ? false : !props.readonly,
+			editable: !props.readonly,
 			onUpdate: () => {
 				if (isUpdatingContent) return
 				debouncedSave()
@@ -358,67 +340,13 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				setInTable(ed.isActive('table'))
 			},
 		})
+
 		currentEditor = editor
 		setInTable(editor.isActive('table'))
 		editor.view.dom.spellcheck = !!note.spellcheck
-		setupCheckboxHandler()
-	}
 
-	/** Create a collaborative editor backed by a synced Yjs doc */
-	function createCollabEditor(note: Note, ydoc: Y.Doc) {
-		const fragment = ydoc.getXmlFragment('default')
-		const extensions = getBaseExtensions(true)
-
-		// Use y-prosemirror directly instead of @tiptap/extension-collaboration.
-		// y-prosemirror does incremental ProseMirror updates (minimal DOM changes),
-		// while @tiptap/y-tiptap replaces the entire document on every Yjs change.
-		extensions.push(
-			Extension.create({
-				name: 'ySync',
-				addProseMirrorPlugins: () => [ySyncPlugin(fragment)],
-			})
-		)
-
-		editor = new Editor({
-			element: containerRef!,
-			extensions,
-			content: undefined, // content comes from Yjs
-			editable: !props.readonly,
-			onUpdate: ({ transaction }) => {
-				if (isUpdatingContent) return
-				// Skip saves for remote Yjs updates — the content is already
-				// in the Yjs doc and will be persisted via Yjs state saves.
-				if (transaction.getMeta(ySyncPluginKey)) return
-				debouncedSave()
-			},
-			onTransaction: ({ editor: ed }) => {
-				setInTable(ed.isActive('table'))
-			},
-		})
-		currentEditor = editor
-		setInTable(editor.isActive('table'))
-		editor.view.dom.spellcheck = !!note.spellcheck
-		setupCheckboxHandler()
-
-		// Persist synced content to DB so note.content gets populated
-		// (clears "Syncing" skeleton for joined notes).
-		// Only refresh currentNote once here — not on every subsequent save.
-		if (editor.getText().trim() && !note.content) {
-			const json = JSON.stringify(editor.getJSON())
-			const plainText = tiptapToPlaintext(json)
-			editorStore.saveNote({ content: json, content_plain: plainText }).then(() => {
-				editorStore.refreshCurrentNote()
-			})
-		} else if (editor.getText().trim()) {
-			const json = JSON.stringify(editor.getJSON())
-			const plainText = tiptapToPlaintext(json)
-			editorStore.saveNote({ content: json, content_plain: plainText })
-		}
-	}
-
-	function setupCheckboxHandler() {
 		// Prevent task checkboxes from stealing editor focus/cursor
-		containerRef!.addEventListener('mousedown', (e) => {
+		containerRef.addEventListener('mousedown', (e) => {
 			const target = e.target as HTMLElement
 			if (target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox') {
 				e.preventDefault()
@@ -442,140 +370,6 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		})
 	}
 
-	/** Sync the note title between owner and receiver via Yjs _meta map */
-	function syncNoteTitle(note: Note, ydoc: Y.Doc) {
-		const meta = ydoc.getMap('_meta')
-		if (note.is_owner) {
-			// Owner: push title to Yjs so receivers can pick it up
-			if (meta.get('title') !== note.title) {
-				meta.set('title', note.title)
-			}
-		} else {
-			// Receiver: if we have the default title, use the owner's title
-			const remoteTitle = meta.get('title') as string | undefined
-			if (remoteTitle && note.title === 'Shared Note') {
-				// Update title in DB and refresh once to clear "Shared Note"
-				editorStore.saveNote({ title: remoteTitle }).then(() => {
-					editorStore.refreshCurrentNote()
-				})
-			}
-			// Watch for future title changes from the owner — only save if actually changed
-			let lastKnownTitle = remoteTitle || note.title
-			meta.observe((event) => {
-				if (event.transaction.origin === 'local') return
-				const updated = meta.get('title') as string | undefined
-				if (updated && updated !== lastKnownTitle) {
-					lastKnownTitle = updated
-					editorStore.saveNote({ title: updated })
-					// Update the live title signal directly instead of refreshing the whole note
-					editorStore.setLiveTitle(updated)
-				}
-			})
-		}
-	}
-
-	/**
-	 * Two-phase editor creation for shared notes:
-	 * Phase 1: Show local content in readonly mode immediately (no blank flash)
-	 * Phase 2: Once sync is ready, recreate with Collaboration extension
-	 *
-	 * For non-shared notes, creates the editor synchronously.
-	 */
-	async function createEditorInstance(note: Note) {
-		const gen = ++editorGeneration
-
-		destroyEditor()
-		if (!containerRef) return
-
-		currentSyncId = note.sync_id || null
-
-		// Non-shared note: create editor synchronously
-		if (!note.sync_id || !note.sync_secret) {
-			createLocalEditor(note)
-			return
-		}
-
-		// -- Shared note: two-phase approach --
-
-		// Phase 1: Show local content as readonly placeholder while sync loads
-		createLocalEditor(note, { readonly: true })
-
-		// Phase 2: Wait for sync doc to be ready
-		try {
-			const handle = await syncStore.getDoc(note.sync_id, note.sync_secret)
-
-			// Stale guard: user navigated away while we were waiting
-			if (gen !== editorGeneration) {
-				syncStore.releaseDoc(note.sync_id)
-				return
-			}
-
-			activeSyncId = note.sync_id
-
-			// Seed if needed — safe because doc is in 'ready' state (post-sync).
-			// If the server had content, fragment.length > 0 and we skip.
-			// If the server was empty, we seed with local content.
-			if (note.content) {
-				const fragment = handle.ydoc.getXmlFragment('default')
-				if (fragment.length === 0) {
-					const tempExtensions = getBaseExtensions(true)
-					tempExtensions.push(Extension.create({
-						name: 'ySync',
-						addProseMirrorPlugins: () => [ySyncPlugin(fragment)],
-					}))
-					const tempEditor = new Editor({ extensions: tempExtensions })
-					tempEditor.commands.setContent(parseContent(note.content))
-					tempEditor.destroy()
-				}
-			}
-
-			// Swap editors: capture current DOM as a visual placeholder to
-			// prevent a blank flash while the collab editor initializes.
-			let placeholder: HTMLDivElement | null = null
-			if (editor && containerRef) {
-				placeholder = document.createElement('div')
-				placeholder.innerHTML = containerRef.innerHTML
-				placeholder.style.opacity = '0.5'
-				placeholder.style.pointerEvents = 'none'
-			}
-
-			if (editor) { editor.destroy(); editor = null }
-			currentEditor = null
-
-			// Stale guard again after editor destruction
-			if (gen !== editorGeneration || !containerRef) {
-				syncStore.releaseDoc(note.sync_id)
-				activeSyncId = null
-				return
-			}
-
-			if (placeholder && containerRef) {
-				containerRef.appendChild(placeholder)
-			}
-
-			// Create the collaborative editor
-			createCollabEditor(note, handle.ydoc)
-
-			// Remove the placeholder now that the collab editor is mounted
-			if (placeholder && containerRef?.contains(placeholder)) {
-				placeholder.remove()
-			}
-
-			// Sync note title via Yjs _meta map
-			syncNoteTitle(note, handle.ydoc)
-		} catch (err) {
-			// Sync failed — fall back to local-only editing
-			syncLog.error('editor', `Sync failed for ${note.sync_id}:`, err)
-
-			if (gen !== editorGeneration) return
-
-			// Make the placeholder editor editable as fallback
-			if (editor) {
-				editor.setEditable(!props.readonly)
-			}
-		}
-	}
-
 	onMount(() => {
 		createEditorInstance(props.note)
 	})
@@ -591,25 +385,13 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					cursorPositions.set(previousNoteId, { from, to })
 				}
 
-				const note = props.note
-				const newSyncId = note.sync_id || null
+				debouncedSave.cancel()
+				isUpdatingContent = true
+				editor?.commands.setContent(parseContent(props.note.content))
+				editor?.setEditable(!props.readonly)
+				isUpdatingContent = false
 
-				if (newSyncId !== currentSyncId) {
-					debouncedSave.cancel()
-					createEditorInstance(note)
-				} else if (editor) {
-					debouncedSave.cancel()
-					if (!note.sync_id) {
-						isUpdatingContent = true
-						editor.commands.setContent(parseContent(note.content))
-						editor.setEditable(!props.readonly)
-						isUpdatingContent = false
-					} else {
-						editor.setEditable(!props.readonly)
-					}
-				}
-
-				if (!note.sync_id && !editorStore.isNewNote()) {
+				if (!editorStore.isNewNote()) {
 					const saved = cursorPositions.get(newId)
 					requestAnimationFrame(() => {
 						if (editor) {
@@ -627,36 +409,6 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				}
 
 				previousNoteId = newId
-			},
-			{ defer: true }
-		)
-	)
-
-	// Watch for sync_id changes on the SAME note (e.g., user clicks Share)
-	createEffect(
-		on(
-			() => props.note.sync_id,
-			(newSyncId) => {
-				if ((newSyncId || null) !== currentSyncId) {
-					debouncedSave.flush()
-					createEditorInstance(props.note)
-				}
-			}
-		)
-	)
-
-	// Owner: push title updates to Yjs _meta when the note title changes
-	createEffect(
-		on(
-			() => props.note.title,
-			(title) => {
-				if (!activeSyncId || !props.note.is_owner) return
-				const machine = syncStore.getDocSync(activeSyncId)
-				if (!machine || !machine.isReady) return
-				const meta = machine.ydoc.getMap('_meta')
-				if (meta.get('title') !== title) {
-					meta.set('title', title)
-				}
 			},
 			{ defer: true }
 		)

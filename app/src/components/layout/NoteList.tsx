@@ -57,7 +57,7 @@ export function NoteList() {
 	// Re-fetch when notes are added/removed (length changes) — not on every content save.
 	createEffect(
 		on(
-			() => ({ view: store.currentView(), sort: store.noteSort(), _len: (store.notes() || []).length }),
+			() => ({ view: store.currentView(), sort: store.noteSort() }),
 			async ({ view, sort }) => {
 				if (typeof view === 'object' && view.type === 'list') {
 					const notes = await window.electronAPI.fetchNotesByList(
