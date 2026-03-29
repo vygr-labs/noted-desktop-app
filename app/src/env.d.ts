@@ -33,6 +33,7 @@ interface NoteList {
 	sync_secret: string | null
 	is_shared: number
 	is_owner: number
+	is_hidden: number
 	created_at: string
 	updated_at: string
 }
@@ -144,12 +145,15 @@ interface ElectronAPI {
 
 	// Lists
 	fetchAllLists: () => Promise<NoteList[]>
+	fetchHiddenLists: () => Promise<NoteList[]>
 	createList: (name: string, icon?: string, color?: string) => Promise<NoteList>
 	updateList: (
 		id: string,
 		data: { name?: string; icon?: string; color?: string }
 	) => Promise<NoteList | undefined>
 	deleteList: (id: string) => Promise<void>
+	hideList: (id: string) => Promise<void>
+	unhideList: (id: string) => Promise<void>
 	reorderLists: (ids: string[]) => Promise<void>
 
 	// Tags

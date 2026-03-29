@@ -9,13 +9,21 @@ export interface NoteList {
 	sync_id: string | null
 	sync_secret: string | null
 	is_shared: number
+	is_owner: number
+	is_hidden: number
 	created_at: string
 	updated_at: string
 }
 
 export function fetchAllLists(): NoteList[] {
 	return db
-		.prepare('SELECT * FROM lists ORDER BY sort_order ASC, created_at ASC')
+		.prepare('SELECT * FROM lists WHERE is_hidden = 0 ORDER BY sort_order ASC, created_at ASC')
+		.all() as NoteList[]
+}
+
+export function fetchHiddenLists(): NoteList[] {
+	return db
+		.prepare('SELECT * FROM lists WHERE is_hidden = 1 ORDER BY name ASC')
 		.all() as NoteList[]
 }
 
@@ -66,6 +74,14 @@ export function deleteList(id: string): void {
 	db.prepare('UPDATE notes SET is_trashed = 1, updated_at = CURRENT_TIMESTAMP WHERE list_id = ? AND is_trashed = 0').run(id)
 	// Then delete the list (notes.list_id set to NULL via ON DELETE SET NULL)
 	db.prepare('DELETE FROM lists WHERE id = ?').run(id)
+}
+
+export function hideList(id: string): void {
+	db.prepare('UPDATE lists SET is_hidden = 1, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id)
+}
+
+export function unhideList(id: string): void {
+	db.prepare('UPDATE lists SET is_hidden = 0, updated_at = CURRENT_TIMESTAMP WHERE id = ?').run(id)
 }
 
 export function reorderLists(ids: string[]): void {

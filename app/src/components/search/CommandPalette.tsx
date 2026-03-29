@@ -190,8 +190,14 @@ export function CommandPalette() {
 		}, 150)
 	}
 
-	function handleSelect(result: SearchResult) {
-		store.setCurrentView('all')
+	async function handleSelect(result: SearchResult) {
+		// Fetch the note directly — store.notes() excludes hidden lists
+		const note = await window.electronAPI.fetchNote(result.note_id)
+		if (note?.list_id) {
+			store.setCurrentView({ type: 'list', listId: note.list_id })
+		} else {
+			store.setCurrentView('all')
+		}
 		store.setSelectedNoteId(result.note_id)
 		store.setCommandPaletteOpen(false)
 	}

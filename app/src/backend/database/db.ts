@@ -288,6 +288,14 @@ function runMigrations() {
 		setSchemaVersion(11)
 	}
 
+	if (currentVersion < 12) {
+		const cols = db.prepare('PRAGMA table_info(lists)').all() as { name: string }[]
+		if (!cols.some(c => c.name === 'is_hidden')) {
+			db.exec('ALTER TABLE lists ADD COLUMN is_hidden INTEGER DEFAULT 0;')
+		}
+		setSchemaVersion(12)
+	}
+
 }
 
 runMigrations()

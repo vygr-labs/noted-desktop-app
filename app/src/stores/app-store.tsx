@@ -39,6 +39,7 @@ interface AppStore {
 	// Data
 	notes: () => Note[] | undefined
 	lists: () => NoteList[] | undefined
+	hiddenLists: () => NoteList[] | undefined
 	tags: () => Tag[] | undefined
 	todos: () => Todo[] | undefined
 	todoLists: () => TodoListItem[] | undefined
@@ -47,6 +48,7 @@ interface AppStore {
 	loadTagsForNotes: (ids: string[]) => void
 	refetchNotes: () => void
 	refetchLists: () => void
+	refetchHiddenLists: () => void
 	refetchTags: () => void
 	refetchTodos: () => void
 	refetchTodoLists: () => void
@@ -58,6 +60,10 @@ const AppStoreContext = createContext<AppStore>()
 
 async function loadLists(): Promise<NoteList[]> {
 	return window.electronAPI.fetchAllLists()
+}
+
+async function loadHiddenLists(): Promise<NoteList[]> {
+	return window.electronAPI.fetchHiddenLists()
 }
 
 async function loadTags(): Promise<Tag[]> {
@@ -119,6 +125,7 @@ export function AppStoreProvider(props: ParentProps) {
 		}
 	)
 	const [lists, { refetch: refetchLists }] = createResource(loadLists)
+	const [hiddenLists, { refetch: refetchHiddenLists }] = createResource(loadHiddenLists)
 	const [tags, { refetch: refetchTags }] = createResource(loadTags)
 	const [todos, { refetch: refetchTodos }] = createResource(loadTodos)
 	const [todoLists, { refetch: refetchTodoLists }] = createResource(loadTodoLists)
@@ -153,6 +160,7 @@ export function AppStoreProvider(props: ParentProps) {
 
 		notes: () => notes(),
 		lists: () => lists(),
+		hiddenLists: () => hiddenLists(),
 		tags: () => tags(),
 		todos: () => todos(),
 		todoLists: () => todoLists(),
@@ -161,6 +169,7 @@ export function AppStoreProvider(props: ParentProps) {
 		loadTagsForNotes,
 		refetchNotes: () => refetchNotes(),
 		refetchLists: () => refetchLists(),
+		refetchHiddenLists: () => refetchHiddenLists(),
 		refetchTags: () => refetchTags(),
 		refetchTodos: () => refetchTodos(),
 		refetchTodoLists: () => refetchTodoLists(),

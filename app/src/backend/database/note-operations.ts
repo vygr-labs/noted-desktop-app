@@ -29,7 +29,9 @@ export function fetchAllNotes(sort: NoteSortOrder = 'created_at'): Note[] {
 	else orderCol = `${sort} DESC`
 	return db
 		.prepare(
-			`SELECT * FROM notes WHERE is_trashed = 0 ORDER BY is_pinned DESC, ${orderCol}`
+			`SELECT * FROM notes WHERE is_trashed = 0
+			 AND (list_id IS NULL OR list_id NOT IN (SELECT id FROM lists WHERE is_hidden = 1))
+			 ORDER BY is_pinned DESC, ${orderCol}`
 		)
 		.all() as Note[]
 }

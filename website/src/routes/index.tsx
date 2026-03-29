@@ -256,10 +256,10 @@ function Nav() {
 }
 
 /* ================================================================
-   Hero Section
+   Hero Card (full-width bento card)
    ================================================================ */
 
-function Hero() {
+function HeroCard() {
   const { displayed, cursorHidden } = createTypingAnimation(
     ['Your thoughts,', 'beautifully noted.'],
     60,
@@ -267,7 +267,20 @@ function Hero() {
   )
 
   return (
-    <Box as="section" maxW="4xl" mx="auto" px="6" textAlign="center" mb={{ base: '6', lg: '10' }}>
+    <div
+      class={css({
+        textAlign: 'center',
+        px: { base: '6', md: '8', lg: '12' },
+        py: { base: '10', md: '14', lg: '16' },
+        borderRadius: 'xl',
+        overflow: 'hidden',
+      })}
+      style={{
+        'grid-column': '1 / -1',
+        'background-color': 'var(--surface-low)',
+        border: '1px solid var(--surface-border)',
+      }}
+    >
       {/* Open Source Badge */}
       <Box class="animate-fade-in-up" mb="6">
         <Flex
@@ -314,7 +327,7 @@ function Hero() {
         </span>
       </h1>
 
-      {/* Subtitle — single concise line */}
+      {/* Subtitle */}
       <p
         class={`animate-fade-in-up-delay-1 ${css({
           maxW: 'lg',
@@ -385,52 +398,7 @@ function Hero() {
           Star on GitHub
         </a>
       </Flex>
-    </Box>
-  )
-}
-
-/* ================================================================
-   Bento Section
-   ================================================================ */
-
-function BentoSection() {
-  return (
-    <Box as="section" id="features" maxW="7xl" mx="auto" px="6" py={{ base: '12', lg: '20' }} mb={{ base: '8', lg: '16' }}>
-      {/* Heading */}
-      <Box mb={{ base: '10', lg: '16' }} textAlign={{ base: 'center', md: 'left' }}>
-        <h2
-          class={css({
-            fontSize: { base: '3xl', md: '4xl', lg: '5xl' },
-            fontWeight: 'bold',
-            letterSpacing: '-0.03em',
-            color: 'fg.default',
-            mb: '4',
-          })}
-        >
-          Precision Crafted.
-        </h2>
-        <p class={css({ fontSize: 'lg', maxW: 'xl' })} style={{ color: 'var(--on-surface-variant)' }}>
-          Every feature is designed to reduce friction and amplify your cognitive workflow.
-        </p>
-      </Box>
-
-      {/* Bento Grid */}
-      <div
-        class={css({
-          display: 'grid',
-          gap: '5',
-          gridTemplateColumns: { base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
-        })}
-      >
-        <ThemeCard />
-        <EditorCard />
-        <SpeedCard />
-        <PrivacyCard />
-        <PlatformCard />
-        <SyncCard />
-        <OpenSourceCard />
-      </div>
-    </Box>
+    </div>
   )
 }
 
@@ -933,101 +901,98 @@ function OpenSourceCard() {
 }
 
 /* ================================================================
-   CTA Section
+   CTA Card (full-width gradient bento card)
    ================================================================ */
 
-function CallToAction() {
-  const reveal = createScrollReveal(0)
+function CtaCard() {
+  const reveal = createScrollReveal(0.7)
 
   return (
-    <Box as="section" id="download" maxW="7xl" mx="auto" px="6" py={{ base: '12', lg: '24' }}>
-      <div ref={reveal}>
-        <Box
-          position="relative"
-          borderRadius="2xl"
-          overflow="hidden"
-          textAlign="center"
-          px={{ base: '6', md: '12', lg: '24' }}
-          py={{ base: '12', md: '16', lg: '24' }}
-          class="hero-cta-gradient"
+    <div
+      id="download"
+      ref={reveal}
+      class={`hero-cta-gradient ${css({
+        borderRadius: 'xl',
+        overflow: 'hidden',
+        textAlign: 'center',
+        px: { base: '6', md: '12', lg: '20' },
+        py: { base: '12', md: '16', lg: '20' },
+      })}`}
+      style={{ 'grid-column': '1 / -1' }}
+    >
+      <h2
+        class={css({
+          fontSize: { base: '3xl', md: '5xl', lg: '6xl' },
+          fontWeight: 'extrabold',
+          letterSpacing: '-0.03em',
+          color: 'white',
+          mb: '6',
+        })}
+      >
+        Ready to start noting?
+      </h2>
+      <p
+        class={css({ maxW: 'xl', mx: 'auto', fontSize: 'lg', mb: '10', lineHeight: 'relaxed' })}
+        style={{ color: 'rgba(255, 255, 255, 0.8)' }}
+      >
+        Join thousands of writers and thinkers who have found their focus.
+      </p>
+      <Flex
+        flexDirection={{ base: 'column', sm: 'row' }}
+        alignItems="center"
+        justifyContent="center"
+        gap="4"
+      >
+        <a
+          href="#"
+          class={css({
+            w: { base: 'full', sm: 'auto' },
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '3',
+            px: '8',
+            py: '4',
+            borderRadius: 'full',
+            fontWeight: 'bold',
+            fontSize: 'lg',
+            textDecoration: 'none',
+            transition: 'all 0.3s cubic-bezier(0.23, 1, 0.32, 1)',
+            _hover: { transform: 'translateY(-2px)' },
+            _active: { transform: 'translateY(0)' },
+          })}
+          style={{ 'background-color': 'white', color: '#ce2100' }}
         >
-          <Box position="relative" zIndex={1}>
-            <h2
-              class={css({
-                fontSize: { base: '3xl', md: '5xl', lg: '7xl' },
-                fontWeight: 'extrabold',
-                letterSpacing: '-0.03em',
-                color: 'white',
-                mb: '8',
-              })}
-            >
-              Ready to start noting?
-            </h2>
-            <p
-              class={css({ maxW: 'xl', mx: 'auto', fontSize: 'lg', mb: '12', lineHeight: 'relaxed' })}
-              style={{ color: 'rgba(255, 255, 255, 0.8)' }}
-            >
-              Join thousands of writers and thinkers who have found their focus.
-            </p>
-            <Flex
-              flexDirection={{ base: 'column', sm: 'row' }}
-              alignItems="center"
-              justifyContent="center"
-              gap="4"
-            >
-              <a
-                href="#"
-                class={css({
-                  w: { base: 'full', sm: 'auto' },
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '3',
-                  px: '10',
-                  py: '5',
-                  borderRadius: 'full',
-                  fontWeight: 'bold',
-                  fontSize: 'xl',
-                  textDecoration: 'none',
-                  transition: 'all 0.3s cubic-bezier(0.23, 1, 0.32, 1)',
-                  _hover: { transform: 'translateY(-2px)' },
-                  _active: { transform: 'translateY(0)' },
-                })}
-                style={{ 'background-color': 'white', color: '#ce2100' }}
-              >
-                <DownloadIcon />
-                Get Noted for Desktop
-              </a>
-              <a
-                href="https://github.com"
-                target="_blank"
-                rel="noopener noreferrer"
-                class={css({
-                  w: { base: 'full', sm: 'auto' },
-                  display: 'inline-flex',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  gap: '2',
-                  px: '10',
-                  py: '5',
-                  borderRadius: 'full',
-                  color: 'white',
-                  fontWeight: 'bold',
-                  fontSize: 'xl',
-                  textDecoration: 'none',
-                  transition: 'all 0.3s cubic-bezier(0.23, 1, 0.32, 1)',
-                  _hover: { transform: 'translateY(-2px)' },
-                  _active: { transform: 'translateY(0)' },
-                })}
-                style={{ border: '1px solid rgba(255, 255, 255, 0.3)' }}
-              >
-                View on GitHub
-              </a>
-            </Flex>
-          </Box>
-        </Box>
-      </div>
-    </Box>
+          <DownloadIcon />
+          Get Noted for Desktop
+        </a>
+        <a
+          href="https://github.com"
+          target="_blank"
+          rel="noopener noreferrer"
+          class={css({
+            w: { base: 'full', sm: 'auto' },
+            display: 'inline-flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            gap: '2',
+            px: '8',
+            py: '4',
+            borderRadius: 'full',
+            color: 'white',
+            fontWeight: 'bold',
+            fontSize: 'lg',
+            textDecoration: 'none',
+            transition: 'all 0.3s cubic-bezier(0.23, 1, 0.32, 1)',
+            _hover: { transform: 'translateY(-2px)' },
+            _active: { transform: 'translateY(0)' },
+          })}
+          style={{ border: '1px solid rgba(255, 255, 255, 0.3)' }}
+        >
+          View on GitHub
+        </a>
+      </Flex>
+    </div>
   )
 }
 
@@ -1102,10 +1067,30 @@ export default function Home() {
   return (
     <>
       <Nav />
-      <main class={css({ pt: '32' })} style={{ 'background-color': 'var(--surface-dim)' }}>
-        <Hero />
-        <BentoSection />
-        <CallToAction />
+      <main style={{ 'background-color': 'var(--surface-dim)' }}>
+        <div
+          id="features"
+          class={css({
+            display: 'grid',
+            gap: '5',
+            gridTemplateColumns: { base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
+            maxW: '7xl',
+            mx: 'auto',
+            px: '6',
+            pt: '24',
+            pb: { base: '12', lg: '20' },
+          })}
+        >
+          <HeroCard />
+          <ThemeCard />
+          <EditorCard />
+          <SpeedCard />
+          <PrivacyCard />
+          <PlatformCard />
+          <SyncCard />
+          <OpenSourceCard />
+          <CtaCard />
+        </div>
       </main>
       <Footer />
     </>
