@@ -29,11 +29,14 @@ contextBridge.exposeInMainWorld('electronAPI', {
 
 	// Lists
 	fetchAllLists: () => ipcRenderer.invoke('lists:fetch-all'),
+	fetchHiddenLists: () => ipcRenderer.invoke('lists:fetch-hidden'),
 	createList: (name: string, icon?: string, color?: string) =>
 		ipcRenderer.invoke('lists:create', name, icon, color),
 	updateList: (id: string, data: Record<string, unknown>) =>
 		ipcRenderer.invoke('lists:update', id, data),
 	deleteList: (id: string) => ipcRenderer.invoke('lists:delete', id),
+	hideList: (id: string) => ipcRenderer.invoke('lists:hide', id),
+	unhideList: (id: string) => ipcRenderer.invoke('lists:unhide', id),
 	reorderLists: (ids: string[]) => ipcRenderer.invoke('lists:reorder', ids),
 
 	// Tags

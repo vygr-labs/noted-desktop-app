@@ -17,6 +17,9 @@ import {
 	PanelLeftOpenIcon,
 	SunIcon,
 	DownloadIcon,
+	EyeOffIcon,
+	EyeIcon,
+	ChevronRightIcon,
 } from 'lucide-solid'
 
 // ─── Styles ───────────────────────────────────────────────
@@ -215,6 +218,63 @@ const listName = css({
 	whiteSpace: 'nowrap',
 })
 
+const contextMenu = css({
+	position: 'fixed',
+	zIndex: 100,
+	bg: 'gray.2',
+	borderRadius: 'md',
+	py: '1',
+	minWidth: '160px',
+	boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.25), 0 0 0 1px {colors.gray.a3}',
+	borderWidth: '1px',
+	borderStyle: 'solid',
+	borderColor: 'gray.a3',
+	animation: 'fade-in 0.1s ease-out',
+})
+
+const contextMenuItem = css({
+	display: 'flex',
+	alignItems: 'center',
+	gap: '2',
+	width: '100%',
+	px: '3',
+	py: '1.5',
+	fontSize: '13px',
+	color: 'fg.default',
+	cursor: 'pointer',
+	transition: 'background 0.1s',
+	_hover: { bg: 'gray.a3' },
+})
+
+const contextMenuDanger = css({
+	display: 'flex',
+	alignItems: 'center',
+	gap: '2',
+	width: '100%',
+	px: '3',
+	py: '1.5',
+	fontSize: '13px',
+	color: 'red.11',
+	cursor: 'pointer',
+	transition: 'background 0.1s',
+	_hover: { bg: 'red.a2' },
+})
+
+const hiddenHeader = css({
+	display: 'flex',
+	alignItems: 'center',
+	gap: '2',
+	px: '2.5',
+	py: '1.5',
+	fontSize: '11px',
+	fontWeight: '600',
+	color: 'fg.subtle',
+	textTransform: 'uppercase',
+	letterSpacing: '0.05em',
+	cursor: 'pointer',
+	_hover: { color: 'fg.default' },
+})
+
 const inlineInput = css({
 	display: 'flex',
 	alignItems: 'center',
@@ -387,6 +447,8 @@ export function Sidebar() {
 	const [newListName, setNewListName] = createSignal('')
 	const [showBulkExport, setShowBulkExport] = createSignal(false)
 	const [deleteListConfirm, setDeleteListConfirm] = createSignal<{ id: string; name: string } | null>(null)
+	const [listContextMenu, setListContextMenu] = createSignal<{ x: number; y: number; listId: string; hidden: boolean } | null>(null)
+	const [showHiddenLists, setShowHiddenLists] = createSignal(false)
 
 	onMount(() => {
 		function handleClickOutside(e: MouseEvent) {
@@ -395,6 +457,9 @@ export function Sidebar() {
 				if (!target.closest('[data-bulk-export]')) {
 					setShowBulkExport(false)
 				}
+			}
+			if (listContextMenu()) {
+				setListContextMenu(null)
 			}
 		}
 		window.addEventListener('mousedown', handleClickOutside)
@@ -433,23 +498,59 @@ export function Sidebar() {
 		store.setSelectedNoteId(null)
 	}
 
-	function handleDeleteList(e: Event, listId: string) {
+	function handleListContextMenu(e: MouseEvent, listId: string, hidden: boolean) {
+		e.preventDefault()
 		e.stopPropagation()
-		const list = (store.lists() || []).find(l => l.id === listId)
-		setDeleteListConfirm({ id: listId, name: list?.name || 'this list' })
+		setListContextMenu({ x: e.clientX, y: e.clientY, listId, hidden })
+	}
+
+	function handleDeleteFromMenu() {
+		const menu = listContextMenu()
+		if (!menu) return
+		setListContextMenu(null)
+		const allLists = [...(store.lists() || []), ...(store.hiddenLists() || [])]
+		const list = allLists.find(l => l.id === menu.listId)
+		setDeleteListConfirm({ id: menu.listId, name: list?.name || 'this list' })
+	}
+
+	async function handleHideFromMenu() {
+		const menu = listContextMenu()
+		if (!menu) return
+		setListContextMenu(null)
+		const currentNote = editorStore.currentNote()
+		if (currentNote?.list_id === menu.listId) {
+			store.setSelectedNoteId(null)
+		}
+		await window.electronAPI.hideList(menu.listId)
+		store.refetchLists()
+		store.refetchHiddenLists()
+		store.refetchNotes()
+		if (isListActive(menu.listId)) {
+			store.setCurrentView('all')
+		}
+	}
+
+	async function handleUnhideFromMenu() {
+		const menu = listContextMenu()
+		if (!menu) return
+		setListContextMenu(null)
+		await window.electronAPI.unhideList(menu.listId)
+		store.refetchLists()
+		store.refetchHiddenLists()
+		store.refetchNotes()
 	}
 
 	async function confirmDeleteList() {
 		const info = deleteListConfirm()
 		if (!info) return
 		setDeleteListConfirm(null)
-		// Close the editor if the open note belongs to this list
 		const currentNote = editorStore.currentNote()
 		if (currentNote?.list_id === info.id) {
 			store.setSelectedNoteId(null)
 		}
 		await window.electronAPI.deleteList(info.id)
 		store.refetchLists()
+		store.refetchHiddenLists()
 		store.refetchNotes()
 		if (isListActive(info.id)) {
 			store.setCurrentView('all')
@@ -720,7 +821,10 @@ export function Sidebar() {
 				<div class={listScroll}>
 					<For each={store.lists()}>
 						{(list) => (
-							<div class={listItemRow}>
+							<div
+								class={listItemRow}
+								onContextMenu={(e) => handleListContextMenu(e, list.id, false)}
+							>
 								<div
 									class={navItem}
 									style={{ flex: 1 }}
@@ -731,13 +835,6 @@ export function Sidebar() {
 									<FolderIcon class={iconStyle} />
 									<span class={listName}>{list.name}</span>
 								</div>
-							<div
-								class={`list-actions ${listActions}`}
-								onClick={(e) => handleDeleteList(e, list.id)}
-								title="Delete list"
-							>
-								<Trash2Icon class={css({ width: '3', height: '3' })} />
-							</div>
 							</div>
 						)}
 					</For>
@@ -757,6 +854,43 @@ export function Sidebar() {
 						</div>
 					</Show>
 				</div>
+
+				{/* Hidden Lists */}
+				<Show when={(store.hiddenLists() || []).length > 0}>
+					<div
+						class={hiddenHeader}
+						onClick={() => setShowHiddenLists(!showHiddenLists())}
+					>
+						<ChevronRightIcon
+							class={css({ width: '3', height: '3', transition: 'transform 0.15s' })}
+							style={{ transform: showHiddenLists() ? 'rotate(90deg)' : 'rotate(0deg)' }}
+						/>
+						<span>Hidden ({(store.hiddenLists() || []).length})</span>
+					</div>
+					<Show when={showHiddenLists()}>
+						<div style={{ animation: 'fade-in 0.15s ease' }}>
+							<For each={store.hiddenLists()}>
+								{(list) => (
+									<div
+										class={listItemRow}
+										onContextMenu={(e) => handleListContextMenu(e, list.id, true)}
+									>
+										<div
+											class={navItem}
+											style={{ flex: 1, opacity: 0.6 }}
+											data-active={isListActive(list.id)}
+											onClick={() => handleListClick(list.id)}
+										>
+											<div class={`nav-indicator ${navIndicator}`} />
+											<EyeOffIcon class={iconStyle} />
+											<span class={listName}>{list.name}</span>
+										</div>
+									</div>
+								)}
+							</For>
+						</div>
+					</Show>
+				</Show>
 
 				{/* Bottom */}
 				<div class={divider} />
@@ -826,6 +960,32 @@ export function Sidebar() {
 				</div>
 			</div>
 
+		</Show>
+		<Show when={listContextMenu()}>
+			{(menu) => (
+				<div
+					class={contextMenu}
+					style={{ left: `${menu().x}px`, top: `${menu().y}px` }}
+					onMouseDown={(e) => e.stopPropagation()}
+				>
+					<Show when={menu().hidden}>
+						<button class={contextMenuItem} onClick={handleUnhideFromMenu}>
+							<EyeIcon class={css({ width: '3.5', height: '3.5' })} />
+							Show list
+						</button>
+					</Show>
+					<Show when={!menu().hidden}>
+						<button class={contextMenuItem} onClick={handleHideFromMenu}>
+							<EyeOffIcon class={css({ width: '3.5', height: '3.5' })} />
+							Hide list
+						</button>
+					</Show>
+					<button class={contextMenuDanger} onClick={handleDeleteFromMenu}>
+						<Trash2Icon class={css({ width: '3.5', height: '3.5' })} />
+						Delete list
+					</button>
+				</div>
+			)}
 		</Show>
 		<ConfirmDialog
 			open={!!deleteListConfirm()}

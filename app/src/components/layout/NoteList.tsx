@@ -112,6 +112,7 @@ export function NoteList() {
 		if (view === 'search') return 'Search'
 		if (typeof view === 'object') {
 			const list = store.lists()?.find((l) => l.id === view.listId)
+				|| store.hiddenLists()?.find((l) => l.id === view.listId)
 			return list?.name || 'List'
 		}
 		return 'Notes'
