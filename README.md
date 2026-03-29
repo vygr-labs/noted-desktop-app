@@ -10,7 +10,7 @@ A minimal, distraction-free note-taking app for desktop. Built by [Voyager Techn
 - **Todos** — Built-in task management with dedicated todo lists and completion tracking
 - **Tags** — Tag notes for flexible organization
 - **Custom lists** — Organize notes into lists with custom colors and icons
-- **Quick capture** — Global shortcut (`Ctrl+Shift+N`) to jot down a note from anywhere
+- **Quick capture** — Global shortcut (`Ctrl+Alt+N`) to jot down a note from anywhere
 - **Popout windows** — Pop out notes or todos into separate pinnable windows
 - **Focus mode** — Hide the sidebar and note list for distraction-free writing
 - **Full-text search** — Search across all notes instantly, plus in-note search (`Ctrl+F`)

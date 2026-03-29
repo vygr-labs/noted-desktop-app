@@ -236,7 +236,7 @@ function spawnPopoutWindow(opts: { view: string; listId?: string; title?: string
 }
 
 function registerGlobalShortcuts() {
-	globalShortcut.register('CommandOrControl+Shift+N', () => {
+	globalShortcut.register('CommandOrControl+Alt+N', () => {
 		spawnQuickCaptureWindow()
 	})
 }
