@@ -114,6 +114,34 @@
 }
 
 /* ================================================================
+   Responsive Grid Spans
+   ================================================================ */
+
+.bento-span-2-col {
+  grid-column: auto;
+}
+
+.bento-span-2-row {
+  grid-row: auto;
+}
+
+.bento-span-full {
+  grid-column: auto;
+}
+
+@media (min-width: 768px) {
+  .bento-span-2-col {
+    grid-column: span 2;
+  }
+  .bento-span-2-row {
+    grid-row: span 2;
+  }
+  .bento-span-full {
+    grid-column: 1 / -1;
+  }
+}
+
+/* ================================================================
    Selection
    ================================================================ */
 

@@ -126,11 +126,11 @@ function ThemeToggle() {
 
 export function Nav() {
   const [dark, setDark] = createSignal(false)
+  const [menuOpen, setMenuOpen] = createSignal(false)
 
   onMount(() => {
     setDark(document.documentElement.classList.contains('dark'))
 
-    // Watch for theme changes from the toggle
     const observer = new MutationObserver(() => {
       setDark(document.documentElement.classList.contains('dark'))
     })
@@ -148,11 +148,11 @@ export function Nav() {
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
         pt: '3',
-        px: '6',
+        px: { base: '3', md: '6' },
       })}`}
       style={{ 'background-color': 'transparent' }}
     >
-      <Box maxW="7xl" mx="auto" px="6">
+      <Box maxW="7xl" mx="auto" px={{ base: '0', md: '6' }}>
         <Box
           borderRadius="sm"
           style={{
@@ -160,45 +160,139 @@ export function Nav() {
             border: '1px solid var(--surface-border)',
           }}
         >
-          <Flex justifyContent="space-between" alignItems="center" py="3" px="5">
-          <Flex alignItems="center" gap="8">
-            <a href="/" class={css({ textDecoration: 'none' })}>
-              <img
-                src={dark() ? '/noted-logo-white.svg' : '/noted-logo.svg'}
-                alt="noted."
-                class={css({ h: '6' })}
-              />
-            </a>
-            <Flex display={{ base: 'none', md: 'flex' }} alignItems="center" gap="6">
-              <a href="/#features" onClick={scrollToSection('features')} class={navLinkClass}>Features</a>
-              <a href="/download" class={navLinkClass}>Download</a>
-              <a href="https://github.com/vygr-labs/noted-desktop-app" target="_blank" rel="noopener noreferrer" class={navLinkClass}>GitHub</a>
+          <Flex justifyContent="space-between" alignItems="center" py="3" px={{ base: '3', md: '5' }}>
+            <Flex alignItems="center" gap={{ base: '4', md: '8' }}>
+              <a href="/" class={css({ textDecoration: 'none' })}>
+                <img
+                  src={dark() ? '/noted-logo-white.svg' : '/noted-logo.svg'}
+                  alt="noted."
+                  class={css({ h: { base: '5', md: '6' } })}
+                />
+              </a>
+              <Flex display={{ base: 'none', md: 'flex' }} alignItems="center" gap="6">
+                <a href="/#features" onClick={scrollToSection('features')} class={navLinkClass}>Features</a>
+                <a href="/download" class={navLinkClass}>Download</a>
+                <a href="https://github.com/vygr-labs/noted-desktop-app" target="_blank" rel="noopener noreferrer" class={navLinkClass}>GitHub</a>
+              </Flex>
+            </Flex>
+
+            <Flex alignItems="center" gap="2">
+              <ThemeToggle />
+              <a
+                href="/download?auto"
+                class={css({
+                  display: { base: 'none', sm: 'inline-flex' },
+                  alignItems: 'center',
+                  px: '5',
+                  py: '2',
+                  borderRadius: 'sm',
+                  color: 'white',
+                  fontWeight: 'semibold',
+                  fontSize: 'sm',
+                  textDecoration: 'none',
+                  transition: 'transform 0.2s cubic-bezier(0.23, 1, 0.32, 1)',
+                  _active: { transform: 'scale(0.95)' },
+                })}
+                style={{ 'background-color': '#7a0d02' }}
+              >
+                Download
+              </a>
+              {/* Mobile menu toggle */}
+              <button
+                onClick={() => setMenuOpen(!menuOpen())}
+                aria-label="Toggle menu"
+                class={css({
+                  display: { base: 'flex', md: 'none' },
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  w: '8',
+                  h: '8',
+                  borderRadius: 'sm',
+                  cursor: 'pointer',
+                  border: 'none',
+                  color: 'fg.muted',
+                  _hover: { color: 'fg.default' },
+                })}
+                style={{ 'background-color': 'var(--surface-high)' }}
+              >
+                {menuOpen() ? (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="18" y1="6" x2="6" y2="18" />
+                    <line x1="6" y1="6" x2="18" y2="18" />
+                  </svg>
+                ) : (
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <line x1="3" y1="12" x2="21" y2="12" />
+                    <line x1="3" y1="6" x2="21" y2="6" />
+                    <line x1="3" y1="18" x2="21" y2="18" />
+                  </svg>
+                )}
+              </button>
             </Flex>
           </Flex>
 
-          <Flex alignItems="center" gap="3">
-            <ThemeToggle />
-            <a
-              href="/download?auto"
-              class={css({
-                display: 'inline-flex',
-                alignItems: 'center',
-                px: '5',
-                py: '2',
-                borderRadius: 'sm',
-                color: 'white',
-                fontWeight: 'semibold',
-                fontSize: 'sm',
-                textDecoration: 'none',
-                transition: 'transform 0.2s cubic-bezier(0.23, 1, 0.32, 1)',
-                _active: { transform: 'scale(0.95)' },
-              })}
-              style={{ 'background-color': '#7a0d02' }}
+          {/* Mobile menu dropdown */}
+          {menuOpen() && (
+            <Flex
+              flexDirection="column"
+              gap="1"
+              px={{ base: '3', md: '5' }}
+              pb="3"
+              display={{ md: 'none' }}
             >
-              Download
-            </a>
-          </Flex>
-        </Flex>
+              <a
+                href="/#features"
+                onClick={(e) => { scrollToSection('features')(e); setMenuOpen(false) }}
+                class={css({
+                  py: '2.5',
+                  px: '3',
+                  borderRadius: 'sm',
+                  textDecoration: 'none',
+                  fontSize: 'sm',
+                  fontWeight: 'medium',
+                  color: 'fg.muted',
+                  _hover: { color: 'fg.default' },
+                })}
+                style={{ 'background-color': 'var(--surface-high)' }}
+              >
+                Features
+              </a>
+              <a
+                href="/download"
+                class={css({
+                  py: '2.5',
+                  px: '3',
+                  borderRadius: 'sm',
+                  textDecoration: 'none',
+                  fontSize: 'sm',
+                  fontWeight: 'medium',
+                  color: 'fg.muted',
+                  _hover: { color: 'fg.default' },
+                })}
+                style={{ 'background-color': 'var(--surface-high)' }}
+              >
+                Download
+              </a>
+              <a
+                href="https://github.com/vygr-labs/noted-desktop-app"
+                target="_blank"
+                rel="noopener noreferrer"
+                class={css({
+                  py: '2.5',
+                  px: '3',
+                  borderRadius: 'sm',
+                  textDecoration: 'none',
+                  fontSize: 'sm',
+                  fontWeight: 'medium',
+                  color: 'fg.muted',
+                  _hover: { color: 'fg.default' },
+                })}
+                style={{ 'background-color': 'var(--surface-high)' }}
+              >
+                GitHub
+              </a>
+            </Flex>
+          )}
         </Box>
       </Box>
     </nav>
@@ -235,7 +329,7 @@ export function FooterCard(props: { staggerRef?: (el: HTMLElement) => void }) {
           </span>
         </Flex>
 
-        <Flex gap="8">
+        <Flex gap={{ base: '4', md: '8' }} flexWrap="wrap" justifyContent="center">
           <For each={[{ label: 'Features', href: '/#features' }, { label: 'Download', href: '/download' }, { label: 'GitHub', href: 'https://github.com/vygr-labs/noted-desktop-app' }]}>
             {(link) => (
               <a
@@ -244,7 +338,7 @@ export function FooterCard(props: { staggerRef?: (el: HTMLElement) => void }) {
                 target={link.label === 'GitHub' ? '_blank' : undefined}
                 rel={link.label === 'GitHub' ? 'noopener noreferrer' : undefined}
                 style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)', 'text-decoration': 'none', transition: 'color 0.3s' }}
-                class={css({ _hover: { color: 'fg.default' } })}
+                class={css({ py: '1', _hover: { color: 'fg.default' } })}
               >
                 {link.label}
               </a>

@@ -254,15 +254,12 @@ function VersionCard(props: { staggerRef?: (el: HTMLElement) => void }) {
     <div
       ref={props.staggerRef}
       data-stagger=""
-      class={css({
+      class={`bento-span-2-col ${css({
         p: { base: '6', lg: '8' },
         borderRadius: 'sm',
         overflow: 'hidden',
-      })}
-      style={{
-        'grid-column': 'span 2',
-        ...cardStyle,
-      }}
+      })}`}
+      style={cardStyle}
     >
       <Flex
         flexDirection={{ base: 'column', md: 'row' }}
@@ -414,12 +411,12 @@ export default function Download() {
       <div
         class={css({
           display: 'grid',
-          gap: '5',
+          gap: { base: '3', md: '5' },
           gridTemplateColumns: { base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
           maxW: '7xl',
           mx: 'auto',
-          px: '6',
-          pt: '24',
+          px: { base: '3', md: '6' },
+          pt: { base: '20', md: '24' },
           pb: { base: '12', lg: '20' },
         })}
       >

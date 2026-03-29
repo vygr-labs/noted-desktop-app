@@ -170,7 +170,7 @@ function HeroCard() {
       {/* Staggered Fade Headline */}
       <h1
         class={`hero-gradient-text ${css({
-          fontSize: { base: '4xl', md: '6xl', lg: '7xl' },
+          fontSize: { base: '3xl', md: '6xl', lg: '7xl' },
           fontWeight: 'extrabold',
           letterSpacing: '-0.04em',
           lineHeight: { base: '1.1', lg: '1.1' },
@@ -318,15 +318,13 @@ function ThemeCard(props: { staggerRef?: (el: HTMLElement) => void }) {
       id="features"
       ref={props.staggerRef}
       data-stagger=""
-      class={`${bentoCardClass} ${css({
+      class={`${bentoCardClass} bento-span-2-col bento-span-2-row ${css({
         display: 'flex',
         flexDirection: 'column',
       })}`}
       style={{
         'background-color': 'var(--surface-low)',
         border: '1px solid var(--surface-border)',
-        'grid-column': 'span 2',
-        'grid-row': 'span 2',
       }}
     >
       {/* Header */}
@@ -596,7 +594,7 @@ function SyncCard(props: { staggerRef?: (el: HTMLElement) => void }) {
     <div
       ref={props.staggerRef}
       data-stagger=""
-      class={`${bentoCardClass} ${css({
+      class={`${bentoCardClass} bento-span-2-row ${css({
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',
@@ -604,7 +602,6 @@ function SyncCard(props: { staggerRef?: (el: HTMLElement) => void }) {
       style={{
         'background-color': 'var(--surface-low)',
         border: '1px solid var(--surface-border)',
-        'grid-row': 'span 2',
       }}
     >
       <Box>
@@ -696,11 +693,10 @@ function OpenSourceCard(props: { staggerRef?: (el: HTMLElement) => void }) {
     <div
       ref={props.staggerRef}
       data-stagger=""
-      class={`${bentoCardClass}`}
+      class={`${bentoCardClass} bento-span-2-col`}
       style={{
         'background-color': 'var(--surface-low)',
         border: '1px solid var(--surface-border)',
-        'grid-column': 'span 2',
       }}
     >
       <Flex
@@ -789,14 +785,14 @@ function CtaCard(props: { staggerRef?: (el: HTMLElement) => void }) {
         borderRadius: 'sm',
         overflow: 'hidden',
         textAlign: 'center',
-        px: { base: '6', md: '12', lg: '20' },
-        py: { base: '12', md: '16', lg: '20' },
+        px: { base: '4', md: '12', lg: '20' },
+        py: { base: '10', md: '16', lg: '20' },
       })}`}
       style={{ 'grid-column': '1 / -1' }}
     >
       <h2
         class={css({
-          fontSize: { base: '3xl', md: '5xl', lg: '6xl' },
+          fontSize: { base: '2xl', md: '5xl', lg: '6xl' },
           fontWeight: 'extrabold',
           letterSpacing: '-0.03em',
           color: 'white',
@@ -882,13 +878,13 @@ export default function Home() {
       <div
           class={css({
             display: 'grid',
-            gap: '5',
+            gap: { base: '3', md: '5' },
             gridTemplateColumns: { base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
             maxW: '7xl',
             mx: 'auto',
-            px: '6',
-            pt: '24',
-            pb: { base: '12', lg: '20' },
+            px: { base: '3', md: '6' },
+            pt: { base: '20', md: '24' },
+            pb: { base: '8', lg: '20' },
           })}
         >
           <HeroCard />
