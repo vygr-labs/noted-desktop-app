@@ -6,6 +6,7 @@ import { SyncStoreProvider, useSyncStore } from '../stores/sync-store'
 import { NoteListSync } from '../lib/list-sync'
 import { TodoListSync } from '../lib/todo-sync'
 import { seedYjsWithContent } from '../lib/seed-yjs-note'
+import { syncLog } from '../lib/sync-log'
 import { AppShell } from './layout/AppShell'
 import { SettingsDialog } from './settings/SettingsDialog'
 import { CommandPalette } from './search/CommandPalette'
@@ -124,15 +125,18 @@ function AppInner() {
 					}
 				}).catch(err => {
 					pendingListConnects.delete(syncId)
-					console.error(`[app] Failed to connect list sync for ${syncId}:`, err)
+					syncLog.error('app', `Failed to connect list sync for ${syncId}:`, err)
 				})
 			}
 		}
 	))
 
 	// When notes change, push updated membership to all shared lists
-	// and seed Yjs docs with content for owned notes not open in the editor
+	// and seed Yjs docs with content for owned notes not open in the editor.
+	// Track the last pushed membership fingerprint per list to avoid pushing
+	// on every content save (which would cause Yjs churn and editor glitches).
 	const seededNotes = new Set<string>()
+	const lastPushedMembership = new Map<string, string>()
 	createEffect(on(
 		() => store.notes(),
 		(notes) => {
@@ -147,11 +151,18 @@ function AppInner() {
 				const listNotes = notes.filter(
 					n => n.list_id === list.id && n.sync_id && n.sync_secret && !n.is_trashed
 				)
-				listSync.pushNotes(listNotes.map(n => ({
+				const membership = listNotes.map(n => ({
 					sync_id: n.sync_id!,
 					sync_secret: n.sync_secret!,
 					title: n.title,
-				})))
+				}))
+
+				// Only push if membership actually changed (notes added/removed/renamed)
+				const fingerprint = membership.map(m => `${m.sync_id}:${m.title}`).join('|')
+				if (fingerprint !== lastPushedMembership.get(list.sync_id!)) {
+					lastPushedMembership.set(list.sync_id!, fingerprint)
+					listSync.pushNotes(membership)
+				}
 
 				// Seed Yjs docs with content for owned notes
 				for (const note of listNotes) {
@@ -164,7 +175,7 @@ function AppInner() {
 						// Release after seeding — idle timer keeps connection alive briefly
 						syncStore.releaseDoc(noteSyncId)
 					}).catch(err => {
-						console.error(`[app] Failed to seed note ${noteSyncId}:`, err)
+						syncLog.error('app', `Failed to seed note ${noteSyncId}:`, err)
 					})
 				}
 			}
@@ -256,7 +267,7 @@ function AppInner() {
 					}
 				}).catch(err => {
 					pendingTodoConnects.delete(syncId)
-					console.error(`[app] Failed to connect todo sync for ${syncId}:`, err)
+					syncLog.error('app', `Failed to connect todo sync for ${syncId}:`, err)
 				})
 			}
 		}

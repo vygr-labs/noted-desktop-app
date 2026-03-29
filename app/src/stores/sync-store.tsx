@@ -11,6 +11,7 @@ import * as Y from 'yjs'
 import type { Awareness } from 'y-protocols/awareness'
 import { useSettingsStore } from './settings-store'
 import { DocStateMachine, UNSHARE_ORIGIN, type DocState } from '../lib/doc-state-machine'
+import { syncLog } from '../lib/sync-log'
 
 interface SyncPeer {
 	clientId: number
@@ -112,7 +113,7 @@ export function SyncStoreProvider(props: ParentProps) {
 				unshareCallback?.(id)
 			},
 			onError: (id, error) => {
-				console.error(`[sync-store] Doc ${id} error:`, error)
+				syncLog.error('store', `Doc ${id} error:`, error)
 			},
 		})
 
@@ -204,7 +205,7 @@ export function SyncStoreProvider(props: ParentProps) {
 				const state = Y.encodeStateAsUpdate(machine.ydoc)
 				await window.electronAPI.saveYjsState(syncId, state)
 			} catch (err) {
-				console.error(`[sync-store] Failed to save state for ${syncId}:`, err)
+				syncLog.error('store', `Failed to save state for ${syncId}:`, err)
 			}
 		}
 	}
@@ -220,10 +221,11 @@ export function SyncStoreProvider(props: ParentProps) {
 			meta.set('unshared', true)
 		}, UNSHARE_ORIGIN)
 
-		// Wait for the change to propagate (provider reports no unsynced changes)
-		if (machine.provider && machine.provider.hasUnsyncedChanges) {
+		// Wait briefly for the change to propagate — but only if the provider
+		// is actually connected and synced. No point waiting if server is unreachable.
+		if (machine.provider && machine.provider.isSynced && machine.provider.hasUnsyncedChanges) {
 			await new Promise<void>((resolve) => {
-				const timeout = setTimeout(resolve, 5000) // max wait 5s
+				const timeout = setTimeout(resolve, 2000) // max wait 2s
 				const handler = () => {
 					if (!machine.provider?.hasUnsyncedChanges) {
 						clearTimeout(timeout)

@@ -3,6 +3,7 @@ import { css } from '../../../styled-system/css'
 import { useAppStore } from '../../stores/app-store'
 import { useSyncStore } from '../../stores/sync-store'
 import { TodoListSync } from '../../lib/todo-sync'
+import { syncLog } from '../../lib/sync-log'
 import { TodoItem } from './TodoItem'
 import { TodoList } from './TodoList'
 import { getTodayDate, isOverdue, isToday } from '../../lib/date-utils'
@@ -438,7 +439,7 @@ export function TodoView() {
 			setSyncLoading(false)
 		}).catch(err => {
 			if (gen !== todoSyncGeneration) return
-			console.error(`[todo-view] Sync failed for ${list.sync_id}:`, err)
+			syncLog.error('todo-view', `Sync failed for ${list.sync_id}:`, err)
 			setSyncLoading(false)
 		})
 	}))

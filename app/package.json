@@ -19,7 +19,10 @@
     "lint": "prettier -c .",
     "lint:fix": "prettier -w .",
     "boot": "npm run backend:build && electron .",
+    "boot:peer": "npm run backend:build && electron . --user-data-dir=\"C:/tmp/noted-test-peer\"",
+    "boot:both": "npm run backend:build && concurrently -k \"electron .\" \"electron . --user-data-dir=C:/tmp/noted-test-peer\"",
     "start": "concurrently -k \"npm run frontend:dev\" \"wait-on tcp:127.0.0.1:7241 && npm run boot\"",
+    "start:both": "concurrently -k \"npm run frontend:dev\" \"wait-on tcp:127.0.0.1:7241 && npm run boot:both\"",
     "pre-build": "npm run frontend:build && npm run backend:build",
     "build": "npm run pre-build && electron-builder",
     "build:dir": "npm run pre-build && set CSC_IDENTITY_AUTO_DISCOVERY=false && electron-builder --dir",
@@ -57,6 +60,7 @@
     "qrcode": "^1.5.4",
     "solid-icons": "^1.2.0",
     "solid-js": "^1.9.11",
+    "y-prosemirror": "^1.3.7",
     "y-protocols": "^1.0.7",
     "yjs": "^13.6.30"
   },
