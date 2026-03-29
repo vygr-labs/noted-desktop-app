@@ -204,7 +204,8 @@ const platforms = [
     name: 'Linux',
     icon: () => <LinuxIcon />,
     file: 'noted-linux-x64.AppImage',
-    requirement: 'Ubuntu 20.04+ / Fedora 36+',
+    requirement: 'Any modern Linux distro',
+    formats: ['.AppImage', '.deb', '.rpm', '.snap', '.tar.gz'],
   },
 ]
 
@@ -247,6 +248,24 @@ function PlatformCard(props: { platform: typeof platforms[0]; delay: number }) {
       <p style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)' }}>
         {props.platform.file}
       </p>
+
+      {/* Extra formats */}
+      {'formats' in props.platform && (
+        <Flex gap="1.5" flexWrap="wrap" justifyContent="center">
+          <For each={(props.platform as any).formats}>
+            {(fmt: string) => (
+              <Box
+                px="2"
+                py="0.5"
+                borderRadius="sm"
+                style={{ ...monoLabelStyle, 'background-color': 'var(--surface-high)', color: 'var(--on-surface-variant)', 'font-size': '0.5625rem' }}
+              >
+                {fmt}
+              </Box>
+            )}
+          </For>
+        </Flex>
+      )}
 
       {/* Requirement */}
       <p class={css({ fontSize: 'xs', lineHeight: 'relaxed' })} style={{ color: 'var(--on-surface-variant)' }}>

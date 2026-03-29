@@ -453,7 +453,6 @@ export function TodoView() {
 		if (!text) return
 		await window.electronAPI.createTodo({
 			text,
-			due_date: getTodayDate(),
 			todo_list_id: selectedListId(),
 		})
 		setNewTodoText('')

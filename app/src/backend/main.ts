@@ -10,6 +10,11 @@ import {
 import log from 'electron-log'
 import electronUpdater from 'electron-updater'
 import electronIsDev from 'electron-is-dev'
+
+// Suppress Electron security warnings in dev (they don't apply to production builds)
+if (electronIsDev) {
+	process.env.ELECTRON_DISABLE_SECURITY_WARNINGS = 'true'
+}
 import ElectronStore from 'electron-store'
 import url from 'url'
 import { fileURLToPath } from 'url'

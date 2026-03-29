@@ -13,6 +13,11 @@ on:
           - macos
           - linux
           - all
+      create_release:
+        description: 'Create a GitHub Release'
+        required: true
+        default: true
+        type: boolean
 
 permissions:
   contents: write
@@ -27,6 +32,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: yarn
+          cache-dependency-path: app/yarn.lock
 
       - name: Enable Corepack & install dependencies
         working-directory: app
@@ -34,17 +41,12 @@ jobs:
           corepack enable
           yarn install --immutable
 
-      - name: Generate PandaCSS
+      - name: Build
         working-directory: app
-        run: yarn prepare
-
-      - name: Build CLI
-        working-directory: app
-        run: yarn cli:build
-
-      - name: Build & package
-        working-directory: app
-        run: yarn run build
+        run: |
+          yarn prepare
+          yarn cli:build
+          yarn run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -66,6 +68,8 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: yarn
+          cache-dependency-path: app/yarn.lock
 
       - name: Enable Corepack & install dependencies
         working-directory: app
@@ -73,17 +77,12 @@ jobs:
           corepack enable
           yarn install --immutable
 
-      - name: Generate PandaCSS
+      - name: Build
         working-directory: app
-        run: yarn prepare
-
-      - name: Build CLI
-        working-directory: app
-        run: yarn cli:build
-
-      - name: Build & package
-        working-directory: app
-        run: yarn run build
+        run: |
+          yarn prepare
+          yarn cli:build
+          yarn run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
@@ -106,6 +105,11 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: yarn
+          cache-dependency-path: app/yarn.lock
+
+      - name: Install Snapcraft
+        run: sudo snap install snapcraft --classic
 
       - name: Enable Corepack & install dependencies
         working-directory: app
@@ -113,17 +117,12 @@ jobs:
           corepack enable
           yarn install --immutable
 
-      - name: Generate PandaCSS
+      - name: Build
         working-directory: app
-        run: yarn prepare
-
-      - name: Build CLI
-        working-directory: app
-        run: yarn cli:build
-
-      - name: Build & package
-        working-directory: app
-        run: yarn run build
+        run: |
+          yarn prepare
+          yarn cli:build
+          yarn run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -133,5 +132,45 @@ jobs:
           name: noted-linux
           path: |
             app/release/*.AppImage
+            app/release/*.deb
+            app/release/*.rpm
+            app/release/*.snap
+            app/release/*.tar.gz
             app/release/*.yml
           if-no-files-found: warn
+
+  release:
+    needs: [build-windows, build-macos, build-linux]
+    if: ${{ always() && inputs.create_release && !contains(needs.*.result, 'failure') }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Get version
+        id: version
+        run: echo "version=$(node -p "require('./app/package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Download all artifacts
+        uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+          merge-multiple: true
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: v${{ steps.version.outputs.version }}
+          name: noted. v${{ steps.version.outputs.version }}
+          draft: true
+          generate_release_notes: true
+          files: |
+            artifacts/**/*.exe
+            artifacts/**/*.dmg
+            artifacts/**/*.AppImage
+            artifacts/**/*.deb
+            artifacts/**/*.rpm
+            artifacts/**/*.snap
+            artifacts/**/*.tar.gz
+            artifacts/**/*.yml
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
