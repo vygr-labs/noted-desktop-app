@@ -3,6 +3,7 @@ import { css } from '../../../styled-system/css'
 import { useAppStore } from '../../stores/app-store'
 import { useEditorStore } from '../../stores/editor-store'
 import { useSettingsStore } from '../../stores/settings-store'
+import { ConfirmDialog } from '../shared/ConfirmDialog'
 import {
 	FileTextIcon,
 	CalendarIcon,
@@ -385,6 +386,7 @@ export function Sidebar() {
 	const [showInlineInput, setShowInlineInput] = createSignal(false)
 	const [newListName, setNewListName] = createSignal('')
 	const [showBulkExport, setShowBulkExport] = createSignal(false)
+	const [deleteListConfirm, setDeleteListConfirm] = createSignal<{ id: string; name: string } | null>(null)
 
 	onMount(() => {
 		function handleClickOutside(e: MouseEvent) {
@@ -431,11 +433,25 @@ export function Sidebar() {
 		store.setSelectedNoteId(null)
 	}
 
-	async function handleDeleteList(e: Event, listId: string) {
+	function handleDeleteList(e: Event, listId: string) {
 		e.stopPropagation()
-		await window.electronAPI.deleteList(listId)
+		const list = (store.lists() || []).find(l => l.id === listId)
+		setDeleteListConfirm({ id: listId, name: list?.name || 'this list' })
+	}
+
+	async function confirmDeleteList() {
+		const info = deleteListConfirm()
+		if (!info) return
+		setDeleteListConfirm(null)
+		// Close the editor if the open note belongs to this list
+		const currentNote = editorStore.currentNote()
+		if (currentNote?.list_id === info.id) {
+			store.setSelectedNoteId(null)
+		}
+		await window.electronAPI.deleteList(info.id)
 		store.refetchLists()
-		if (isListActive(listId)) {
+		store.refetchNotes()
+		if (isListActive(info.id)) {
 			store.setCurrentView('all')
 		}
 	}
@@ -490,6 +506,7 @@ export function Sidebar() {
 	}
 
 	return (
+		<>
 		<Show
 			when={!store.sidebarCollapsed()}
 			fallback={
@@ -810,5 +827,15 @@ export function Sidebar() {
 			</div>
 
 		</Show>
+		<ConfirmDialog
+			open={!!deleteListConfirm()}
+			title="Delete list?"
+			description={`"${deleteListConfirm()?.name}" and all its notes will be moved to trash.`}
+			confirmLabel="Delete"
+			destructive
+			onConfirm={confirmDeleteList}
+			onCancel={() => setDeleteListConfirm(null)}
+		/>
+		</>
 	)
 }

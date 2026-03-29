@@ -62,7 +62,9 @@ export function updateList(
 }
 
 export function deleteList(id: string): void {
-	// Notes in this list get their list_id set to NULL (via ON DELETE SET NULL)
+	// Trash all notes in this list before deleting it
+	db.prepare('UPDATE notes SET is_trashed = 1, updated_at = CURRENT_TIMESTAMP WHERE list_id = ? AND is_trashed = 0').run(id)
+	// Then delete the list (notes.list_id set to NULL via ON DELETE SET NULL)
 	db.prepare('DELETE FROM lists WHERE id = ?').run(id)
 }
 

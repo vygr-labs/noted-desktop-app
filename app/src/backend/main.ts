@@ -83,21 +83,12 @@ function registerZoomShortcuts(win: BrowserWindow) {
 }
 
 const spawnAppWindow = async () => {
-	// In dev, position the window based on whether this is the peer instance
-	// (launched with --user-data-dir) so two windows tile left/right automatically.
-	const isPeer = process.argv.some(a => a.startsWith('--user-data-dir'))
-	const { width: screenW, height: screenH } = screen.getPrimaryDisplay().workAreaSize
-	const winW = Math.floor(screenW / 2)
-	const winH = screenH
-
 	appWindow = new BrowserWindow({
-		width: electronIsDev ? winW : 1200,
-		height: electronIsDev ? winH : 800,
-		x: electronIsDev ? (isPeer ? winW : 0) : undefined,
-		y: electronIsDev ? 0 : undefined,
+		width: 1200,
+		height: 800,
 		minWidth: 800,
 		minHeight: 500,
-		center: !electronIsDev,
+		center: true,
 		icon: getAssetPath('icon.png'),
 		title: electronIsDev ? 'noted. - Development' : 'noted.',
 		show: false,
