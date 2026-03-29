@@ -1,0 +1,155 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<title>Sync Test — y-prosemirror + HocusPocus</title>
+	<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+	<style>
+		* { box-sizing: border-box; margin: 0; padding: 0; }
+		body {
+			font-family: 'Inter', system-ui, sans-serif;
+			background: #f8f9fa;
+			color: #1c2024;
+			padding: 24px;
+		}
+		h1 {
+			font-size: 20px;
+			font-weight: 700;
+			margin-bottom: 4px;
+		}
+		.subtitle {
+			font-size: 13px;
+			color: #80838d;
+			margin-bottom: 24px;
+		}
+		.grid {
+			display: grid;
+			grid-template-columns: 1fr 1fr;
+			gap: 20px;
+		}
+		.panel {
+			background: white;
+			border: 1px solid #e8e8ec;
+			border-radius: 10px;
+			overflow: hidden;
+		}
+		.panel-header {
+			display: flex;
+			align-items: center;
+			justify-content: space-between;
+			padding: 10px 16px;
+			border-bottom: 1px solid #e8e8ec;
+			background: #fcfcfd;
+		}
+		.panel-label {
+			font-size: 13px;
+			font-weight: 600;
+		}
+		.status {
+			font-size: 12px;
+			font-weight: 500;
+			color: #80838d;
+		}
+		.editor-area {
+			min-height: 350px;
+		}
+		.editor-area .tiptap {
+			outline: none;
+			min-height: 350px;
+			padding: 16px;
+		}
+		.editor-area .tiptap p { margin-bottom: 0.5em; }
+		.editor-area .tiptap h1 { font-size: 1.5em; font-weight: 700; margin: 0.5em 0 0.3em; }
+		.editor-area .tiptap h2 { font-size: 1.25em; font-weight: 600; margin: 0.5em 0 0.3em; }
+		.editor-area .tiptap h3 { font-size: 1.1em; font-weight: 600; margin: 0.5em 0 0.3em; }
+		.editor-area .tiptap code { background: #f0f0f3; padding: 2px 5px; border-radius: 3px; font-size: 0.9em; }
+		.editor-area .tiptap pre { background: #f9f9fb; border: 1px solid #e8e8ec; border-radius: 6px; padding: 12px; margin: 0.5em 0; }
+		.editor-area .tiptap blockquote { border-left: 3px solid #e8e8ec; padding-left: 12px; color: #60646c; margin: 0.5em 0; }
+		.editor-area .tiptap ul[data-type="taskList"] { list-style: none; padding-left: 0; }
+		.editor-area .tiptap ul[data-type="taskList"] li { display: flex; align-items: baseline; gap: 8px; }
+		/* y-prosemirror remote cursor */
+		.ProseMirror-yjs-cursor {
+			position: relative;
+			border-left: 2px solid orange;
+			margin-left: -1px;
+			margin-right: -1px;
+			pointer-events: none;
+			word-break: normal;
+		}
+		.ProseMirror-yjs-cursor > div {
+			position: absolute;
+			top: -1.4em;
+			left: -2px;
+			font-size: 10px;
+			font-weight: 600;
+			font-style: normal;
+			color: white;
+			padding: 1px 6px;
+			border-radius: 3px;
+			white-space: nowrap;
+			line-height: 1.4;
+			pointer-events: none;
+			user-select: none;
+		}
+		/* y-prosemirror remote selection */
+		.ProseMirror-yjs-selection {
+			/* inline style handles background-color via user.color */
+		}
+		.log-area {
+			max-height: 120px;
+			overflow-y: auto;
+			padding: 8px 12px;
+			font-size: 11px;
+			font-family: 'JetBrains Mono', monospace;
+			color: #80838d;
+			border-top: 1px solid #e8e8ec;
+			background: #fcfcfd;
+		}
+		.log-area div { padding: 1px 0; }
+		.instructions {
+			margin-top: 20px;
+			padding: 16px;
+			background: white;
+			border: 1px solid #e8e8ec;
+			border-radius: 10px;
+			font-size: 13px;
+			color: #60646c;
+			line-height: 1.6;
+		}
+		.instructions strong { color: #1c2024; }
+	</style>
+</head>
+<body>
+	<h1>Sync Test</h1>
+	<p class="subtitle">Two editors connected to the same HocusPocus document via y-prosemirror. Type in one, see it in the other.</p>
+
+	<div class="grid">
+		<div class="panel">
+			<div class="panel-header">
+				<span class="panel-label">Editor A</span>
+				<span class="status" id="status1">Connecting...</span>
+			</div>
+			<div class="editor-area" id="editor1"></div>
+			<div class="log-area" id="log1"></div>
+		</div>
+		<div class="panel">
+			<div class="panel-header">
+				<span class="panel-label">Editor B</span>
+				<span class="status" id="status2">Connecting...</span>
+			</div>
+			<div class="editor-area" id="editor2"></div>
+			<div class="log-area" id="log2"></div>
+		</div>
+	</div>
+
+	<div class="instructions">
+		<strong>How to test:</strong> Start the HocusPocus server (<code>cd server && npm start</code>),
+		then run <code>cd app && npx vite --open test/sync-test.html</code>.
+		Type in either editor — changes should appear in the other instantly with no glitches.
+		Check the log panels for connection status and sync events.
+	</div>
+
+	<script type="module" src="./sync-test.ts"></script>
+</body>
+</html>

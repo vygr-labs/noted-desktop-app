@@ -135,7 +135,6 @@ jobs:
             app/release/*.deb
             app/release/*.rpm
             app/release/*.snap
-            app/release/*.tar.gz
             app/release/*.yml
           if-no-files-found: warn
 

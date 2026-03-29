@@ -18,13 +18,46 @@ function createScrollReveal(delay: number = 0) {
           observer.unobserve(el)
         }
       },
-      { threshold: 0.15 },
+      { threshold: 0.1 },
     )
 
-    // Defer to next frame so initial styles apply before observing
     requestAnimationFrame(() => observer.observe(el))
     onCleanup(() => observer.disconnect())
   }
+}
+
+function createStaggerReveal(count: number, staggerMs = 100) {
+  const refs: HTMLElement[] = []
+  const timeouts: number[] = []
+
+  onMount(() => {
+    const startTimeout = window.setTimeout(() => {
+      refs.forEach((el, i) => {
+        if (el) {
+          const t = window.setTimeout(() => {
+            el.classList.add('bento-revealed')
+          }, i * staggerMs)
+          timeouts.push(t)
+        }
+      })
+    }, 50)
+    onCleanup(() => {
+      clearTimeout(startTimeout)
+      timeouts.forEach(clearTimeout)
+    })
+  })
+
+  return (index: number) => (el: HTMLElement) => {
+    // data-stagger in CSS hides it before JS; bento-reveal adds the transition
+    el.classList.add('bento-reveal')
+    refs[index] = el
+  }
+}
+
+// Add data-stagger to JSX elements that will be stagger-revealed.
+// This ensures they're hidden by CSS before JS runs, preventing flash.
+function staggerAttrs() {
+  return { 'data-stagger': '' }
 }
 
 function createStaggeredFade(text: string, staggerMs = 30) {
@@ -143,34 +176,23 @@ function Nav() {
         zIndex: 50,
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
-        px: '6',
         pt: '3',
+        px: '6',
       })}`}
       style={{ 'background-color': 'transparent' }}
     >
-      <Box
-        maxW="7xl"
-        mx="auto"
-        px="6"
-        borderRadius="xl"
-        style={{
-          'background-color': 'var(--surface-low)',
-          border: '1px solid var(--surface-border)',
-        }}
-      >
-        <Flex justifyContent="space-between" alignItems="center" py="3">
+      <Box maxW="7xl" mx="auto" px="6">
+        <Box
+          borderRadius="sm"
+          style={{
+            'background-color': 'var(--surface-low)',
+            border: '1px solid var(--surface-border)',
+          }}
+        >
+          <Flex justifyContent="space-between" alignItems="center" py="3" px="5">
           <Flex alignItems="center" gap="8">
             <a href="/" class={css({ textDecoration: 'none' })}>
-              <span
-                class={css({
-                  fontSize: '2xl',
-                  fontWeight: 'bold',
-                  letterSpacing: '-0.05em',
-                  color: 'fg.default',
-                })}
-              >
-                noted.
-              </span>
+              <img src="/noted-logo-white.svg" alt="noted." class={css({ h: '6' })} />
             </a>
             <Flex display={{ base: 'none', md: 'flex' }} alignItems="center" gap="6">
               <a href="#features" onClick={(e) => { e.preventDefault(); document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' }) }} class={navLinkClass}>Features</a>
@@ -181,7 +203,7 @@ function Nav() {
 
           <Flex alignItems="center" gap="4">
             <a
-              href="/download"
+              href="/download?auto"
               class={css({
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -201,6 +223,7 @@ function Nav() {
             </a>
           </Flex>
         </Flex>
+        </Box>
       </Box>
     </nav>
   )
@@ -310,7 +333,7 @@ function HeroCard() {
         class="animate-fade-in-up-delay-2"
       >
         <a
-          href="/download"
+          href="/download?auto"
           class={css({
             w: { base: 'full', sm: 'auto' },
             display: 'inline-flex',
@@ -370,14 +393,13 @@ function BentoCard(props: {
   children: any
   gridColumn?: { base?: string; md?: string; lg?: string }
   gridRow?: { base?: string; md?: string; lg?: string }
-  delay?: number
+  staggerRef?: (el: HTMLElement) => void
   class?: string
 }) {
-  const reveal = createScrollReveal(props.delay ?? 0)
-
   return (
     <div
-      ref={reveal}
+      ref={props.staggerRef}
+      data-stagger=""
       class={`${bentoCardClass} ${props.class ?? ''}`}
       style={{
         'background-color': 'var(--surface-low)',
@@ -395,14 +417,14 @@ function BentoCard(props: {
    Interactive Theme Card (2×2 star card)
    ================================================================ */
 
-function ThemeCard() {
+function ThemeCard(props: { staggerRef?: (el: HTMLElement) => void }) {
   const [active, setActive] = createSignal<ThemeName>('dark')
-  const reveal = createScrollReveal(0)
 
   return (
     <div
       id="features"
-      ref={reveal}
+      ref={props.staggerRef}
+      data-stagger=""
       class={`${bentoCardClass} ${css({
         display: 'flex',
         flexDirection: 'column',
@@ -504,9 +526,9 @@ function ThemeCard() {
    Editor Card (1×1)
    ================================================================ */
 
-function EditorCard() {
+function EditorCard(props: { staggerRef?: (el: HTMLElement) => void }) {
   return (
-    <BentoCard delay={0.1}>
+    <BentoCard staggerRef={props.staggerRef}>
       <Flex
         alignItems="center"
         justifyContent="center"
@@ -555,9 +577,9 @@ function EditorCard() {
    Speed Card (1×1)
    ================================================================ */
 
-function SpeedCard() {
+function SpeedCard(props: { staggerRef?: (el: HTMLElement) => void }) {
   return (
-    <BentoCard delay={0.2}>
+    <BentoCard staggerRef={props.staggerRef}>
       <Flex
         alignItems="center"
         justifyContent="center"
@@ -593,9 +615,9 @@ function SpeedCard() {
    Privacy Card (1×1)
    ================================================================ */
 
-function PrivacyCard() {
+function PrivacyCard(props: { staggerRef?: (el: HTMLElement) => void }) {
   return (
-    <BentoCard delay={0.3}>
+    <BentoCard staggerRef={props.staggerRef}>
       <Flex
         alignItems="center"
         justifyContent="center"
@@ -626,9 +648,9 @@ function PrivacyCard() {
    Platform Card (1×1)
    ================================================================ */
 
-function PlatformCard() {
+function PlatformCard(props: { staggerRef?: (el: HTMLElement) => void }) {
   return (
-    <BentoCard delay={0.4}>
+    <BentoCard staggerRef={props.staggerRef}>
       <Flex
         alignItems="center"
         justifyContent="center"
@@ -676,12 +698,11 @@ function PlatformCard() {
    Sync Card (1×2 tall)
    ================================================================ */
 
-function SyncCard() {
-  const reveal = createScrollReveal(0.5)
-
+function SyncCard(props: { staggerRef?: (el: HTMLElement) => void }) {
   return (
     <div
-      ref={reveal}
+      ref={props.staggerRef}
+      data-stagger=""
       class={`${bentoCardClass} ${css({
         display: 'flex',
         flexDirection: 'column',
@@ -777,12 +798,11 @@ function SyncCard() {
    Open Source Card (2×1 wide, with animated counters)
    ================================================================ */
 
-function OpenSourceCard() {
-  const reveal = createScrollReveal(0.6)
-
+function OpenSourceCard(props: { staggerRef?: (el: HTMLElement) => void }) {
   return (
     <div
-      ref={reveal}
+      ref={props.staggerRef}
+      data-stagger=""
       class={`${bentoCardClass}`}
       style={{
         'background-color': 'var(--surface-low)',
@@ -866,13 +886,12 @@ function OpenSourceCard() {
    CTA Card (full-width gradient bento card)
    ================================================================ */
 
-function CtaCard() {
-  const reveal = createScrollReveal(0.7)
-
+function CtaCard(props: { staggerRef?: (el: HTMLElement) => void }) {
   return (
     <div
       id="download"
-      ref={reveal}
+      ref={props.staggerRef}
+      data-stagger=""
       class={`hero-cta-gradient ${css({
         borderRadius: 'sm',
         overflow: 'hidden',
@@ -906,7 +925,7 @@ function CtaCard() {
         gap="4"
       >
         <a
-          href="/download"
+          href="/download?auto"
           class={css({
             w: { base: 'full', sm: 'auto' },
             display: 'inline-flex',
@@ -962,17 +981,12 @@ function CtaCard() {
    Footer Card (full-width bento card)
    ================================================================ */
 
-function FooterCard() {
-  const reveal = createScrollReveal(0.8)
-
+function FooterCard(props: { staggerRef?: (el: HTMLElement) => void }) {
   return (
     <div
-      ref={reveal}
-      class={css({
-        borderRadius: 'sm',
-        px: { base: '6', md: '8' },
-        py: { base: '8', md: '10' },
-      })}
+      ref={props.staggerRef}
+      data-stagger=""
+      class={bentoCardClass}
       style={{
         'grid-column': '1 / -1',
         'background-color': 'var(--surface-low)',
@@ -986,9 +1000,7 @@ function FooterCard() {
         gap="6"
       >
         <Flex flexDirection="column" alignItems={{ base: 'center', md: 'flex-start' }} gap="3">
-          <span class={css({ fontSize: 'xl', fontWeight: 'bold', letterSpacing: '-0.05em', color: 'fg.default' })}>
-            noted.
-          </span>
+          <img src="/noted-logo-white.svg" alt="noted." class={css({ h: '5' })} />
           <span style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)' }}>
             &copy; 2026 noted. All rights reserved. Voyager Technologies
           </span>
@@ -1030,6 +1042,8 @@ function FooterCard() {
    ================================================================ */
 
 export default function Home() {
+  const stagger = createStaggerReveal(10, 80)
+
   return (
     <>
       <Nav />
@@ -1047,15 +1061,15 @@ export default function Home() {
           })}
         >
           <HeroCard />
-          <ThemeCard />
-          <EditorCard />
-          <SpeedCard />
-          <PrivacyCard />
-          <PlatformCard />
-          <SyncCard />
-          <OpenSourceCard />
-          <CtaCard />
-          <FooterCard />
+          <ThemeCard staggerRef={stagger(1)} />
+          <EditorCard staggerRef={stagger(2)} />
+          <SpeedCard staggerRef={stagger(3)} />
+          <PrivacyCard staggerRef={stagger(4)} />
+          <PlatformCard staggerRef={stagger(5)} />
+          <SyncCard staggerRef={stagger(6)} />
+          <OpenSourceCard staggerRef={stagger(7)} />
+          <CtaCard staggerRef={stagger(8)} />
+          <FooterCard staggerRef={stagger(9)} />
         </div>
       </main>
     </>

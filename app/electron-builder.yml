@@ -28,7 +28,6 @@ linux:
     - deb
     - rpm
     - snap
-    - tar.gz
   category: Utility
   icon: assets/icon.png
 

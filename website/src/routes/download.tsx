@@ -1,28 +1,36 @@
 import { css } from 'styled-system/css'
 import { Box, Flex } from 'styled-system/jsx'
-import { For, onCleanup } from 'solid-js'
+import { createSignal, For, onMount, onCleanup } from 'solid-js'
+import { useSearchParams } from '@solidjs/router'
 
 /* ================================================================
    Hooks
    ================================================================ */
 
-function createScrollReveal(delay: number = 0) {
-  return (el: HTMLElement) => {
-    el.classList.add('bento-reveal')
-    el.style.transitionDelay = `${delay}s`
+function createStaggerReveal(count: number, staggerMs = 100) {
+  const refs: HTMLElement[] = []
+  const timeouts: number[] = []
 
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) {
-          el.classList.add('bento-revealed')
-          observer.unobserve(el)
+  onMount(() => {
+    const startTimeout = window.setTimeout(() => {
+      refs.forEach((el, i) => {
+        if (el) {
+          const t = window.setTimeout(() => {
+            el.classList.add('bento-revealed')
+          }, i * staggerMs)
+          timeouts.push(t)
         }
-      },
-      { threshold: 0.15 },
-    )
+      })
+    }, 50)
+    onCleanup(() => {
+      clearTimeout(startTimeout)
+      timeouts.forEach(clearTimeout)
+    })
+  })
 
-    requestAnimationFrame(() => observer.observe(el))
-    onCleanup(() => observer.disconnect())
+  return (index: number) => (el: HTMLElement) => {
+    el.classList.add('bento-reveal')
+    refs[index] = el
   }
 }
 
@@ -112,22 +120,18 @@ function Nav() {
       })}`}
       style={{ 'background-color': 'transparent' }}
     >
-      <Box
-        maxW="7xl"
-        mx="auto"
-        px="6"
-        borderRadius="xl"
-        style={{
-          'background-color': 'var(--surface-low)',
-          border: '1px solid var(--surface-border)',
-        }}
-      >
-        <Flex justifyContent="space-between" alignItems="center" py="3">
+      <Box maxW="7xl" mx="auto" px="6">
+        <Box
+          borderRadius="sm"
+          style={{
+            'background-color': 'var(--surface-low)',
+            border: '1px solid var(--surface-border)',
+          }}
+        >
+          <Flex justifyContent="space-between" alignItems="center" py="3" px="5">
           <Flex alignItems="center" gap="8">
             <a href="/" class={css({ textDecoration: 'none' })}>
-              <span class={css({ fontSize: '2xl', fontWeight: 'bold', letterSpacing: '-0.05em', color: 'fg.default' })}>
-                noted.
-              </span>
+              <img src="/noted-logo-white.svg" alt="noted." class={css({ h: '6' })} />
             </a>
             <Flex display={{ base: 'none', md: 'flex' }} alignItems="center" gap="6">
               <a href="/#features" class={navLinkClass}>Features</a>
@@ -157,6 +161,7 @@ function Nav() {
             </a>
           </Flex>
         </Flex>
+        </Box>
       </Box>
     </nav>
   )
@@ -166,14 +171,14 @@ function Nav() {
    Hero Card
    ================================================================ */
 
-function HeroCard() {
+function HeroCard(props: { autoStarted?: boolean; platformName?: string }) {
   return (
     <div
       class={`animate-fade-in-up ${css({
         textAlign: 'center',
         px: { base: '6', md: '8', lg: '12' },
         py: { base: '10', md: '12', lg: '14' },
-        borderRadius: 'xl',
+        borderRadius: 'sm',
         overflow: 'hidden',
       })}`}
       style={{
@@ -190,7 +195,7 @@ function HeroCard() {
           mb: '4',
         })}`}
       >
-        Download noted.
+        {props.autoStarted ? 'Your download has started.' : 'Download noted.'}
       </h1>
       <p
         class={css({
@@ -201,7 +206,9 @@ function HeroCard() {
         })}
         style={{ color: 'var(--on-surface-variant)' }}
       >
-        Available on macOS, Windows, and Linux. Free and open source, forever.
+        {props.autoStarted
+          ? `noted. for ${props.platformName} is downloading. If it didn\u2019t start, pick your platform below.`
+          : 'Available on macOS, Windows, and Linux. Free and open source, forever.'}
       </p>
     </div>
   )
@@ -210,6 +217,8 @@ function HeroCard() {
 /* ================================================================
    Platform Download Cards
    ================================================================ */
+
+const RELEASE_BASE = 'https://github.com/vygr-labs/noted-desktop-app/releases/latest/download'
 
 const platforms = [
   {
@@ -225,23 +234,39 @@ const platforms = [
     requirement: 'macOS 12 Monterey or later',
   },
   {
-    name: 'Linux',
+    name: 'Linux (AppImage)',
     icon: () => <LinuxIcon />,
     file: 'noted-linux-x64.AppImage',
     requirement: 'Any modern Linux distro',
-    formats: ['.AppImage', '.deb', '.rpm', '.snap', '.tar.gz'],
+  },
+  {
+    name: 'Linux (Debian)',
+    icon: () => <LinuxIcon />,
+    file: 'noted-linux-x64.deb',
+    requirement: 'Ubuntu, Debian, Mint, Pop!_OS',
+  },
+  {
+    name: 'Linux (RPM)',
+    icon: () => <LinuxIcon />,
+    file: 'noted-linux-x64.rpm',
+    requirement: 'Fedora, RHEL, openSUSE',
+  },
+  {
+    name: 'Linux (Snap)',
+    icon: () => <LinuxIcon />,
+    file: 'noted-linux-x64.snap',
+    requirement: 'Any distro with Snapd',
   },
 ]
 
-function PlatformCard(props: { platform: typeof platforms[0]; delay: number }) {
-  const reveal = createScrollReveal(props.delay)
-
+function PlatformCard(props: { platform: typeof platforms[0]; staggerRef?: (el: HTMLElement) => void }) {
   return (
     <div
-      ref={reveal}
+      ref={props.staggerRef}
+      data-stagger=""
       class={css({
         p: { base: '6', lg: '8' },
-        borderRadius: 'xl',
+        borderRadius: 'sm',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
@@ -276,24 +301,6 @@ function PlatformCard(props: { platform: typeof platforms[0]; delay: number }) {
         {props.platform.file}
       </p>
 
-      {/* Extra formats */}
-      {'formats' in props.platform && (
-        <Flex gap="1.5" flexWrap="wrap" justifyContent="center">
-          <For each={(props.platform as any).formats}>
-            {(fmt: string) => (
-              <Box
-                px="2"
-                py="0.5"
-                borderRadius="sm"
-                style={{ ...monoLabelStyle, 'background-color': 'var(--surface-high)', color: 'var(--on-surface-variant)', 'font-size': '0.5625rem' }}
-              >
-                {fmt}
-              </Box>
-            )}
-          </For>
-        </Flex>
-      )}
-
       {/* Requirement */}
       <p class={css({ fontSize: 'xs', lineHeight: 'relaxed' })} style={{ color: 'var(--on-surface-variant)' }}>
         {props.platform.requirement}
@@ -301,7 +308,7 @@ function PlatformCard(props: { platform: typeof platforms[0]; delay: number }) {
 
       {/* Download Button */}
       <a
-        href="#"
+        href={`${RELEASE_BASE}/${props.platform.file}`}
         class={css({
           w: 'full',
           display: 'inline-flex',
@@ -336,15 +343,14 @@ function PlatformCard(props: { platform: typeof platforms[0]; delay: number }) {
    Version Info Card (wide)
    ================================================================ */
 
-function VersionCard() {
-  const reveal = createScrollReveal(0.3)
-
+function VersionCard(props: { staggerRef?: (el: HTMLElement) => void }) {
   return (
     <div
-      ref={reveal}
+      ref={props.staggerRef}
+      data-stagger=""
       class={css({
         p: { base: '6', lg: '8' },
-        borderRadius: 'xl',
+        borderRadius: 'sm',
         overflow: 'hidden',
       })}
       style={{
@@ -414,15 +420,14 @@ function VersionCard() {
    Source Card
    ================================================================ */
 
-function SourceCard() {
-  const reveal = createScrollReveal(0.4)
-
+function SourceCard(props: { staggerRef?: (el: HTMLElement) => void }) {
   return (
     <div
-      ref={reveal}
+      ref={props.staggerRef}
+      data-stagger=""
       class={css({
         p: { base: '6', lg: '8' },
-        borderRadius: 'xl',
+        borderRadius: 'sm',
         overflow: 'hidden',
         display: 'flex',
         flexDirection: 'column',
@@ -470,14 +475,13 @@ function SourceCard() {
    Footer Card
    ================================================================ */
 
-function FooterCard() {
-  const reveal = createScrollReveal(0.5)
-
+function FooterCard(props: { staggerRef?: (el: HTMLElement) => void }) {
   return (
     <div
-      ref={reveal}
+      ref={props.staggerRef}
+      data-stagger=""
       class={css({
-        borderRadius: 'xl',
+        borderRadius: 'sm',
         px: { base: '6', md: '8' },
         py: { base: '8', md: '10' },
       })}
@@ -493,9 +497,7 @@ function FooterCard() {
         gap="6"
       >
         <Flex flexDirection="column" alignItems={{ base: 'center', md: 'flex-start' }} gap="3">
-          <span class={css({ fontSize: 'xl', fontWeight: 'bold', letterSpacing: '-0.05em', color: 'fg.default' })}>
-            noted.
-          </span>
+          <img src="/noted-logo-white.svg" alt="noted." class={css({ h: '5' })} />
           <span style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)' }}>
             &copy; 2026 noted. All rights reserved. Voyager Technologies
           </span>
@@ -536,7 +538,32 @@ function FooterCard() {
    Page
    ================================================================ */
 
+function detectPlatform(): { file: string; name: string } | null {
+  if (typeof navigator === 'undefined') return null
+  const ua = navigator.userAgent.toLowerCase()
+  if (ua.includes('win')) return { file: 'noted-win-x64.exe', name: 'Windows' }
+  if (ua.includes('mac')) return { file: 'noted-mac-arm64.dmg', name: 'macOS' }
+  if (ua.includes('linux')) return { file: 'noted-linux-x64.AppImage', name: 'Linux' }
+  return null
+}
+
 export default function Download() {
+  const [params] = useSearchParams()
+  const stagger = createStaggerReveal(9, 80)
+  const [autoStarted, setAutoStarted] = createSignal(false)
+  const [platformName, setPlatformName] = createSignal('')
+
+  onMount(() => {
+    if (params.auto !== undefined) {
+      const platform = detectPlatform()
+      if (platform) {
+        setPlatformName(platform.name)
+        setAutoStarted(true)
+        window.location.href = `${RELEASE_BASE}/${platform.file}`
+      }
+    }
+  })
+
   return (
     <>
       <Nav />
@@ -553,13 +580,13 @@ export default function Download() {
             pb: { base: '12', lg: '20' },
           })}
         >
-          <HeroCard />
+          <HeroCard autoStarted={autoStarted()} platformName={platformName()} />
           <For each={platforms}>
-            {(platform, i) => <PlatformCard platform={platform} delay={i() * 0.1} />}
+            {(platform, i) => <PlatformCard platform={platform} staggerRef={stagger(i())} />}
           </For>
-          <VersionCard />
-          <SourceCard />
-          <FooterCard />
+          <VersionCard staggerRef={stagger(6)} />
+          <SourceCard staggerRef={stagger(7)} />
+          <FooterCard staggerRef={stagger(8)} />
         </div>
       </main>
     </>

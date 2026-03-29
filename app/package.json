@@ -14,6 +14,7 @@
     "frontend:dev": "astro dev",
     "frontend:build": "astro build",
     "backend:build": "tsc -p src/backend && tsc-alias -p ./src/backend/tsconfig.json",
+    "test:sync": "npx vite --open /test/sync-test.html",
     "cli:build": "tsc -p ../cli",
     "backend:lint": "eslint src/backend",
     "lint": "prettier -c .",
