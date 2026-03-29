@@ -5,10 +5,10 @@
    ================================================================ */
 
 :root {
-  --surface-dim: #fcfcfd;
-  --surface-low: #f5f5f7;
-  --surface-container: #ececee;
-  --surface-high: #e0e0e3;
+  --surface-dim: #f5f5f7;
+  --surface-low: #ededf0;
+  --surface-container: #e5e5e8;
+  --surface-high: #dddde0;
   --surface-highest: #d5d5d8;
   --surface-border: rgba(0, 0, 0, 0.06);
   --nav-bg: rgba(252, 252, 253, 0.7);
