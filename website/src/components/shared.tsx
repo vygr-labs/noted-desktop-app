@@ -1,6 +1,6 @@
 import { css } from 'styled-system/css'
 import { Box, Flex } from 'styled-system/jsx'
-import { For } from 'solid-js'
+import { createSignal, For, onMount } from 'solid-js'
 
 /* ================================================================
    Shared Styles
@@ -48,10 +48,80 @@ export function GitHubIcon(props: { size?: number }) {
 }
 
 /* ================================================================
+   Theme Toggle
+   ================================================================ */
+
+function ThemeToggle() {
+  const [dark, setDark] = createSignal(false)
+
+  onMount(() => {
+    setDark(document.documentElement.classList.contains('dark'))
+  })
+
+  const toggle = () => {
+    const next = !dark()
+    setDark(next)
+    document.documentElement.classList.toggle('dark', next)
+    localStorage.setItem('noted-theme', next ? 'dark' : 'light')
+  }
+
+  return (
+    <button
+      onClick={toggle}
+      aria-label="Toggle theme"
+      class={css({
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        w: '8',
+        h: '8',
+        borderRadius: 'sm',
+        cursor: 'pointer',
+        border: 'none',
+        color: 'fg.muted',
+        transition: 'all 0.2s',
+        _hover: { color: 'fg.default' },
+      })}
+      style={{ 'background-color': 'var(--surface-high)' }}
+    >
+      {dark() ? (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="5" />
+          <line x1="12" y1="1" x2="12" y2="3" />
+          <line x1="12" y1="21" x2="12" y2="23" />
+          <line x1="4.22" y1="4.22" x2="5.64" y2="5.64" />
+          <line x1="18.36" y1="18.36" x2="19.78" y2="19.78" />
+          <line x1="1" y1="12" x2="3" y2="12" />
+          <line x1="21" y1="12" x2="23" y2="12" />
+          <line x1="4.22" y1="19.78" x2="5.64" y2="18.36" />
+          <line x1="18.36" y1="5.64" x2="19.78" y2="4.22" />
+        </svg>
+      ) : (
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z" />
+        </svg>
+      )}
+    </button>
+  )
+}
+
+/* ================================================================
    Navigation
    ================================================================ */
 
 export function Nav() {
+  const [dark, setDark] = createSignal(false)
+
+  onMount(() => {
+    setDark(document.documentElement.classList.contains('dark'))
+
+    // Watch for theme changes from the toggle
+    const observer = new MutationObserver(() => {
+      setDark(document.documentElement.classList.contains('dark'))
+    })
+    observer.observe(document.documentElement, { attributes: true, attributeFilter: ['class'] })
+  })
+
   return (
     <nav
       class={`animate-slide-down ${css({
@@ -78,7 +148,11 @@ export function Nav() {
           <Flex justifyContent="space-between" alignItems="center" py="3" px="5">
           <Flex alignItems="center" gap="8">
             <a href="/" class={css({ textDecoration: 'none' })}>
-              <img src="/noted-logo-white.svg" alt="noted." class={css({ h: '6' })} />
+              <img
+                src={dark() ? '/noted-logo-white.svg' : '/noted-logo.svg'}
+                alt="noted."
+                class={css({ h: '6' })}
+              />
             </a>
             <Flex display={{ base: 'none', md: 'flex' }} alignItems="center" gap="6">
               <a href="/#features" class={navLinkClass}>Features</a>
@@ -87,7 +161,8 @@ export function Nav() {
             </Flex>
           </Flex>
 
-          <Flex alignItems="center" gap="4">
+          <Flex alignItems="center" gap="3">
+            <ThemeToggle />
             <a
               href="/download?auto"
               class={css({
@@ -138,7 +213,8 @@ export function FooterCard(props: { staggerRef?: (el: HTMLElement) => void }) {
         gap="6"
       >
         <Flex flexDirection="column" alignItems={{ base: 'center', md: 'flex-start' }} gap="3">
-          <img src="/noted-logo-white.svg" alt="noted." class={css({ h: '5' })} />
+          <img src="/noted-logo.svg" alt="noted." class={css({ h: '5', _dark: { display: 'none' } })} />
+          <img src="/noted-logo-white.svg" alt="noted." class={css({ h: '5', display: 'none', _dark: { display: 'block' } })} />
           <span style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)' }}>
             &copy; 2026 noted. All rights reserved. Voyager Technologies
           </span>
