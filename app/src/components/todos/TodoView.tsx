@@ -340,13 +340,16 @@ function ProgressRingSVG(props: { pct: number }) {
 export function TodoView() {
 	const store = useAppStore()
 	const [newTodoText, setNewTodoText] = createSignal('')
-	const [selectedListId, setSelectedListId] = createSignal<string | null>(null)
+	const selectedListId = store.selectedTodoListId
+	const setSelectedListId = store.setSelectedTodoListId
 	const [showNewList, setShowNewList] = createSignal(false)
 	const [newListName, setNewListName] = createSignal('')
 
 	const allTodos = () => store.todos() || []
 	const allTodoLists = () => store.todoLists() || []
 	let dragTodoId: string | null = null
+	const [dragOverId, setDragOverId] = createSignal<string | null>(null)
+	const [dragOverPosition, setDragOverPosition] = createSignal<'above' | 'below'>('below')
 
 	// Get the currently selected list object
 	const selectedList = createMemo(() => {
@@ -364,12 +367,22 @@ export function TodoView() {
 					e.dataTransfer.setData('text/plain', todoId)
 				}
 			},
-			onDragOver: (e: DragEvent) => {
+			onDragOver: (targetId: string) => (e: DragEvent) => {
 				e.preventDefault()
 				if (e.dataTransfer) e.dataTransfer.dropEffect = 'move'
+				if (!dragTodoId || dragTodoId === targetId) {
+					setDragOverId(null)
+					return
+				}
+				// Determine above/below based on mouse position within the element
+				const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
+				const midY = rect.top + rect.height / 2
+				setDragOverPosition(e.clientY < midY ? 'above' : 'below')
+				setDragOverId(targetId)
 			},
 			onDrop: (targetId: string) => async (e: DragEvent) => {
 				e.preventDefault()
+				setDragOverId(null)
 				if (!dragTodoId || dragTodoId === targetId) return
 				const list = todos()
 				const ids = list.map(t => t.id)
@@ -381,7 +394,10 @@ export function TodoView() {
 				await window.electronAPI.reorderTodos(ids)
 				store.refetchTodos()
 			},
-			onDragEnd: () => { dragTodoId = null },
+			onDragEnd: () => {
+				dragTodoId = null
+				setDragOverId(null)
+			},
 		}
 	}
 
@@ -639,7 +655,7 @@ export function TodoView() {
 								return (
 									<TodoList title="Overdue" variant="danger">
 										<For each={overdue()}>
-											{(todo) => <TodoItem todo={todo} onDragStart={h.onDragStart(todo.id)} onDragOver={h.onDragOver} onDrop={h.onDrop(todo.id)} onDragEnd={h.onDragEnd} />}
+											{(todo) => <TodoItem todo={todo} onDragStart={h.onDragStart(todo.id)} onDragOver={h.onDragOver(todo.id)} onDrop={h.onDrop(todo.id)} onDragEnd={h.onDragEnd} dropIndicator={dragOverId() === todo.id ? dragOverPosition() : null} />}
 										</For>
 									</TodoList>
 								)
@@ -651,7 +667,7 @@ export function TodoView() {
 								return (
 									<TodoList title="Today">
 										<For each={today()}>
-											{(todo) => <TodoItem todo={todo} onDragStart={h.onDragStart(todo.id)} onDragOver={h.onDragOver} onDrop={h.onDrop(todo.id)} onDragEnd={h.onDragEnd} />}
+											{(todo) => <TodoItem todo={todo} onDragStart={h.onDragStart(todo.id)} onDragOver={h.onDragOver(todo.id)} onDrop={h.onDrop(todo.id)} onDragEnd={h.onDragEnd} dropIndicator={dragOverId() === todo.id ? dragOverPosition() : null} />}
 										</For>
 									</TodoList>
 								)
@@ -663,7 +679,7 @@ export function TodoView() {
 								return (
 									<TodoList title="Upcoming">
 										<For each={upcoming()}>
-											{(todo) => <TodoItem todo={todo} onDragStart={h.onDragStart(todo.id)} onDragOver={h.onDragOver} onDrop={h.onDrop(todo.id)} onDragEnd={h.onDragEnd} />}
+											{(todo) => <TodoItem todo={todo} onDragStart={h.onDragStart(todo.id)} onDragOver={h.onDragOver(todo.id)} onDrop={h.onDrop(todo.id)} onDragEnd={h.onDragEnd} dropIndicator={dragOverId() === todo.id ? dragOverPosition() : null} />}
 										</For>
 									</TodoList>
 								)
@@ -675,7 +691,7 @@ export function TodoView() {
 								return (
 									<TodoList title="No Due Date">
 										<For each={noDueDate()}>
-											{(todo) => <TodoItem todo={todo} onDragStart={h.onDragStart(todo.id)} onDragOver={h.onDragOver} onDrop={h.onDrop(todo.id)} onDragEnd={h.onDragEnd} />}
+											{(todo) => <TodoItem todo={todo} onDragStart={h.onDragStart(todo.id)} onDragOver={h.onDragOver(todo.id)} onDrop={h.onDrop(todo.id)} onDragEnd={h.onDragEnd} dropIndicator={dragOverId() === todo.id ? dragOverPosition() : null} />}
 										</For>
 									</TodoList>
 								)
@@ -705,7 +721,7 @@ export function TodoView() {
 								return (
 									<TodoList title="Completed" variant="muted">
 										<For each={completed()}>
-											{(todo) => <TodoItem todo={todo} onDragStart={h.onDragStart(todo.id)} onDragOver={h.onDragOver} onDrop={h.onDrop(todo.id)} onDragEnd={h.onDragEnd} />}
+											{(todo) => <TodoItem todo={todo} onDragStart={h.onDragStart(todo.id)} onDragOver={h.onDragOver(todo.id)} onDrop={h.onDrop(todo.id)} onDragEnd={h.onDragEnd} dropIndicator={dragOverId() === todo.id ? dragOverPosition() : null} />}
 										</For>
 									</TodoList>
 								)

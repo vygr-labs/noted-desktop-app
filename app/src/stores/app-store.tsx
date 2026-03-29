@@ -35,6 +35,8 @@ interface AppStore {
 	setNoteSearchOpen: (v: boolean) => void
 	noteSort: () => NoteSortOrder
 	setNoteSort: (sort: NoteSortOrder) => void
+	selectedTodoListId: () => string | null
+	setSelectedTodoListId: (id: string | null) => void
 
 	// Data
 	notes: () => Note[] | undefined
@@ -88,6 +90,7 @@ export function AppStoreProvider(props: ParentProps) {
 	const [commandPaletteOpen, setCommandPaletteOpen] = createSignal(false)
 	const [noteSearchOpen, setNoteSearchOpen] = createSignal(false)
 	const [noteSort, _setNoteSort] = createSignal<NoteSortOrder>('updated_at')
+	const [selectedTodoListId, setSelectedTodoListId] = createSignal<string | null>(null)
 	const [noteTagsMap, setNoteTagsMap] = createSignal<Record<string, Tag[]>>({})
 
 	// Persist sort preference
@@ -157,6 +160,8 @@ export function AppStoreProvider(props: ParentProps) {
 		setNoteSearchOpen,
 		noteSort,
 		setNoteSort,
+		selectedTodoListId,
+		setSelectedTodoListId,
 
 		notes: () => notes(),
 		lists: () => lists(),

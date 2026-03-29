@@ -238,12 +238,24 @@ const editBtn = css({
 
 const smallIcon = css({ width: '3.5', height: '3.5' })
 
+const dropLine = css({
+	position: 'absolute',
+	left: '8px',
+	right: '8px',
+	height: '2px',
+	bg: 'indigo.9',
+	borderRadius: 'full',
+	pointerEvents: 'none',
+	zIndex: 1,
+})
+
 export function TodoItem(props: {
 	todo: Todo
 	onDragStart?: (e: DragEvent) => void
 	onDragOver?: (e: DragEvent) => void
 	onDrop?: (e: DragEvent) => void
 	onDragEnd?: (e: DragEvent) => void
+	dropIndicator?: 'above' | 'below' | null
 }) {
 	const store = useAppStore()
 	const [expanded, setExpanded] = createSignal(false)
@@ -322,6 +334,13 @@ export function TodoItem(props: {
 	}
 
 	return (
+		<div style={{ position: 'relative' }}>
+			<Show when={props.dropIndicator === 'above'}>
+				<div class={dropLine} style={{ top: '0px' }} />
+			</Show>
+			<Show when={props.dropIndicator === 'below'}>
+				<div class={dropLine} style={{ bottom: '0px' }} />
+			</Show>
 		<div
 			class={itemStyle}
 			draggable={!expanded()}
@@ -434,6 +453,7 @@ export function TodoItem(props: {
 					</button>
 				</div>
 			</Show>
+		</div>
 		</div>
 	)
 }

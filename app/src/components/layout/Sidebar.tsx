@@ -490,12 +490,15 @@ export function Sidebar() {
 
 	function handleNavClick(view: 'all' | 'today' | 'todos' | 'trash' | 'search') {
 		store.setCurrentView(view)
-		store.setSelectedNoteId(null)
+		// Only clear editor when switching to non-note views
+		if (view === 'todos' || view === 'search') {
+			store.setSelectedNoteId(null)
+		}
 	}
 
 	function handleListClick(listId: string) {
 		store.setCurrentView({ type: 'list', listId })
-		store.setSelectedNoteId(null)
+		// Keep the editor open — the note persists across list switches
 	}
 
 	function handleListContextMenu(e: MouseEvent, listId: string, hidden: boolean) {
