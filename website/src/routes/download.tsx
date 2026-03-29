@@ -1,6 +1,30 @@
 import { css } from 'styled-system/css'
 import { Box, Flex } from 'styled-system/jsx'
-import { For } from 'solid-js'
+import { For, onCleanup } from 'solid-js'
+
+/* ================================================================
+   Hooks
+   ================================================================ */
+
+function createScrollReveal(delay: number = 0) {
+  return (el: HTMLElement) => {
+    el.classList.add('bento-reveal')
+    el.style.transitionDelay = `${delay}s`
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting) {
+          el.classList.add('bento-revealed')
+          observer.unobserve(el)
+        }
+      },
+      { threshold: 0.15 },
+    )
+
+    requestAnimationFrame(() => observer.observe(el))
+    onCleanup(() => observer.disconnect())
+  }
+}
 
 /* ================================================================
    Shared Styles
@@ -75,7 +99,7 @@ function LinuxIcon() {
 function Nav() {
   return (
     <nav
-      class={css({
+      class={`animate-slide-down ${css({
         position: 'fixed',
         top: 0,
         left: 0,
@@ -85,7 +109,7 @@ function Nav() {
         WebkitBackdropFilter: 'blur(24px)',
         px: '6',
         pt: '3',
-      })}
+      })}`}
       style={{ 'background-color': 'transparent' }}
     >
       <Box
@@ -145,13 +169,13 @@ function Nav() {
 function HeroCard() {
   return (
     <div
-      class={css({
+      class={`animate-fade-in-up ${css({
         textAlign: 'center',
         px: { base: '6', md: '8', lg: '12' },
         py: { base: '10', md: '12', lg: '14' },
         borderRadius: 'xl',
         overflow: 'hidden',
-      })}
+      })}`}
       style={{
         'grid-column': '1 / -1',
         ...cardStyle,
@@ -210,8 +234,11 @@ const platforms = [
 ]
 
 function PlatformCard(props: { platform: typeof platforms[0]; delay: number }) {
+  const reveal = createScrollReveal(props.delay)
+
   return (
     <div
+      ref={reveal}
       class={css({
         p: { base: '6', lg: '8' },
         borderRadius: 'xl',
@@ -310,8 +337,11 @@ function PlatformCard(props: { platform: typeof platforms[0]; delay: number }) {
    ================================================================ */
 
 function VersionCard() {
+  const reveal = createScrollReveal(0.3)
+
   return (
     <div
+      ref={reveal}
       class={css({
         p: { base: '6', lg: '8' },
         borderRadius: 'xl',
@@ -385,8 +415,11 @@ function VersionCard() {
    ================================================================ */
 
 function SourceCard() {
+  const reveal = createScrollReveal(0.4)
+
   return (
     <div
+      ref={reveal}
       class={css({
         p: { base: '6', lg: '8' },
         borderRadius: 'xl',
@@ -438,8 +471,11 @@ function SourceCard() {
    ================================================================ */
 
 function FooterCard() {
+  const reveal = createScrollReveal(0.5)
+
   return (
     <div
+      ref={reveal}
       class={css({
         borderRadius: 'xl',
         px: { base: '6', md: '8' },

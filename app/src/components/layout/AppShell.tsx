@@ -103,6 +103,19 @@ export function AppShell() {
 				e.preventDefault()
 				store.setNoteListCollapsed(!store.noteListCollapsed())
 			}
+			// Ctrl+Tab / Ctrl+Shift+Tab: cycle through notes
+			if ((e.ctrlKey || e.metaKey) && e.key === 'Tab') {
+				e.preventDefault()
+				const notes = store.notes() || []
+				if (notes.length === 0) return
+				const currentId = store.selectedNoteId()
+				const currentIdx = currentId ? notes.findIndex(n => n.id === currentId) : -1
+				const dir = e.shiftKey ? -1 : 1
+				const nextIdx = currentIdx === -1
+					? 0
+					: (currentIdx + dir + notes.length) % notes.length
+				store.setSelectedNoteId(notes[nextIdx].id)
+			}
 		}
 		window.addEventListener('keydown', handleKeyDown)
 		onCleanup(() => window.removeEventListener('keydown', handleKeyDown))

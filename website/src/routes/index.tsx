@@ -135,7 +135,7 @@ function DownloadIcon() {
 function Nav() {
   return (
     <nav
-      class={css({
+      class={`animate-slide-down ${css({
         position: 'fixed',
         top: 0,
         left: 0,
@@ -145,7 +145,7 @@ function Nav() {
         WebkitBackdropFilter: 'blur(24px)',
         px: '6',
         pt: '3',
-      })}
+      })}`}
       style={{ 'background-color': 'transparent' }}
     >
       <Box
@@ -963,8 +963,11 @@ function CtaCard() {
    ================================================================ */
 
 function FooterCard() {
+  const reveal = createScrollReveal(0.8)
+
   return (
     <div
+      ref={reveal}
       class={css({
         borderRadius: 'sm',
         px: { base: '6', md: '8' },

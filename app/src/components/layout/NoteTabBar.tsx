@@ -38,8 +38,9 @@ const tabStyle = css({
 	cursor: 'pointer',
 	whiteSpace: 'nowrap',
 	borderRight: '1px solid',
-	borderRightColor: 'gray.a2',
+	borderRightColor: 'gray.a4',
 	flexShrink: 0,
+	maxWidth: '180px',
 	transition: 'all 0.1s',
 	position: 'relative',
 	_hover: {
@@ -70,7 +71,7 @@ const tabClose = css({
 	width: '14px',
 	height: '14px',
 	borderRadius: 'sm',
-	opacity: 0,
+	opacity: 0.4,
 	transition: 'all 0.1s',
 	_hover: { bg: 'gray.a4', opacity: '1 !important' },
 })
@@ -94,6 +95,12 @@ const addTabBtn = css({
 	mx: '1',
 	transition: 'all 0.1s',
 	_hover: { bg: 'gray.a3', color: 'fg.default' },
+})
+
+const tabTitle = css({
+	overflow: 'hidden',
+	textOverflow: 'ellipsis',
+	whiteSpace: 'nowrap',
 })
 
 const smallIcon = css({ width: '3', height: '3' })
@@ -160,7 +167,7 @@ export function NoteTabBar() {
 		}
 	}
 
-	function tabTitle(note: Note): string {
+	function tabTitleText(note: Note): string {
 		const active = store.selectedNoteId() === note.id
 		if (active) {
 			const live = editorStore.liveTitle()
@@ -172,7 +179,16 @@ export function NoteTabBar() {
 	return (
 		<Show when={currentView() !== 'search' && currentView() !== 'today' && currentView() !== 'todos'}>
 			<div class={tabBarContainer}>
-				<div class={tabScroll} ref={scrollRef}>
+				<div
+					class={tabScroll}
+					ref={scrollRef}
+					onWheel={(e) => {
+						if (scrollRef) {
+							e.preventDefault()
+							scrollRef.scrollLeft += e.deltaY || e.deltaX
+						}
+					}}
+				>
 					<For each={displayNotes()}>
 						{(note) => (
 							<div
@@ -183,7 +199,7 @@ export function NoteTabBar() {
 								<Show when={note.is_pinned}>
 									<PinIcon class={pinDot} />
 								</Show>
-								<span>{tabTitle(note)}</span>
+								<span class={tabTitle}>{tabTitleText(note)}</span>
 								<Show when={store.selectedNoteId() === note.id}>
 									<div
 										class={`tab-close ${tabClose}`}
