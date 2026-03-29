@@ -20,6 +20,7 @@ import {
 	EyeOffIcon,
 	EyeIcon,
 	ChevronRightIcon,
+	LinkIcon,
 } from 'lucide-solid'
 
 // ─── Styles ───────────────────────────────────────────────
@@ -449,6 +450,21 @@ export function Sidebar() {
 	const [deleteListConfirm, setDeleteListConfirm] = createSignal<{ id: string; name: string } | null>(null)
 	const [listContextMenu, setListContextMenu] = createSignal<{ x: number; y: number; listId: string; hidden: boolean } | null>(null)
 	const [showHiddenLists, setShowHiddenLists] = createSignal(false)
+	const [showJoinDialog, setShowJoinDialog] = createSignal(false)
+	const [joinCode, setJoinCode] = createSignal('')
+
+	async function handleJoin() {
+		const code = joinCode().trim()
+		if (!code) return
+		const noteId = await window.electronAPI.joinSharedNote(code)
+		if (noteId) {
+			store.refetchNotes()
+			store.setCurrentView('all')
+			store.setSelectedNoteId(noteId)
+			setJoinCode('')
+			setShowJoinDialog(false)
+		}
+	}
 
 	onMount(() => {
 		function handleClickOutside(e: MouseEvent) {
@@ -911,6 +927,9 @@ export function Sidebar() {
 						<button class={toolbarBtn} onClick={handleNewNote} title="New Note">
 							<PlusIcon class={smallIcon} />
 						</button>
+						<button class={toolbarBtn} onClick={() => setShowJoinDialog(true)} title="Join shared note">
+							<LinkIcon class={smallIcon} />
+						</button>
 						<button
 							class={toolbarBtn}
 							onClick={() => settingsStore.setShowSettingsDialog(true)}
@@ -999,6 +1018,45 @@ export function Sidebar() {
 			onConfirm={confirmDeleteList}
 			onCancel={() => setDeleteListConfirm(null)}
 		/>
+		<Show when={showJoinDialog()}>
+			<div
+				class={css({ position: 'fixed', inset: 0, bg: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 })}
+				onClick={() => setShowJoinDialog(false)}
+			>
+				<div
+					class={css({ bg: 'gray.2', borderRadius: 'lg', p: '6', width: '360px', boxShadow: '0 24px 64px -8px rgba(0, 0, 0, 0.35)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'gray.a3' })}
+					onClick={(e) => e.stopPropagation()}
+				>
+					<div class={css({ fontSize: 'md', fontWeight: 'semibold', mb: '2', color: 'fg.default' })}>Join shared note</div>
+					<div class={css({ fontSize: 'sm', color: 'fg.subtle', mb: '4' })}>Paste a share code or link to join a shared note.</div>
+					<input
+						class={css({ width: '100%', bg: 'gray.a2', border: '1px solid', borderColor: 'gray.a4', borderRadius: 'md', px: '3', py: '2', fontSize: '13px', color: 'fg.default', fontFamily: 'mono', outline: 'none', mb: '4', _focus: { borderColor: 'indigo.8' } })}
+						value={joinCode()}
+						onInput={(e) => setJoinCode(e.currentTarget.value)}
+						onKeyDown={(e) => {
+							if (e.key === 'Enter') handleJoin()
+							if (e.key === 'Escape') setShowJoinDialog(false)
+						}}
+						placeholder="Paste share code or link..."
+						ref={(el) => requestAnimationFrame(() => el.focus())}
+					/>
+					<div class={css({ display: 'flex', justifyContent: 'flex-end', gap: '2' })}>
+						<button
+							class={css({ px: '4', py: '1.5', borderRadius: 'md', fontSize: 'sm', fontWeight: 'medium', cursor: 'pointer', bg: 'bg.muted', color: 'fg.default', _hover: { bg: 'bg.emphasized' } })}
+							onClick={() => setShowJoinDialog(false)}
+						>
+							Cancel
+						</button>
+						<button
+							class={css({ px: '4', py: '1.5', borderRadius: 'md', fontSize: 'sm', fontWeight: 'medium', cursor: 'pointer', bg: 'indigo.9', color: 'white', _hover: { bg: 'indigo.10' } })}
+							onClick={handleJoin}
+						>
+							Join
+						</button>
+					</div>
+				</div>
+			</div>
+		</Show>
 		</>
 	)
 }

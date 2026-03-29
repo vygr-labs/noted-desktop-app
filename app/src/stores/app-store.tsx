@@ -113,6 +113,19 @@ export function AppStoreProvider(props: ParentProps) {
 		window.electronAPI.onNotesRefresh(() => {
 			refetchNotes()
 		})
+
+		// Handle noted://share/... deep links
+		window.electronAPI.onDeepLink(async (url: string) => {
+			const match = url.match(/^noted:\/\/share\/(.+)$/)
+			if (!match) return
+			const shareCode = decodeURIComponent(match[1])
+			const noteId = await window.electronAPI.joinSharedNote(shareCode)
+			if (noteId) {
+				refetchNotes()
+				setCurrentView('all')
+				setSelectedNoteId(noteId)
+			}
+		})
 	})
 
 	async function loadTagsForNotes(ids: string[]) {

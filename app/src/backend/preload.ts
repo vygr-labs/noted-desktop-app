@@ -92,6 +92,13 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	biometricAvailable: () => ipcRenderer.invoke('lock:biometric-available'),
 	biometricAuthenticate: () => ipcRenderer.invoke('lock:biometric-authenticate'),
 
+	// Sync / Sharing
+	shareNote: (noteId: string) => ipcRenderer.invoke('sync:share-note', noteId),
+	unshareNote: (noteId: string) => ipcRenderer.invoke('sync:unshare-note', noteId),
+	joinSharedNote: (shareCode: string, opts?: { title?: string }) => ipcRenderer.invoke('sync:join-note', shareCode, opts),
+	saveYjsState: (docName: string, state: Uint8Array) => ipcRenderer.invoke('sync:save-yjs-state', docName, state),
+	loadYjsState: (docName: string) => ipcRenderer.invoke('sync:load-yjs-state', docName),
+
 	onDeepLink: (callback: (url: string) => void) => {
 		ipcRenderer.on('deep-link', (_: unknown, url: string) => callback(url))
 	},

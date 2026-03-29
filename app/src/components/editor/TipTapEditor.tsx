@@ -12,6 +12,9 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { Slice } from '@tiptap/pm/model'
 import { useEditorStore } from '../../stores/editor-store'
+import { useSettingsStore } from '../../stores/settings-store'
+import { createCollabSession, type CollabSession } from '../../lib/collab'
+import { ySyncPlugin, yCursorPlugin, yUndoPlugin } from 'y-prosemirror'
 import { debounce } from '../../lib/debounce'
 import { tiptapToPlaintext } from '../../lib/tiptap-to-plaintext'
 import { hasListPatterns, hasTablePattern, hasMarkdownPatterns, parseLinesToNodes, parseMarkdownTable, cleanTipTapContent, alignLeftContent } from '../../lib/text-cleanup'
@@ -30,9 +33,28 @@ const editorWrap = css({
 		outline: 'none',
 		minHeight: '200px',
 	},
-	'& .tiptap .ProseMirror-yjs-cursor': {
-		// Prevent remote cursor elements from causing layout shifts
+	'& .ProseMirror-yjs-cursor': {
 		position: 'relative',
+		borderLeft: '2px solid orange',
+		marginLeft: '-1px',
+		marginRight: '-1px',
+		pointerEvents: 'none',
+		wordBreak: 'normal',
+	},
+	'& .ProseMirror-yjs-cursor > div': {
+		position: 'absolute',
+		top: '-1.4em',
+		left: '-2px',
+		fontSize: '10px',
+		fontWeight: '600',
+		fontStyle: 'normal',
+		color: 'white',
+		padding: '1px 6px',
+		borderRadius: '3px',
+		whiteSpace: 'nowrap',
+		lineHeight: '1.4',
+		pointerEvents: 'none',
+		userSelect: 'none',
 	},
 	'& .tiptap p.is-editor-empty:first-child::before': {
 		content: 'attr(data-placeholder)',
@@ -279,7 +301,9 @@ const cursorPositions = new Map<string, { from: number; to: number }>()
 export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	let containerRef: HTMLDivElement | undefined
 	let editor: Editor | null = null
+	let collab: CollabSession | null = null
 	const editorStore = useEditorStore()
+	const settings = useSettingsStore()
 	let isUpdatingContent = false
 
 	const debouncedSave = debounce(() => {
@@ -289,11 +313,12 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		editorStore.saveNote({ content: json, content_plain: plainText })
 	}, 500)
 
-	function getBaseExtensions() {
+	function getBaseExtensions(isCollab: boolean) {
 		return [
 			StarterKit.configure({
 				heading: { levels: [1, 2, 3] },
 				codeBlock: false,
+				...(isCollab ? { undoRedo: false } : {}),
 			}),
 			CodeBlockWithCopy,
 			DetailsBlock,
@@ -318,35 +343,29 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	}
 
 	function destroyEditor() {
+		if (collab) {
+			// Save Yjs state before destroying
+			if (collab.ydoc && props.note.sync_id) {
+				try {
+					const Y = collab.ydoc.constructor as any
+					const state = Y.encodeStateAsUpdate
+						? Y.encodeStateAsUpdate(collab.ydoc)
+						: null
+					// Fire and forget — save to local DB for offline resilience
+					if (state) {
+						window.electronAPI.saveYjsState(props.note.sync_id, state)
+					}
+				} catch { /* ignore */ }
+			}
+			collab.destroy()
+			collab = null
+		}
 		if (editor) { editor.destroy(); editor = null }
 		currentEditor = null
 	}
 
-	function createEditorInstance(note: Note) {
-		destroyEditor()
-		if (!containerRef) return
-
-		editor = new Editor({
-			element: containerRef,
-			extensions: getBaseExtensions(),
-			content: parseContent(note.content),
-			editable: !props.readonly,
-			onUpdate: ({ editor: ed }) => {
-				if (isUpdatingContent) return
-				editorStore.setLivePreview(ed.getText().slice(0, 160))
-				debouncedSave()
-			},
-			onTransaction: ({ editor: ed }) => {
-				setInTable(ed.isActive('table'))
-			},
-		})
-
-		currentEditor = editor
-		setInTable(editor.isActive('table'))
-		editor.view.dom.spellcheck = !!note.spellcheck
-
-		// Prevent task checkboxes from stealing editor focus/cursor
-		containerRef.addEventListener('mousedown', (e) => {
+	function setupCheckboxHandler() {
+		containerRef!.addEventListener('mousedown', (e) => {
 			const target = e.target as HTMLElement
 			if (target.tagName === 'INPUT' && target.getAttribute('type') === 'checkbox') {
 				e.preventDefault()
@@ -370,12 +389,99 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		})
 	}
 
+	function createEditorInstance(note: Note) {
+		destroyEditor()
+		if (!containerRef) return
+
+		const isShared = !!(note.sync_id && note.sync_secret)
+
+		if (isShared) {
+			// ── Collaborative mode ──
+			const serverUrl = settings.syncServerUrl()
+			const authToken = settings.syncToken()
+
+			collab = createCollabSession({
+				syncId: note.sync_id!,
+				syncSecret: note.sync_secret!,
+				serverUrl,
+				authToken: authToken || undefined,
+			})
+
+			// If Yjs doc is empty and we have local content, seed it
+			if (note.content && collab.fragment.length === 0) {
+				const tempExtensions = getBaseExtensions(true)
+				tempExtensions.push(Extension.create({
+					name: 'ySync',
+					addProseMirrorPlugins: () => [ySyncPlugin(collab!.fragment)],
+				}))
+				const tempEditor = new Editor({ extensions: tempExtensions })
+				tempEditor.commands.setContent(parseContent(note.content))
+				tempEditor.destroy()
+			}
+
+			const extensions = getBaseExtensions(true)
+			extensions.push(Extension.create({
+				name: 'yCollab',
+				addProseMirrorPlugins: () => [
+					ySyncPlugin(collab!.fragment),
+					yCursorPlugin(collab!.awareness),
+					yUndoPlugin(),
+				],
+			}))
+
+			editor = new Editor({
+				element: containerRef,
+				extensions,
+				editable: !props.readonly,
+				onUpdate: ({ editor: ed }) => {
+					if (isUpdatingContent) return
+					editorStore.setLivePreview(ed.getText().slice(0, 160))
+					debouncedSave()
+				},
+				onTransaction: ({ editor: ed }) => {
+					setInTable(ed.isActive('table'))
+				},
+			})
+		} else {
+			// ── Local mode ──
+			editor = new Editor({
+				element: containerRef,
+				extensions: getBaseExtensions(false),
+				content: parseContent(note.content),
+				editable: !props.readonly,
+				onUpdate: ({ editor: ed }) => {
+					if (isUpdatingContent) return
+					editorStore.setLivePreview(ed.getText().slice(0, 160))
+					debouncedSave()
+				},
+				onTransaction: ({ editor: ed }) => {
+					setInTable(ed.isActive('table'))
+				},
+			})
+		}
+
+		currentEditor = editor
+		setInTable(editor.isActive('table'))
+		editor.view.dom.spellcheck = !!note.spellcheck
+		setupCheckboxHandler()
+
+		// For collab: persist initial content if the receiver got content from server
+		if (isShared && editor.getText().trim() && !note.content) {
+			const json = JSON.stringify(editor.getJSON())
+			const plainText = tiptapToPlaintext(json)
+			editorStore.saveNote({ content: json, content_plain: plainText }).then(() => {
+				editorStore.refreshCurrentNote()
+			})
+		}
+	}
+
 	onMount(() => {
 		createEditorInstance(props.note)
 	})
 
 	// When the note changes, recreate or update the editor
 	let previousNoteId: string | null = null
+	let previousSyncId: string | null = null
 	createEffect(
 		on(
 			() => props.note.id,
@@ -385,22 +491,36 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					cursorPositions.set(previousNoteId, { from, to })
 				}
 
-				debouncedSave.cancel()
-				isUpdatingContent = true
-				editor?.commands.setContent(parseContent(props.note.content))
-				editor?.setEditable(!props.readonly)
-				isUpdatingContent = false
+				const note = props.note
+				const newSyncId = note.sync_id || null
+				const needsRecreate = newSyncId !== previousSyncId || previousNoteId === null
 
-				if (!editorStore.isNewNote()) {
+				if (needsRecreate) {
+					debouncedSave.cancel()
+					createEditorInstance(note)
+				} else if (editor && !newSyncId) {
+					// Local note switch — update content in place
+					debouncedSave.cancel()
+					isUpdatingContent = true
+					editor.commands.setContent(parseContent(note.content))
+					editor.setEditable(!props.readonly)
+					isUpdatingContent = false
+				} else if (editor && newSyncId) {
+					// Switching to a different shared note — must recreate
+					debouncedSave.cancel()
+					createEditorInstance(note)
+				}
+
+				if (!note.sync_id && !editorStore.isNewNote()) {
 					const saved = cursorPositions.get(newId)
 					requestAnimationFrame(() => {
 						if (editor) {
-							// Restore cursor via raw transaction — no scrollIntoView
 							const docSize = editor.state.doc.content.size
 							const from = saved ? Math.min(saved.from, docSize) : docSize
 							const to = saved ? Math.min(saved.to, docSize) : docSize
+							const SelectionClass = editor.state.selection.constructor as any
 							const tr = editor.state.tr.setSelection(
-								editor.state.selection.constructor.create(editor.state.doc, from, to) as any
+								SelectionClass.create(editor.state.doc, from, to)
 							)
 							editor.view.dispatch(tr)
 							editor.view.focus()
@@ -409,8 +529,23 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				}
 
 				previousNoteId = newId
+				previousSyncId = newSyncId
 			},
 			{ defer: true }
+		)
+	)
+
+	// Watch for sync_id changes on the same note (user clicks Share/Stop Sharing)
+	createEffect(
+		on(
+			() => props.note.sync_id,
+			(newSyncId) => {
+				if ((newSyncId || null) !== previousSyncId) {
+					debouncedSave.cancel()
+					createEditorInstance(props.note)
+					previousSyncId = newSyncId || null
+				}
+			}
 		)
 	)
 

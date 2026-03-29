@@ -56,6 +56,14 @@ import {
 
 	TypeIcon,
 
+	Share2Icon,
+
+	CopyIcon,
+
+	LinkIcon,
+
+	UsersIcon,
+
 } from 'lucide-solid'
 
 
@@ -611,6 +619,9 @@ export function EditorPane() {
 	const [showReplace, setShowReplace] = createSignal(false)
 
 	const [showExportMenu, setShowExportMenu] = createSignal(false)
+	const [showShareMenu, setShowShareMenu] = createSignal(false)
+	const [shareCode, setShareCode] = createSignal('')
+	const [copied, setCopied] = createSignal(false)
 
 
 
@@ -641,6 +652,34 @@ export function EditorPane() {
 	} | null>(null)
 
 
+
+	async function handleShare(noteId: string) {
+		const code = await window.electronAPI.shareNote(noteId)
+		if (code) {
+			setShareCode(code)
+			await editorStore.refreshCurrentNote()
+			appStore.refetchNotes()
+			setShowShareMenu(true)
+		}
+	}
+
+	async function handleUnshare(noteId: string) {
+		await window.electronAPI.unshareNote(noteId)
+		await editorStore.refreshCurrentNote()
+		appStore.refetchNotes()
+		setShareCode('')
+		setShowShareMenu(false)
+	}
+
+	function copyToClipboard(text: string) {
+		navigator.clipboard.writeText(text)
+		setCopied(true)
+		setTimeout(() => setCopied(false), 2000)
+	}
+
+	function getShareLink(code: string): string {
+		return `noted://share/${code}`
+	}
 
 	async function convertToRich(noteId: string) {
 
@@ -907,9 +946,10 @@ export function EditorPane() {
 			const target = e.target as HTMLElement
 
 			if (showExportMenu() && !target.closest('[data-export-menu]')) {
-
 				setShowExportMenu(false)
-
+			}
+			if (showShareMenu() && !target.closest('[data-share-menu]')) {
+				setShowShareMenu(false)
 			}
 
 		}
@@ -1157,6 +1197,78 @@ export function EditorPane() {
 								</Show>
 
 							</button>
+
+							<Show when={note().note_type === 'rich' && !isTrash()}>
+								<div style={{ position: 'relative' }} data-share-menu>
+									<button
+										class={controlBtn}
+										onClick={() => {
+											if (note().is_shared && note().sync_id && note().sync_secret) {
+												setShareCode(`${note().sync_id}.${note().sync_secret}`)
+											}
+											setShowShareMenu(!showShareMenu())
+										}}
+										title={note().is_shared ? 'Sharing active' : 'Share note'}
+										style={note().is_shared ? { color: 'var(--colors-indigo-11)', opacity: '1' } : {}}
+									>
+										<Share2Icon class={controlIconSize} />
+									</button>
+									<Show when={showShareMenu()}>
+										<div class={exportMenu}>
+											<Show
+												when={shareCode() || note().is_shared}
+												fallback={
+													<button
+														class={exportMenuItem}
+														onClick={() => handleShare(note().id)}
+													>
+														<LinkIcon class={css({ width: '3.5', height: '3.5', mr: '1' })} />
+														Share & copy code
+													</button>
+												}
+											>
+												<div style={{ padding: '8px 12px', 'font-size': '11px', color: 'var(--colors-fg-subtle)' }}>
+													Share code
+												</div>
+												<div style={{ padding: '0 12px 8px', display: 'flex', gap: '4px' }}>
+													<input
+														class={css({
+															flex: 1, bg: 'gray.a2', border: '1px solid', borderColor: 'gray.a4',
+															borderRadius: 'sm', px: '2', py: '1', fontSize: '11px', color: 'fg.default',
+															fontFamily: 'mono', outline: 'none',
+														})}
+														value={shareCode()}
+														readOnly
+													/>
+													<button
+														class={exportMenuItem}
+														style={{ padding: '4px 8px', width: 'auto' }}
+														onClick={() => copyToClipboard(shareCode())}
+														title="Copy code"
+													>
+														<CopyIcon class={css({ width: '3', height: '3' })} />
+													</button>
+												</div>
+												<button
+													class={exportMenuItem}
+													onClick={() => copyToClipboard(getShareLink(shareCode()))}
+												>
+													<LinkIcon class={css({ width: '3.5', height: '3.5', mr: '1' })} />
+													{copied() ? 'Copied!' : 'Copy share link'}
+												</button>
+												<div style={{ height: '1px', background: 'var(--colors-gray-a3)', margin: '4px 0' }} />
+												<button
+													class={exportMenuItem}
+													style={{ color: 'var(--colors-red-11)' }}
+													onClick={() => handleUnshare(note().id)}
+												>
+													Stop sharing
+												</button>
+											</Show>
+										</div>
+									</Show>
+								</div>
+							</Show>
 
 							<div style={{ position: 'relative' }} data-export-menu>
 

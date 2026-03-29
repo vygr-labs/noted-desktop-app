@@ -9,6 +9,7 @@ import { registerTodoListsHandlers } from './todo-lists-handlers.js'
 import { registerExportHandlers } from './export-handlers.js'
 import { registerCliHandlers } from './cli-handlers.js'
 import { registerLockHandlers } from './lock-handlers.js'
+import { registerSyncHandlers } from './sync-handlers.js'
 
 export function registerAllHandlers() {
 	registerNotesHandlers()
@@ -22,4 +23,5 @@ export function registerAllHandlers() {
 	registerExportHandlers()
 	registerCliHandlers()
 	registerLockHandlers()
+	registerSyncHandlers()
 }

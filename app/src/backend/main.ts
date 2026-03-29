@@ -88,12 +88,21 @@ function registerZoomShortcuts(win: BrowserWindow) {
 }
 
 const spawnAppWindow = async () => {
+	// In dev, position left/right based on --user-data-dir flag (for two-window testing)
+	const isPeer = process.argv.some(a => a.startsWith('--user-data-dir'))
+	const display = screen.getPrimaryDisplay()
+	const { width: screenW, height: screenH } = display.workAreaSize
+	const devW = Math.floor(screenW / 2)
+	const devH = screenH
+
 	appWindow = new BrowserWindow({
-		width: 1200,
-		height: 800,
+		width: electronIsDev ? devW : 1200,
+		height: electronIsDev ? devH : 800,
+		x: electronIsDev ? (isPeer ? devW : 0) : undefined,
+		y: electronIsDev ? 0 : undefined,
 		minWidth: 800,
 		minHeight: 500,
-		center: true,
+		center: !electronIsDev,
 		icon: getAssetPath('icon.png'),
 		title: electronIsDev ? 'noted. - Development' : 'noted.',
 		show: false,
