@@ -84,6 +84,43 @@
 }
 
 /* ================================================================
+   Typing Cursor
+   ================================================================ */
+
+@keyframes blink-cursor {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+
+.typing-cursor {
+  -webkit-text-fill-color: #ff690a;
+  font-weight: 200;
+  animation: blink-cursor 1.06s step-end infinite;
+}
+
+.typing-cursor--hidden {
+  animation: none;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+}
+
+/* ================================================================
+   Scroll Reveal
+   ================================================================ */
+
+.bento-reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.6s cubic-bezier(0.23, 1, 0.32, 1),
+              transform 0.6s cubic-bezier(0.23, 1, 0.32, 1);
+}
+
+.bento-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ================================================================
    Selection
    ================================================================ */
 
