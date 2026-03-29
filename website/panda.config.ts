@@ -47,7 +47,7 @@ export default defineConfig({
         durations,
         zIndex,
         fonts: {
-          body: { value: "Inter, system-ui, -apple-system, 'Segoe UI', sans-serif" },
+          body: { value: "Manrope, system-ui, -apple-system, 'Segoe UI', sans-serif" },
         },
       },
       semanticTokens: {

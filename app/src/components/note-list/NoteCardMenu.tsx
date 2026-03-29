@@ -118,6 +118,12 @@ export function NoteCardMenu(props: {
 	onRefresh: () => void
 }) {
 	const store = useAppStore()
+	// Capture note data eagerly — the <Show> parent may unmount this component
+	// during async operations, making props.note stale
+	const noteId = props.note.id
+	const noteTitle = props.note.title
+	const noteType = props.note.note_type
+	const noteListId = props.note.list_id
 	const [showMoveList, setShowMoveList] = createSignal(false)
 	let menuRef: HTMLDivElement | undefined
 
@@ -150,7 +156,7 @@ export function NoteCardMenu(props: {
 	})
 
 	async function handlePin() {
-		await window.electronAPI.updateNote(props.note.id, {
+		await window.electronAPI.updateNote(noteId, {
 			is_pinned: !props.note.is_pinned,
 		})
 		props.onRefresh()
@@ -159,11 +165,11 @@ export function NoteCardMenu(props: {
 
 	async function handleDuplicate() {
 		const note = await window.electronAPI.createNote({
-			title: `${props.note.title || 'Untitled'} (copy)`,
+			title: `${noteTitle || 'Untitled'} (copy)`,
 			content: props.note.content,
 			content_plain: props.note.content_plain,
-			note_type: props.note.note_type,
-			list_id: props.note.list_id,
+			note_type: noteType,
+			list_id: noteListId,
 		})
 		props.onRefresh()
 		store.setSelectedNoteId(note.id)
@@ -171,31 +177,31 @@ export function NoteCardMenu(props: {
 	}
 
 	async function handleTrash() {
-		await window.electronAPI.trashNote(props.note.id)
-		if (store.selectedNoteId() === props.note.id) {
+		if (store.selectedNoteId() === noteId) {
 			store.setSelectedNoteId(null)
 		}
-		props.onRefresh()
 		props.onClose()
+		await window.electronAPI.trashNote(noteId)
+		props.onRefresh()
 	}
 
 	async function handleRestore() {
-		await window.electronAPI.restoreNote(props.note.id)
-		props.onRefresh()
 		props.onClose()
+		await window.electronAPI.restoreNote(noteId)
+		props.onRefresh()
 	}
 
 	async function handleDeletePermanently() {
-		await window.electronAPI.deleteNotePermanently(props.note.id)
-		if (store.selectedNoteId() === props.note.id) {
+		if (store.selectedNoteId() === noteId) {
 			store.setSelectedNoteId(null)
 		}
-		props.onRefresh()
 		props.onClose()
+		await window.electronAPI.deleteNotePermanently(noteId)
+		props.onRefresh()
 	}
 
 	async function handleMoveToList(listId: string | null) {
-		await window.electronAPI.updateNote(props.note.id, {
+		await window.electronAPI.updateNote(noteId, {
 			list_id: listId,
 		})
 		props.onRefresh()

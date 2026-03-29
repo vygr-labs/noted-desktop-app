@@ -293,7 +293,7 @@ function BentoCard(props: {
     <div
       ref={props.staggerRef}
       data-stagger=""
-      class={`${bentoCardClass} ${props.class ?? ''}`}
+      class={`${bentoCardClass} ${props.class ?? ''} ${css({ display: 'flex', flexDirection: 'column', justifyContent: 'center' })}`}
       style={{
         'background-color': 'var(--surface-low)',
         border: '1px solid var(--surface-border)',
@@ -594,7 +594,7 @@ function SyncCard(props: { staggerRef?: (el: HTMLElement) => void }) {
     <div
       ref={props.staggerRef}
       data-stagger=""
-      class={`${bentoCardClass} bento-span-2-row ${css({
+      class={`${bentoCardClass} bento-span-2-col-md-only bento-span-2-row-lg ${css({
         display: 'flex',
         flexDirection: 'column',
         justifyContent: 'space-between',

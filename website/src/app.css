@@ -1,3 +1,17 @@
+@font-face {
+  font-family: 'Manrope';
+  src: url('/fonts/Manrope-VariableFont_wght.ttf') format('truetype');
+  font-weight: 200 800;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'JetBrains Mono';
+  src: url('/fonts/JetBrainsMono-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 800;
+  font-display: swap;
+}
+
 @layer reset, base, tokens, recipes, utilities;
 
 /* ================================================================
@@ -139,6 +153,18 @@
   .bento-span-full {
     grid-column: 1 / -1;
   }
+  .bento-span-2-col-md-only {
+    grid-column: span 2;
+  }
+}
+
+@media (min-width: 1024px) {
+  .bento-span-2-col-md-only {
+    grid-column: auto;
+  }
+  .bento-span-2-row-lg {
+    grid-row: span 2;
+  }
 }
 
 /* ================================================================
@@ -193,6 +219,14 @@
 
 .nav-dropdown-exit {
   animation: nav-dropdown-exit 0.2s cubic-bezier(0.23, 1, 0.32, 1) both;
+}
+
+/* ================================================================
+   Scroll Offset for anchors
+   ================================================================ */
+
+[id] {
+  scroll-margin-top: 7rem;
 }
 
 /* ================================================================
