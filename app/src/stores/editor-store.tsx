@@ -64,7 +64,6 @@ export function EditorStoreProvider(props: ParentProps) {
 
 		setIsSaving(true)
 		await window.electronAPI.updateNote(note.id, data)
-		await appStore.refetchNotes()
 		setIsSaving(false)
 	}
 

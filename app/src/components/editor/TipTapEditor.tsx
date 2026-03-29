@@ -284,7 +284,6 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 
 	const debouncedSave = debounce(() => {
 		if (!editor) return
-		editorStore.setLivePreview(editor.getText().slice(0, 160))
 		const json = JSON.stringify(editor.getJSON())
 		const plainText = tiptapToPlaintext(json)
 		editorStore.saveNote({ content: json, content_plain: plainText })
@@ -332,8 +331,9 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 			extensions: getBaseExtensions(),
 			content: parseContent(note.content),
 			editable: !props.readonly,
-			onUpdate: () => {
+			onUpdate: ({ editor: ed }) => {
 				if (isUpdatingContent) return
+				editorStore.setLivePreview(ed.getText().slice(0, 160))
 				debouncedSave()
 			},
 			onTransaction: ({ editor: ed }) => {

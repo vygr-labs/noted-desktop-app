@@ -127,7 +127,7 @@ function Nav() {
                 transition: 'transform 0.2s cubic-bezier(0.23, 1, 0.32, 1)',
                 _active: { transform: 'scale(0.95)' },
               })}
-              style={{ 'background-color': '#a01a00' }}
+              style={{ 'background-color': '#7a0d02' }}
             >
               Download
             </a>
@@ -292,7 +292,7 @@ function PlatformCard(props: { platform: typeof platforms[0]; delay: number }) {
           _hover: { transform: 'translateY(-1px)' },
           _active: { transform: 'translateY(0)' },
         })}
-        style={{ 'background-color': '#a01a00' }}
+        style={{ 'background-color': '#7a0d02' }}
       >
         <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
           <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
@@ -421,11 +421,11 @@ function SourceCard() {
         }}
       >
         <p>
-          <span style={{ color: '#a01a00' }}>$ </span>
+          <span style={{ color: '#7a0d02' }}>$ </span>
           <span style={{ color: 'var(--on-surface)' }}>git clone https://github.com/vygr-labs/noted-desktop-app</span>
         </p>
         <p style={{ 'margin-top': '0.25rem' }}>
-          <span style={{ color: '#a01a00' }}>$ </span>
+          <span style={{ color: '#7a0d02' }}>$ </span>
           <span style={{ color: 'var(--on-surface)' }}>npm install && npm run build</span>
         </p>
       </Box>
