@@ -3,7 +3,15 @@
   "type": "module",
   "version": "1.0.0",
   "description": "A minimal, distraction-free note-taking app",
-  "author": "Voyager Technologies Limited",
+  "author": {
+    "name": "Voyager Technologies Limited",
+    "email": "contact@voyagerlabs.tech"
+  },
+  "homepage": "https://noted.voyagerlabs.tech",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/vygr-labs/noted-desktop-app.git"
+  },
   "license": "AGPL-3.0-only",
   "keywords": [
     "note-taking",

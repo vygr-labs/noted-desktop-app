@@ -64,6 +64,11 @@ dmg:
   title: "noted."
   icon: assets/icon.icns
 
+publish:
+  provider: github
+  owner: vygr-labs
+  repo: noted-desktop-app
+
 files: ['src/backend/build/**/*', 'dist/**/*']
 extraResources: ['./assets/**', '../cli/build/**', './app.config.json']
 directories:
