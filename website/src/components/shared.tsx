@@ -127,6 +127,24 @@ function ThemeToggle() {
 export function Nav() {
   const [dark, setDark] = createSignal(false)
   const [menuOpen, setMenuOpen] = createSignal(false)
+  const [menuVisible, setMenuVisible] = createSignal(false)
+  const [menuClosing, setMenuClosing] = createSignal(false)
+
+  const toggleMenu = () => {
+    if (menuOpen()) {
+      // Close: play exit animation, then remove
+      setMenuClosing(true)
+      setTimeout(() => {
+        setMenuOpen(false)
+        setMenuVisible(false)
+        setMenuClosing(false)
+      }, 250)
+    } else {
+      // Open
+      setMenuOpen(true)
+      setMenuVisible(true)
+    }
+  }
 
   onMount(() => {
     setDark(document.documentElement.classList.contains('dark'))
@@ -199,7 +217,7 @@ export function Nav() {
               </a>
               {/* Mobile menu toggle */}
               <button
-                onClick={() => setMenuOpen(!menuOpen())}
+                onClick={toggleMenu}
                 aria-label="Toggle menu"
                 class={css({
                   display: { base: 'flex', md: 'none' },
@@ -232,65 +250,48 @@ export function Nav() {
           </Flex>
 
           {/* Mobile menu dropdown */}
-          {menuOpen() && (
+          {menuVisible() && (
             <Flex
               flexDirection="column"
-              gap="1"
+              gap="1.5"
               px={{ base: '3', md: '5' }}
-              pb="3"
-              display={{ md: 'none' }}
+              py="3"
+              display={{ base: 'flex', md: 'none' }}
+              class={menuClosing() ? 'nav-dropdown-exit' : 'nav-dropdown'}
+              style={{ 'border-top': '1px solid var(--surface-border)' }}
             >
-              <a
-                href="/#features"
-                onClick={(e) => { scrollToSection('features')(e); setMenuOpen(false) }}
-                class={css({
-                  py: '2.5',
-                  px: '3',
-                  borderRadius: 'sm',
-                  textDecoration: 'none',
-                  fontSize: 'sm',
-                  fontWeight: 'medium',
-                  color: 'fg.muted',
-                  _hover: { color: 'fg.default' },
-                })}
-                style={{ 'background-color': 'var(--surface-high)' }}
-              >
-                Features
-              </a>
-              <a
-                href="/download"
-                class={css({
-                  py: '2.5',
-                  px: '3',
-                  borderRadius: 'sm',
-                  textDecoration: 'none',
-                  fontSize: 'sm',
-                  fontWeight: 'medium',
-                  color: 'fg.muted',
-                  _hover: { color: 'fg.default' },
-                })}
-                style={{ 'background-color': 'var(--surface-high)' }}
-              >
-                Download
-              </a>
-              <a
-                href="https://github.com/vygr-labs/noted-desktop-app"
-                target="_blank"
-                rel="noopener noreferrer"
-                class={css({
-                  py: '2.5',
-                  px: '3',
-                  borderRadius: 'sm',
-                  textDecoration: 'none',
-                  fontSize: 'sm',
-                  fontWeight: 'medium',
-                  color: 'fg.muted',
-                  _hover: { color: 'fg.default' },
-                })}
-                style={{ 'background-color': 'var(--surface-high)' }}
-              >
-                GitHub
-              </a>
+              {[
+                { label: 'Features', href: '/#features', onClick: (e: MouseEvent) => { scrollToSection('features')(e); toggleMenu() } },
+                { label: 'Download', href: '/download?auto' },
+                { label: 'GitHub', href: 'https://github.com/vygr-labs/noted-desktop-app', external: true },
+              ].map((item) => (
+                <a
+                  href={item.href}
+                  onClick={item.onClick}
+                  target={item.external ? '_blank' : undefined}
+                  rel={item.external ? 'noopener noreferrer' : undefined}
+                  class={css({
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    py: '3',
+                    px: '3',
+                    borderRadius: 'sm',
+                    textDecoration: 'none',
+                    fontSize: 'sm',
+                    fontWeight: 'medium',
+                    color: 'fg.muted',
+                    transition: 'all 0.2s',
+                    _hover: { color: 'fg.default' },
+                  })}
+                  style={{ 'background-color': 'var(--surface-high)' }}
+                >
+                  {item.label}
+                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style={{ opacity: '0.4' }}>
+                    <polyline points="9 18 15 12 9 6" />
+                  </svg>
+                </a>
+              ))}
             </Flex>
           )}
         </Box>
@@ -324,7 +325,10 @@ export function FooterCard(props: { staggerRef?: (el: HTMLElement) => void }) {
         <Flex flexDirection="column" alignItems={{ base: 'center', md: 'flex-start' }} gap="3">
           <img src="/noted-logo.svg" alt="noted." class={css({ h: '5', _dark: { display: 'none' } })} />
           <img src="/noted-logo-white.svg" alt="noted." class={css({ h: '5', display: 'none', _dark: { display: 'block' } })} />
-          <span style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)' }}>
+          <span
+            class={css({ textAlign: { base: 'center', md: 'left' } })}
+            style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)' }}
+          >
             &copy; 2026 noted. All rights reserved. Voyager Technologies
           </span>
         </Flex>

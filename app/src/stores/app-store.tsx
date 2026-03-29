@@ -10,6 +10,7 @@ import {
 type SidebarView =
 	| 'all'
 	| 'today'
+	| 'synced'
 	| 'todos'
 	| 'trash'
 	| 'search'

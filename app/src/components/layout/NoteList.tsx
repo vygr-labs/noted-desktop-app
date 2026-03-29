@@ -77,6 +77,9 @@ export function NoteList() {
 		if (view === 'trash' || (typeof view === 'object' && view.type === 'list')) {
 			return listNotes()
 		}
+		if (view === 'synced') {
+			return (store.notes() || []).filter(n => n.is_shared)
+		}
 		return store.notes() || []
 	})
 
@@ -108,6 +111,7 @@ export function NoteList() {
 		const view = currentView()
 		if (view === 'all') return 'All Notes'
 		if (view === 'today') return 'Today'
+		if (view === 'synced') return 'Synced Notes'
 		if (view === 'trash') return 'Trash'
 		if (view === 'search') return 'Search'
 		if (typeof view === 'object') {

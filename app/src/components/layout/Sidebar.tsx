@@ -21,6 +21,7 @@ import {
 	EyeIcon,
 	ChevronRightIcon,
 	LinkIcon,
+	Share2Icon,
 } from 'lucide-solid'
 
 // ─── Styles ───────────────────────────────────────────────
@@ -504,7 +505,11 @@ export function Sidebar() {
 		return (store.todos() || []).filter((t) => !t.is_completed).length
 	})
 
-	function handleNavClick(view: 'all' | 'today' | 'todos' | 'trash' | 'search') {
+	const syncedCount = createMemo(() => {
+		return (store.notes() || []).filter(n => n.is_shared).length
+	})
+
+	function handleNavClick(view: 'all' | 'today' | 'synced' | 'todos' | 'trash' | 'search') {
 		store.setCurrentView(view)
 		// Only clear editor when switching to non-note views
 		if (view === 'todos' || view === 'search') {
@@ -659,6 +664,17 @@ export function Sidebar() {
 						<div class={`nav-indicator ${collapsedIndicator}`} />
 						<FileTextIcon class={iconStyle} />
 					</div>
+					<Show when={syncedCount() > 0}>
+						<div
+							class={collapsedItem}
+							data-active={isActive('synced')}
+							onClick={() => handleNavClick('synced')}
+							title="Synced Notes"
+						>
+							<div class={`nav-indicator ${collapsedIndicator}`} />
+							<Share2Icon class={iconStyle} />
+						</div>
+					</Show>
 					<div
 						class={collapsedItem}
 						data-active={isActive('todos')}
@@ -810,6 +826,18 @@ export function Sidebar() {
 							<span class={badge}>{(store.notes() || []).length}</span>
 						</Show>
 					</div>
+					<Show when={syncedCount() > 0}>
+						<div
+							class={navItem}
+							data-active={isActive('synced')}
+							onClick={() => handleNavClick('synced')}
+						>
+							<div class={`nav-indicator ${navIndicator}`} />
+							<Share2Icon class={iconStyle} />
+							<span>Synced</span>
+							<span class={badge}>{syncedCount()}</span>
+						</div>
+					</Show>
 					<div
 						class={navItem}
 						data-active={isActive('todos')}

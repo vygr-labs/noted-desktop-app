@@ -2,7 +2,7 @@ import { Show, For, createSignal } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { formatCreatedDate, formatRelativeEdited } from '../../lib/date-utils'
 import { useEditorStore } from '../../stores/editor-store'
-import { PinIcon, EllipsisIcon, LockIcon } from 'lucide-solid'
+import { PinIcon, EllipsisIcon, LockIcon, Share2Icon, ArrowDownLeftIcon } from 'lucide-solid'
 import { NoteCardMenu, type MenuPosition } from './NoteCardMenu'
 
 const TAG_COLOR_MAP: Record<string, string> = {
@@ -209,6 +209,12 @@ export function NoteCard(props: {
 						<span class={css({ height: '14px', width: '60%', borderRadius: 'sm', bg: 'gray.a4', animation: 'pulse 1.5s ease-in-out infinite' })} />
 					}>
 						<span class={titleText}>{title()}</span>
+					</Show>
+					<Show when={props.note.is_shared && props.note.is_owner}>
+						<Share2Icon class={pinStyle} style={{ color: 'var(--colors-indigo-9)' }} />
+					</Show>
+					<Show when={props.note.is_shared && !props.note.is_owner}>
+						<ArrowDownLeftIcon class={pinStyle} style={{ color: 'var(--colors-green-9)' }} />
 					</Show>
 					<Show when={props.note.is_locked}>
 						<LockIcon class={pinStyle} style={{ color: 'var(--colors-orange-9)' }} />
