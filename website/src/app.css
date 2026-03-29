@@ -35,21 +35,21 @@
    ================================================================ */
 
 .hero-gradient-text {
-  background: linear-gradient(135deg, #ff690a 0%, #ce2100 50%, #7a0d02 100%);
+  background: linear-gradient(135deg, #1c2024 0%, #60646c 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .dark .hero-gradient-text {
-  background: linear-gradient(135deg, #ff8533 0%, #ff690a 40%, #ce2100 100%);
+  background: linear-gradient(135deg, #edeef0 0%, #80838d 100%);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
   background-clip: text;
 }
 
 .hero-cta-gradient {
-  background: linear-gradient(135deg, #ff690a 0%, #ce2100 50%, #7a0d02 100%);
+  background: linear-gradient(135deg, #ce2100 0%, #a01a00 50%, #5a0e00 100%);
 }
 
 /* ================================================================
@@ -93,7 +93,7 @@
 }
 
 .typing-cursor {
-  -webkit-text-fill-color: #ff690a;
+  -webkit-text-fill-color: #a01a00;
   font-weight: 200;
   animation: blink-cursor 1.06s step-end infinite;
 }
