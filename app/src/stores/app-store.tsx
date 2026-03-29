@@ -56,6 +56,8 @@ interface AppStore {
 	refetchTodos: () => void
 	refetchTodoLists: () => void
 	refetchSearch: () => void
+	listNotesVersion: () => number
+	bumpListNotes: () => void
 	notesLoading: () => boolean
 }
 
@@ -93,6 +95,8 @@ export function AppStoreProvider(props: ParentProps) {
 	const [noteSort, _setNoteSort] = createSignal<NoteSortOrder>('updated_at')
 	const [selectedTodoListId, setSelectedTodoListId] = createSignal<string | null>(null)
 	const [noteTagsMap, setNoteTagsMap] = createSignal<Record<string, Tag[]>>({})
+	const [listNotesVersion, setListNotesVersion] = createSignal(0)
+	function bumpListNotes() { setListNotesVersion(v => v + 1) }
 
 	// Persist sort preference
 	function setNoteSort(sort: NoteSortOrder) {
@@ -193,6 +197,8 @@ export function AppStoreProvider(props: ParentProps) {
 		refetchTodos: () => refetchTodos(),
 		refetchTodoLists: () => refetchTodoLists(),
 		refetchSearch: () => refetchSearch(),
+		listNotesVersion,
+		bumpListNotes,
 		notesLoading: () => notes.loading,
 	}
 

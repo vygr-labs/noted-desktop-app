@@ -696,6 +696,7 @@ export function EditorPane() {
 				})
 			}
 			appStore.refetchNotes()
+			appStore.bumpListNotes()
 		}
 	}
 
@@ -703,6 +704,7 @@ export function EditorPane() {
 		await window.electronAPI.unshareNote(noteId)
 		await editorStore.refreshCurrentNote()
 		appStore.refetchNotes()
+		appStore.bumpListNotes()
 		setShareCode('')
 		setShowShareMenu(false)
 	}
