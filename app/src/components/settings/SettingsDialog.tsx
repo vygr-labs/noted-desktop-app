@@ -16,7 +16,6 @@ import {
 	CloudyIcon,
 	ExternalLinkIcon,
 	TerminalIcon,
-	RefreshCwIcon,
 	ShieldIcon,
 } from 'lucide-solid'
 
@@ -510,44 +509,6 @@ export function SettingsDialog() {
 							>
 								<div class={toggleThumb} />
 							</button>
-						</div>
-
-						<div class={sectionDivider} />
-
-						{/* Sync section */}
-						<div class={sectionTitle}>
-							<RefreshCwIcon class={sectionIcon} />
-							Collaboration
-						</div>
-
-						<div class={settingRow}>
-							<div class={settingInfo}>
-								<div class={settingLabel}>Sync server</div>
-								<div class={settingDesc}>
-									WebSocket URL for real-time collaboration
-								</div>
-							</div>
-							<input
-								class={settingInput}
-								value={settings.syncServerUrl()}
-								onInput={(e) => settings.setSyncServerUrl(e.currentTarget.value)}
-								placeholder="wss://your-sync-server.com"
-							/>
-						</div>
-
-						<div class={settingRow}>
-							<div class={settingInfo}>
-								<div class={settingLabel}>Auth token</div>
-								<div class={settingDesc}>
-									Token for authenticating with the sync server
-								</div>
-							</div>
-							<input
-								class={settingInput}
-								value={settings.syncToken()}
-								onInput={(e) => settings.setSyncToken(e.currentTarget.value)}
-								placeholder="Optional"
-							/>
 						</div>
 
 						<div class={sectionDivider} />

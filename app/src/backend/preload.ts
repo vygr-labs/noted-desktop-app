@@ -89,20 +89,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	biometricAvailable: () => ipcRenderer.invoke('lock:biometric-available'),
 	biometricAuthenticate: () => ipcRenderer.invoke('lock:biometric-authenticate'),
 
-	// Sync
-	shareNote: (noteId: string) => ipcRenderer.invoke('sync:share-note', noteId),
-	unshareNote: (noteId: string) => ipcRenderer.invoke('sync:unshare-note', noteId),
-	joinSharedNote: (shareCode: string, opts?: { list_id?: string; title?: string }) => ipcRenderer.invoke('sync:join-note', shareCode, opts),
-	shareList: (listId: string) => ipcRenderer.invoke('sync:share-list', listId),
-	unshareList: (listId: string) => ipcRenderer.invoke('sync:unshare-list', listId),
-	joinSharedList: (shareCode: string) => ipcRenderer.invoke('sync:join-list', shareCode),
-	shareTodoList: (listId: string) => ipcRenderer.invoke('sync:share-todo-list', listId),
-	unshareTodoList: (listId: string) => ipcRenderer.invoke('sync:unshare-todo-list', listId),
-	joinSharedTodoList: (shareCode: string) => ipcRenderer.invoke('sync:join-todo-list', shareCode),
-	getSharedNotes: () => ipcRenderer.invoke('sync:get-shared-notes'),
-	getSharedLists: () => ipcRenderer.invoke('sync:get-shared-lists'),
-	saveYjsState: (docName: string, state: Uint8Array) => ipcRenderer.invoke('sync:save-yjs-state', docName, state),
-	loadYjsState: (docName: string) => ipcRenderer.invoke('sync:load-yjs-state', docName),
 	onDeepLink: (callback: (url: string) => void) => {
 		ipcRenderer.on('deep-link', (_: unknown, url: string) => callback(url))
 	},

@@ -104,25 +104,6 @@ export function AppStoreProvider(props: ParentProps) {
 		window.electronAPI.onNotesRefresh(() => {
 			refetchNotes()
 		})
-
-		// Handle deep links: noted://join/<shareCode>
-		window.electronAPI.onDeepLink(async (url: string) => {
-			const match = url.match(/^noted:\/\/join\/(.+)$/)
-			if (!match) return
-			const shareCode = decodeURIComponent(match[1])
-			const type = shareCode.includes(':') ? shareCode.split(':')[0] : 'n'
-
-			if (type === 'n') {
-				const noteId = await window.electronAPI.joinSharedNote(shareCode)
-				if (noteId) { refetchNotes(); setCurrentView('all'); setSelectedNoteId(noteId) }
-			} else if (type === 'l') {
-				const listId = await window.electronAPI.joinSharedList(shareCode)
-				if (listId) { refetchLists(); setCurrentView({ type: 'list', listId }) }
-			} else if (type === 't') {
-				const todoListId = await window.electronAPI.joinSharedTodoList(shareCode)
-				if (todoListId) { refetchTodoLists(); setCurrentView('todos') }
-			}
-		})
 	})
 
 	async function loadTagsForNotes(ids: string[]) {
