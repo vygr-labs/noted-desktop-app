@@ -131,7 +131,7 @@ const navLinkClass = css({
 
 const bentoCardClass = css({
   p: { base: '6', lg: '8' },
-  borderRadius: 'md',
+  borderRadius: 'sm',
   cursor: 'default',
   overflow: 'hidden',
   transition: 'all 0.3s cubic-bezier(0.23, 1, 0.32, 1)',
@@ -239,20 +239,20 @@ function Nav() {
           <Flex alignItems="center" gap="4">
             <a
               href="#download"
-              class={`hero-cta-gradient ${css({
+              class={css({
                 display: 'inline-flex',
                 alignItems: 'center',
                 px: '5',
                 py: '2',
-                borderRadius: 'md',
+                borderRadius: 'sm',
                 color: 'white',
                 fontWeight: 'semibold',
                 fontSize: 'sm',
                 textDecoration: 'none',
                 transition: 'transform 0.2s cubic-bezier(0.23, 1, 0.32, 1)',
                 _active: { transform: 'scale(0.95)' },
-              })}`}
-              style={{ 'box-shadow': '0 4px 14px rgba(160, 26, 0, 0.2)' }}
+              })}
+              style={{ 'background-color': '#a01a00' }}
             >
               Download
             </a>
@@ -280,7 +280,7 @@ function HeroCard() {
         textAlign: 'center',
         px: { base: '6', md: '8', lg: '12' },
         py: { base: '10', md: '14', lg: '16' },
-        borderRadius: 'md',
+        borderRadius: 'sm',
         overflow: 'hidden',
       })}
       style={{
@@ -303,7 +303,7 @@ function HeroCard() {
             border: '1px solid var(--surface-border)',
           }}
         >
-          <Box color="white" flexShrink={0}>
+          <Box color="#b0b4ba" flexShrink={0}>
             <TerminalIcon />
           </Box>
           <span style={{ ...monoLabelStyle, color: '#a01a00' }}>
@@ -318,7 +318,7 @@ function HeroCard() {
           fontSize: { base: '4xl', md: '6xl', lg: '7xl' },
           fontWeight: 'extrabold',
           letterSpacing: '-0.04em',
-          lineHeight: { base: '1.05', lg: '0.95' },
+          lineHeight: { base: '1.1', lg: '1.1' },
           mb: '6',
           minH: { base: '5rem', md: '7.5rem', lg: '8.5rem' },
         })}`}
@@ -359,14 +359,14 @@ function HeroCard() {
       >
         <a
           href="#download"
-          class={`hero-cta-gradient ${css({
+          class={css({
             w: { base: 'full', sm: 'auto' },
             display: 'inline-flex',
             alignItems: 'center',
             justifyContent: 'center',
             px: '7',
             py: '3.5',
-            borderRadius: 'md',
+            borderRadius: 'sm',
             color: 'white',
             fontWeight: 'bold',
             fontSize: 'md',
@@ -374,8 +374,8 @@ function HeroCard() {
             transition: 'all 0.3s cubic-bezier(0.23, 1, 0.32, 1)',
             _hover: { transform: 'translateY(-2px)' },
             _active: { transform: 'translateY(0)' },
-          })}`}
-          style={{ 'box-shadow': '0 8px 24px rgba(160, 26, 0, 0.25)' }}
+          })}
+          style={{ 'background-color': '#a01a00' }}
         >
           Download Free
         </a>
@@ -391,7 +391,7 @@ function HeroCard() {
             gap: '2',
             px: '7',
             py: '3.5',
-            borderRadius: 'md',
+            borderRadius: 'sm',
             color: 'fg.default',
             fontWeight: 'bold',
             fontSize: 'md',
@@ -469,8 +469,8 @@ function ThemeCard() {
           w="10"
           h="10"
           borderRadius="lg"
-          color="white"
-          style={{ 'background-color': '#a01a00' }}
+          color="#b0b4ba"
+          style={{ 'border': '1px solid var(--surface-border)' }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="13.5" cy="6.5" r="2.5" />
@@ -495,7 +495,7 @@ function ThemeCard() {
               class={css({
                 px: '3',
                 py: '1.5',
-                borderRadius: 'md',
+                borderRadius: 'sm',
                 fontSize: 'xs',
                 fontWeight: 'semibold',
                 textTransform: 'capitalize',
@@ -561,8 +561,8 @@ function EditorCard() {
         h="10"
         borderRadius="lg"
         mb="5"
-        color="white"
-        style={{ 'background-color': '#a01a00' }}
+        color="#b0b4ba"
+        style={{ 'border': '1px solid var(--surface-border)' }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -612,8 +612,8 @@ function SpeedCard() {
         h="10"
         borderRadius="lg"
         mb="5"
-        color="white"
-        style={{ 'background-color': '#a01a00' }}
+        color="#b0b4ba"
+        style={{ 'border': '1px solid var(--surface-border)' }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -624,7 +624,7 @@ function SpeedCard() {
         my="3"
         fontSize="2xl"
         fontWeight="extrabold"
-        color="white"
+        color="#b0b4ba"
         style={{ 'font-family': "'JetBrains Mono', monospace" }}
       >
         &lt; 50ms
@@ -650,8 +650,8 @@ function PrivacyCard() {
         h="10"
         borderRadius="lg"
         mb="5"
-        color="white"
-        style={{ 'background-color': '#a01a00' }}
+        color="#b0b4ba"
+        style={{ 'border': '1px solid var(--surface-border)' }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -683,8 +683,8 @@ function PlatformCard() {
         h="10"
         borderRadius="lg"
         mb="5"
-        color="white"
-        style={{ 'background-color': '#a01a00' }}
+        color="#b0b4ba"
+        style={{ 'border': '1px solid var(--surface-border)' }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
@@ -748,8 +748,8 @@ function SyncCard() {
           h="10"
           borderRadius="lg"
           mb="5"
-          color="white"
-          style={{ 'background-color': '#a01a00' }}
+          color="#b0b4ba"
+          style={{ 'border': '1px solid var(--surface-border)' }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="16 16 12 12 8 16" />
@@ -920,7 +920,7 @@ function CtaCard() {
       id="download"
       ref={reveal}
       class={`hero-cta-gradient ${css({
-        borderRadius: 'md',
+        borderRadius: 'sm',
         overflow: 'hidden',
         textAlign: 'center',
         px: { base: '6', md: '12', lg: '20' },
@@ -961,7 +961,7 @@ function CtaCard() {
             gap: '3',
             px: '8',
             py: '4',
-            borderRadius: 'md',
+            borderRadius: 'sm',
             fontWeight: 'bold',
             fontSize: 'lg',
             textDecoration: 'none',
@@ -986,7 +986,7 @@ function CtaCard() {
             gap: '2',
             px: '8',
             py: '4',
-            borderRadius: 'md',
+            borderRadius: 'sm',
             color: 'white',
             fontWeight: 'bold',
             fontSize: 'lg',
@@ -1012,7 +1012,7 @@ function FooterCard() {
   return (
     <div
       class={css({
-        borderRadius: 'md',
+        borderRadius: 'sm',
         px: { base: '6', md: '8' },
         py: { base: '8', md: '10' },
       })}
