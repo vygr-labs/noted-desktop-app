@@ -44,7 +44,8 @@ jobs:
         run: |
           yarn prepare
           yarn cli:build
-          yarn run build -- --publish never
+          yarn run pre-build
+          yarn exec electron-builder --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
@@ -78,7 +79,8 @@ jobs:
         run: |
           yarn prepare
           yarn cli:build
-          yarn run build -- --publish never
+          yarn run pre-build
+          yarn exec electron-builder --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
@@ -116,7 +118,8 @@ jobs:
         run: |
           yarn prepare
           yarn cli:build
-          yarn run build -- --publish never
+          yarn run pre-build
+          yarn exec electron-builder --publish never
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
