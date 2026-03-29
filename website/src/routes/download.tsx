@@ -2,6 +2,8 @@ import { css } from 'styled-system/css'
 import { Box, Flex } from 'styled-system/jsx'
 import { createSignal, For, onMount, onCleanup } from 'solid-js'
 import { useSearchParams } from '@solidjs/router'
+import { Layout } from '~/components/Layout'
+import { FooterCard, GitHubIcon, monoLabelStyle } from '~/components/shared'
 
 /* ================================================================
    Hooks
@@ -38,39 +40,10 @@ function createStaggerReveal(count: number, staggerMs = 100) {
    Shared Styles
    ================================================================ */
 
-const navLinkClass = css({
-  fontSize: 'sm',
-  fontWeight: 'medium',
-  color: 'fg.muted',
-  textDecoration: 'none',
-  transition: 'color 0.3s cubic-bezier(0.23, 1, 0.32, 1)',
-  _hover: { color: 'indigo.9' },
-})
-
-const monoLabelStyle = {
-  'font-family': "'JetBrains Mono', monospace",
-  'font-size': '0.6875rem',
-  'text-transform': 'uppercase',
-  'letter-spacing': '0.1em',
-} as const
-
 const cardStyle = {
   'background-color': 'var(--surface-low)',
   border: '1px solid var(--surface-border)',
 } as const
-
-/* ================================================================
-   Icons
-   ================================================================ */
-
-function GitHubIcon(props: { size?: number }) {
-  const s = props.size ?? 20
-  return (
-    <svg width={s} height={s} viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z" />
-    </svg>
-  )
-}
 
 /* ================================================================
    Platform Icons
@@ -97,73 +70,6 @@ function LinuxIcon() {
     <svg width="32" height="32" viewBox="0 0 24 24" fill="currentColor">
       <path d="M12.504 0c-.155 0-.311.01-.465.035-.637.085-1.199.369-1.64.817-.447.451-.759.99-.923 1.559-.152.548-.18 1.088-.08 1.597.086.42.255.864.505 1.325l.03.057c.237.442.49.899.718 1.373.221.46.405.932.505 1.398.083.385.088.782-.009 1.18-.084.342-.225.672-.413.985a7.463 7.463 0 0 0-.474.848 5.618 5.618 0 0 0-.345.95c-.103.382-.141.78-.112 1.186.038.514.156 1.026.349 1.526.189.485.448.95.774 1.374.17.22.364.424.573.609.205.18.423.34.65.48.438.268.912.453 1.396.545.49.091.986.082 1.47-.028.495-.112.966-.323 1.378-.614a4.36 4.36 0 0 0 .577-.486c.206-.196.394-.41.562-.636.335-.456.592-.958.76-1.488.164-.516.247-1.058.245-1.604-.001-.518-.084-1.04-.248-1.545a7.497 7.497 0 0 0-.427-1.057 12.213 12.213 0 0 0-.456-.822c-.167-.274-.35-.557-.504-.84a6.985 6.985 0 0 1-.455-1.006c-.129-.401-.183-.81-.145-1.218.03-.318.116-.64.26-.946.15-.321.361-.622.627-.884.258-.253.568-.46.909-.61.34-.148.705-.238 1.078-.262.372-.023.749.023 1.113.136.377.117.735.305 1.049.557.32.256.595.579.803.945.211.372.348.788.401 1.222.054.439.019.897-.106 1.335-.12.42-.316.82-.577 1.175a4.708 4.708 0 0 1-.493.562c.373.23.717.508 1.02.828.304.322.562.693.758 1.1.196.408.326.85.382 1.31.053.438.03.888-.069 1.324-.096.42-.258.824-.479 1.197-.222.374-.5.714-.827 1.002a5.336 5.336 0 0 1-1.087.76c-.416.225-.863.393-1.328.498-.471.106-.958.148-1.444.125a6.279 6.279 0 0 1-1.408-.213 7.544 7.544 0 0 1-1.33-.498 9.386 9.386 0 0 1-1.215-.7c-.38-.255-.738-.54-1.063-.854a7.152 7.152 0 0 1-.871-.966 5.986 5.986 0 0 1-.65-1.119 5.097 5.097 0 0 1-.377-1.236 5.092 5.092 0 0 1-.059-1.284c.04-.429.142-.851.303-1.252.16-.398.378-.772.647-1.108.133-.166.28-.323.438-.467-.12-.275-.213-.564-.278-.86a4.751 4.751 0 0 1-.078-1.108c.018-.378.085-.752.2-1.112.115-.358.277-.7.484-1.012.207-.313.46-.596.75-.838.288-.24.612-.437.963-.583.35-.146.726-.239 1.114-.276.389-.036.787-.013 1.176.07z" />
     </svg>
-  )
-}
-
-/* ================================================================
-   Navigation
-   ================================================================ */
-
-function Nav() {
-  return (
-    <nav
-      class={`animate-slide-down ${css({
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        zIndex: 50,
-        backdropFilter: 'blur(24px)',
-        WebkitBackdropFilter: 'blur(24px)',
-        px: '6',
-        pt: '3',
-      })}`}
-      style={{ 'background-color': 'transparent' }}
-    >
-      <Box maxW="7xl" mx="auto" px="6">
-        <Box
-          borderRadius="sm"
-          style={{
-            'background-color': 'var(--surface-low)',
-            border: '1px solid var(--surface-border)',
-          }}
-        >
-          <Flex justifyContent="space-between" alignItems="center" py="3" px="5">
-          <Flex alignItems="center" gap="8">
-            <a href="/" class={css({ textDecoration: 'none' })}>
-              <img src="/noted-logo-white.svg" alt="noted." class={css({ h: '6' })} />
-            </a>
-            <Flex display={{ base: 'none', md: 'flex' }} alignItems="center" gap="6">
-              <a href="/#features" class={navLinkClass}>Features</a>
-              <a href="/download" class={navLinkClass}>Download</a>
-              <a href="https://github.com/vygr-labs/noted-desktop-app" target="_blank" rel="noopener noreferrer" class={navLinkClass}>GitHub</a>
-            </Flex>
-          </Flex>
-          <Flex alignItems="center" gap="4">
-            <a
-              href="/download"
-              class={css({
-                display: 'inline-flex',
-                alignItems: 'center',
-                px: '5',
-                py: '2',
-                borderRadius: 'sm',
-                color: 'white',
-                fontWeight: 'semibold',
-                fontSize: 'sm',
-                textDecoration: 'none',
-                transition: 'transform 0.2s cubic-bezier(0.23, 1, 0.32, 1)',
-                _active: { transform: 'scale(0.95)' },
-              })}
-              style={{ 'background-color': '#7a0d02' }}
-            >
-              Download
-            </a>
-          </Flex>
-        </Flex>
-        </Box>
-      </Box>
-    </nav>
   )
 }
 
@@ -472,69 +378,6 @@ function SourceCard(props: { staggerRef?: (el: HTMLElement) => void }) {
 }
 
 /* ================================================================
-   Footer Card
-   ================================================================ */
-
-function FooterCard(props: { staggerRef?: (el: HTMLElement) => void }) {
-  return (
-    <div
-      ref={props.staggerRef}
-      data-stagger=""
-      class={css({
-        borderRadius: 'sm',
-        px: { base: '6', md: '8' },
-        py: { base: '8', md: '10' },
-      })}
-      style={{
-        'grid-column': '1 / -1',
-        ...cardStyle,
-      }}
-    >
-      <Flex
-        flexDirection={{ base: 'column', md: 'row' }}
-        justifyContent="space-between"
-        alignItems="center"
-        gap="6"
-      >
-        <Flex flexDirection="column" alignItems={{ base: 'center', md: 'flex-start' }} gap="3">
-          <img src="/noted-logo-white.svg" alt="noted." class={css({ h: '5' })} />
-          <span style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)' }}>
-            &copy; 2026 noted. All rights reserved. Voyager Technologies
-          </span>
-        </Flex>
-
-        <Flex gap="8">
-          <For each={[{ label: 'Features', href: '/#features' }, { label: 'Download', href: '/download' }, { label: 'GitHub', href: 'https://github.com/vygr-labs/noted-desktop-app' }]}>
-            {(link) => (
-              <a
-                href={link.href}
-                target={link.label === 'GitHub' ? '_blank' : undefined}
-                rel={link.label === 'GitHub' ? 'noopener noreferrer' : undefined}
-                style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)', 'text-decoration': 'none', transition: 'color 0.3s' }}
-                class={css({ _hover: { color: 'fg.default' } })}
-              >
-                {link.label}
-              </a>
-            )}
-          </For>
-        </Flex>
-
-        <Flex alignItems="center" gap="4">
-          <a
-            href="https://github.com/vygr-labs/noted-desktop-app"
-            target="_blank"
-            rel="noopener noreferrer"
-            class={css({ color: 'fg.subtle', transition: 'color 0.3s', _hover: { color: 'indigo.9' } })}
-          >
-            <GitHubIcon />
-          </a>
-        </Flex>
-      </Flex>
-    </div>
-  )
-}
-
-/* ================================================================
    Page
    ================================================================ */
 
@@ -554,6 +397,8 @@ export default function Download() {
   const [platformName, setPlatformName] = createSignal('')
 
   onMount(() => {
+    window.scrollTo(0, 0)
+
     if (params.auto !== undefined) {
       const platform = detectPlatform()
       if (platform) {
@@ -565,30 +410,27 @@ export default function Download() {
   })
 
   return (
-    <>
-      <Nav />
-      <main style={{ 'background-color': 'var(--surface-dim)' }}>
-        <div
-          class={css({
-            display: 'grid',
-            gap: '5',
-            gridTemplateColumns: { base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
-            maxW: '7xl',
-            mx: 'auto',
-            px: '6',
-            pt: '24',
-            pb: { base: '12', lg: '20' },
-          })}
-        >
-          <HeroCard autoStarted={autoStarted()} platformName={platformName()} />
-          <For each={platforms}>
-            {(platform, i) => <PlatformCard platform={platform} staggerRef={stagger(i())} />}
-          </For>
-          <VersionCard staggerRef={stagger(6)} />
-          <SourceCard staggerRef={stagger(7)} />
-          <FooterCard staggerRef={stagger(8)} />
-        </div>
-      </main>
-    </>
+    <Layout>
+      <div
+        class={css({
+          display: 'grid',
+          gap: '5',
+          gridTemplateColumns: { base: '1fr', md: 'repeat(2, 1fr)', lg: 'repeat(3, 1fr)' },
+          maxW: '7xl',
+          mx: 'auto',
+          px: '6',
+          pt: '24',
+          pb: { base: '12', lg: '20' },
+        })}
+      >
+        <HeroCard autoStarted={autoStarted()} platformName={platformName()} />
+        <For each={platforms}>
+          {(platform, i) => <PlatformCard platform={platform} staggerRef={stagger(i())} />}
+        </For>
+        <VersionCard staggerRef={stagger(6)} />
+        <SourceCard staggerRef={stagger(7)} />
+        <FooterCard staggerRef={stagger(8)} />
+      </div>
+    </Layout>
   )
 }

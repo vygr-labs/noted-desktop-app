@@ -407,17 +407,7 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				authToken: authToken || undefined,
 			})
 
-			// If Yjs doc is empty and we have local content, seed it
-			if (note.content && collab.fragment.length === 0) {
-				const tempExtensions = getBaseExtensions(true)
-				tempExtensions.push(Extension.create({
-					name: 'ySync',
-					addProseMirrorPlugins: () => [ySyncPlugin(collab!.fragment)],
-				}))
-				const tempEditor = new Editor({ extensions: tempExtensions })
-				tempEditor.commands.setContent(parseContent(note.content))
-				tempEditor.destroy()
-			}
+			// DON'T seed here — wait for provider to sync first (see onSynced below)
 
 			const extensions = getBaseExtensions(true)
 			extensions.push(Extension.create({
@@ -442,6 +432,51 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					setInTable(ed.isActive('table'))
 				},
 			})
+
+			// After initial sync: seed if server doc was empty, sync title, persist content
+			const currentCollab = collab
+			const currentEditor = editor
+			collab.provider.on('synced', ({ state }: { state: boolean }) => {
+				if (!state || !currentCollab || !currentEditor) return
+
+				// Seed content if server doc is empty and we have local content
+				if (note.content && currentCollab.fragment.length === 0) {
+					const tempExtensions = getBaseExtensions(true)
+					tempExtensions.push(Extension.create({
+						name: 'ySync',
+						addProseMirrorPlugins: () => [ySyncPlugin(currentCollab.fragment)],
+					}))
+					const tempEditor = new Editor({ extensions: tempExtensions })
+					tempEditor.commands.setContent(parseContent(note.content))
+					tempEditor.destroy()
+				}
+
+				// Title sync via _meta map
+				const meta = currentCollab.ydoc.getMap('_meta')
+				if (note.is_owner) {
+					// Owner pushes title
+					if (meta.get('title') !== note.title) {
+						meta.set('title', note.title)
+					}
+				} else {
+					// Receiver reads title
+					const remoteTitle = meta.get('title') as string | undefined
+					if (remoteTitle && note.title === 'Shared Note') {
+						editorStore.saveNote({ title: remoteTitle }).then(() => {
+							editorStore.refreshCurrentNote()
+						})
+					}
+				}
+
+				// Persist synced content for receiver (clears "Shared Note" state)
+				if (currentEditor.getText().trim() && !note.content) {
+					const json = JSON.stringify(currentEditor.getJSON())
+					const plainText = tiptapToPlaintext(json)
+					editorStore.saveNote({ content: json, content_plain: plainText }).then(() => {
+						editorStore.refreshCurrentNote()
+					})
+				}
+			})
 		} else {
 			// ── Local mode ──
 			editor = new Editor({
@@ -464,18 +499,11 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		setInTable(editor.isActive('table'))
 		editor.view.dom.spellcheck = !!note.spellcheck
 		setupCheckboxHandler()
-
-		// For collab: persist initial content if the receiver got content from server
-		if (isShared && editor.getText().trim() && !note.content) {
-			const json = JSON.stringify(editor.getJSON())
-			const plainText = tiptapToPlaintext(json)
-			editorStore.saveNote({ content: json, content_plain: plainText }).then(() => {
-				editorStore.refreshCurrentNote()
-			})
-		}
 	}
 
 	onMount(() => {
+		previousNoteId = props.note.id
+		previousSyncId = props.note.sync_id || null
 		createEditorInstance(props.note)
 	})
 
@@ -486,6 +514,9 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		on(
 			() => props.note.id,
 			(newId) => {
+				// Skip if same note (onMount already created it)
+				if (newId === previousNoteId) return
+
 				if (previousNoteId && editor) {
 					const { from, to } = editor.state.selection
 					cursorPositions.set(previousNoteId, { from, to })
@@ -493,12 +524,12 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 
 				const note = props.note
 				const newSyncId = note.sync_id || null
-				const needsRecreate = newSyncId !== previousSyncId || previousNoteId === null
 
-				if (needsRecreate) {
+				if (newSyncId || previousSyncId || newSyncId !== previousSyncId) {
+					// Shared note or switching collab state — must recreate
 					debouncedSave.cancel()
 					createEditorInstance(note)
-				} else if (editor && !newSyncId) {
+				} else if (editor) {
 					// Local note switch — update content in place
 					debouncedSave.cancel()
 					isUpdatingContent = true
@@ -546,6 +577,21 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					previousSyncId = newSyncId || null
 				}
 			}
+		)
+	)
+
+	// Owner: push title updates to Yjs _meta
+	createEffect(
+		on(
+			() => props.note.title,
+			(title) => {
+				if (!collab || !props.note.is_owner) return
+				const meta = collab.ydoc.getMap('_meta')
+				if (meta.get('title') !== title) {
+					meta.set('title', title)
+				}
+			},
+			{ defer: true }
 		)
 	)
 
