@@ -48,6 +48,21 @@ export function GitHubIcon(props: { size?: number }) {
 }
 
 /* ================================================================
+   Helpers
+   ================================================================ */
+
+function scrollToSection(id: string) {
+  return (e: MouseEvent) => {
+    const el = document.getElementById(id)
+    if (el) {
+      e.preventDefault()
+      const top = el.getBoundingClientRect().top + window.scrollY - 80
+      window.scrollTo({ top, behavior: 'smooth' })
+    }
+  }
+}
+
+/* ================================================================
    Theme Toggle
    ================================================================ */
 
@@ -155,7 +170,7 @@ export function Nav() {
               />
             </a>
             <Flex display={{ base: 'none', md: 'flex' }} alignItems="center" gap="6">
-              <a href="/#features" class={navLinkClass}>Features</a>
+              <a href="/#features" onClick={scrollToSection('features')} class={navLinkClass}>Features</a>
               <a href="/download" class={navLinkClass}>Download</a>
               <a href="https://github.com/vygr-labs/noted-desktop-app" target="_blank" rel="noopener noreferrer" class={navLinkClass}>GitHub</a>
             </Flex>
@@ -225,6 +240,7 @@ export function FooterCard(props: { staggerRef?: (el: HTMLElement) => void }) {
             {(link) => (
               <a
                 href={link.href}
+                onClick={link.href.includes('#') ? scrollToSection(link.href.split('#')[1]) : undefined}
                 target={link.label === 'GitHub' ? '_blank' : undefined}
                 rel={link.label === 'GitHub' ? 'noopener noreferrer' : undefined}
                 style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)', 'text-decoration': 'none', transition: 'color 0.3s' }}

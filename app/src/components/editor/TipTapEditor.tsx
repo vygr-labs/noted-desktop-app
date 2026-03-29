@@ -12,6 +12,7 @@ import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { Slice } from '@tiptap/pm/model'
 import { useEditorStore } from '../../stores/editor-store'
+import { useAppStore } from '../../stores/app-store'
 import { useSettingsStore } from '../../stores/settings-store'
 import { createCollabSession, type CollabSession } from '../../lib/collab'
 import { ySyncPlugin, yCursorPlugin, yUndoPlugin } from 'y-prosemirror'
@@ -32,6 +33,8 @@ const editorWrap = css({
 	'& .tiptap': {
 		outline: 'none',
 		minHeight: '200px',
+		overflow: 'visible',
+		paddingTop: '1.5em', // Space for cursor labels on the first line
 	},
 	'& .ProseMirror-yjs-cursor': {
 		position: 'relative',
@@ -55,6 +58,7 @@ const editorWrap = css({
 		lineHeight: '1.4',
 		pointerEvents: 'none',
 		userSelect: 'none',
+		zIndex: 10,
 	},
 	'& .tiptap p.is-editor-empty:first-child::before': {
 		content: 'attr(data-placeholder)',
@@ -303,6 +307,7 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	let editor: Editor | null = null
 	let collab: CollabSession | null = null
 	const editorStore = useEditorStore()
+	const appStore = useAppStore()
 	const settings = useSettingsStore()
 	let isUpdatingContent = false
 
@@ -462,8 +467,9 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					// Receiver reads title
 					const remoteTitle = meta.get('title') as string | undefined
 					if (remoteTitle && note.title === 'Shared Note') {
-						editorStore.saveNote({ title: remoteTitle }).then(() => {
-							editorStore.refreshCurrentNote()
+						editorStore.saveNote({ title: remoteTitle }).then(async () => {
+							await editorStore.refreshCurrentNote()
+							appStore.refetchNotes()
 						})
 					}
 				}

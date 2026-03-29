@@ -68,6 +68,30 @@ import {
 
 
 
+const syncOverlay = css({
+	position: 'absolute',
+	inset: '0',
+	zIndex: 2,
+	bg: 'bg.default',
+	// Ensure fully opaque to cover the editor placeholder text
+	isolation: 'isolate',
+})
+
+const syncSkeleton = css({
+	display: 'flex',
+	flexDirection: 'column',
+	gap: '3',
+	mt: '4',
+	px: '4',
+	animation: 'pulse 1.5s ease-in-out infinite',
+})
+
+const skeletonLine = css({
+	height: '14px',
+	borderRadius: 'sm',
+	bg: 'gray.a3',
+})
+
 const editorContainer = css({
 
 	display: 'flex',
@@ -1570,39 +1594,55 @@ export function EditorPane() {
 
 									/>
 
-																		<Show
-
-										when={note().note_type === 'rich'}
-
-										fallback={
-
-											<PlainTextEditor
-
-												note={note()}
-
-												readonly={isTrash()}
-
-											/>
-
-										}
-
-									>
-
-										<TipTapEditor
-
-											note={note()}
-
-											readonly={isTrash()}
-
-										/>
-
+								{(() => {
+									const isSyncing = () => note().is_shared && !note().content && !note().content_plain
+									return (
+								<div style={{ position: 'relative', flex: '1', 'min-height': '0' }}>
+									<Show when={isSyncing()}>
+										<div class={syncOverlay}>
+											<div class={syncSkeleton}>
+												<div class={skeletonLine} style={{ width: '90%' }} />
+												<div class={skeletonLine} style={{ width: '75%' }} />
+												<div class={skeletonLine} style={{ width: '85%' }} />
+												<div class={skeletonLine} style={{ width: '40%' }} />
+												<div style={{ height: '8px' }} />
+												<div class={skeletonLine} style={{ width: '95%' }} />
+												<div class={skeletonLine} style={{ width: '70%' }} />
+												<div class={skeletonLine} style={{ width: '80%' }} />
+												<div style={{
+													'font-size': '12px', color: 'var(--colors-fg-subtle)',
+													'text-align': 'center', 'margin-top': '16px',
+												}}>
+													Syncing content...
+												</div>
+											</div>
+										</div>
 									</Show>
-
+									<div style={{
+										visibility: isSyncing() ? 'hidden' : 'visible',
+										height: '100%',
+									}}>
+										<Show
+											when={note().note_type === 'rich'}
+											fallback={
+												<PlainTextEditor
+													note={note()}
+													readonly={isTrash()}
+												/>
+											}
+										>
+											<TipTapEditor
+												note={note()}
+												readonly={isTrash()}
+											/>
+										</Show>
+									</div>
 								</div>
+									)
+								})()}
 
 							</div>
-
-
+							</div>
 
 							<Show
 
