@@ -716,7 +716,7 @@ export function EditorPane() {
 	}
 
 	function getShareLink(code: string): string {
-		return `noted://share/${code}`
+		return `https://noted.voyagerlabs.tech/join/${encodeURIComponent(code)}`
 	}
 
 	async function convertToRich(noteId: string) {

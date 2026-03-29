@@ -6,7 +6,7 @@ export function Layout(props: { children: JSX.Element }) {
   return (
     <>
       <Nav />
-      <main style={{ 'background-color': 'var(--surface-dim)' }}>
+      <main style={{ 'background-color': 'var(--surface-dim)', 'min-height': '100vh' }}>
         {props.children}
       </main>
     </>
