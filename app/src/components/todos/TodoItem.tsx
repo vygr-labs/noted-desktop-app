@@ -5,9 +5,10 @@ import {
 	Trash2Icon,
 	CalendarIcon,
 	GripVerticalIcon,
-	ChevronDownIcon,
-	ChevronUpIcon,
 	AlignLeftIcon,
+	CheckIcon,
+	XIcon,
+	PencilIcon,
 } from 'lucide-solid'
 import { formatDate } from '../../lib/date-utils'
 
@@ -96,19 +97,6 @@ const textStyle = css({
 		textDecorationColor: 'fg.subtle',
 		color: 'fg.muted',
 	},
-})
-
-const textInput = css({
-	fontSize: '14px',
-	color: 'fg.default',
-	lineHeight: '1.5',
-	letterSpacing: '-0.01em',
-	bg: 'transparent',
-	border: 'none',
-	outline: 'none',
-	width: '100%',
-	padding: 0,
-	fontFamily: 'inherit',
 })
 
 const metaRow = css({
@@ -228,6 +216,26 @@ const deleteActionBtn = css({
 	_hover: { bg: 'red.a2', color: 'red.11' },
 })
 
+const editBtnRow = css({
+	display: 'flex',
+	justifyContent: 'flex-end',
+	gap: '2',
+	mt: '1',
+})
+
+const editBtn = css({
+	display: 'inline-flex',
+	alignItems: 'center',
+	gap: '1',
+	px: '3',
+	py: '1.5',
+	borderRadius: 'md',
+	fontSize: '12px',
+	fontWeight: '500',
+	cursor: 'pointer',
+	transition: 'all 0.12s',
+})
+
 const smallIcon = css({ width: '3.5', height: '3.5' })
 
 export function TodoItem(props: {
@@ -239,8 +247,11 @@ export function TodoItem(props: {
 }) {
 	const store = useAppStore()
 	const [expanded, setExpanded] = createSignal(false)
-	const [editing, setEditing] = createSignal(false)
-	const [editText, setEditText] = createSignal('')
+
+	// Draft state for editing — only saved on explicit Save
+	const [draftText, setDraftText] = createSignal('')
+	const [draftDueDate, setDraftDueDate] = createSignal('')
+	const [draftDescription, setDraftDescription] = createSignal('')
 
 	async function handleToggle() {
 		await window.electronAPI.updateTodo(props.todo.id, {
@@ -254,43 +265,40 @@ export function TodoItem(props: {
 		store.refetchTodos()
 	}
 
-	function startEditing() {
-		setEditText(props.todo.text)
-		setEditing(true)
+	function openEdit() {
+		// Populate draft from current todo values
+		setDraftText(props.todo.text)
+		setDraftDueDate(props.todo.due_date || '')
+		setDraftDescription(props.todo.description || '')
+		setExpanded(true)
 	}
 
-	async function commitEdit() {
-		const text = editText().trim()
-		if (text && text !== props.todo.text) {
-			await window.electronAPI.updateTodo(props.todo.id, { text })
+	function cancelEdit() {
+		setExpanded(false)
+	}
+
+	async function saveEdit() {
+		const text = draftText().trim()
+		if (!text) return
+
+		const updates: Record<string, unknown> = {}
+		if (text !== props.todo.text) updates.text = text
+		if (draftDueDate() !== (props.todo.due_date || '')) updates.due_date = draftDueDate() || null
+		if (draftDescription() !== (props.todo.description || '')) updates.description = draftDescription() || null
+
+		if (Object.keys(updates).length > 0) {
+			await window.electronAPI.updateTodo(props.todo.id, updates)
 			store.refetchTodos()
 		}
-		setEditing(false)
+		setExpanded(false)
 	}
 
 	function handleEditKeyDown(e: KeyboardEvent) {
-		if (e.key === 'Enter') {
-			e.preventDefault()
-			commitEdit()
-		}
-		if (e.key === 'Escape') setEditing(false)
-	}
-
-	async function handleDescriptionChange(e: Event) {
-		const value = (e.target as HTMLTextAreaElement).value
-		await window.electronAPI.updateTodo(props.todo.id, { description: value || null })
-		store.refetchTodos()
-	}
-
-	async function handleDueDateChange(e: Event) {
-		const value = (e.target as HTMLInputElement).value
-		await window.electronAPI.updateTodo(props.todo.id, { due_date: value || null })
-		store.refetchTodos()
+		if (e.key === 'Escape') cancelEdit()
 	}
 
 	const isOverdue = () => {
 		if (!props.todo.due_date || props.todo.is_completed) return false
-		// Supports both date-only ("2026-03-27") and datetime ("2026-03-27T15:00")
 		if (props.todo.due_date.includes('T')) {
 			return new Date(props.todo.due_date) < new Date()
 		}
@@ -316,7 +324,7 @@ export function TodoItem(props: {
 	return (
 		<div
 			class={itemStyle}
-			draggable={true}
+			draggable={!expanded()}
 			onDragStart={props.onDragStart}
 			onDragOver={props.onDragOver}
 			onDrop={props.onDrop}
@@ -336,40 +344,41 @@ export function TodoItem(props: {
 			</div>
 			<div class={contentCol}>
 				<Show
-					when={editing()}
+					when={expanded()}
 					fallback={
 						<span
 							class={textStyle}
 							data-completed={!!props.todo.is_completed}
-							onDblClick={startEditing}
 						>
 							{props.todo.text}
 						</span>
 					}
 				>
 					<input
-						class={textInput}
-						value={editText()}
-						onInput={(e) => setEditText(e.currentTarget.value)}
-						onBlur={commitEdit}
+						class={`${fieldInput} ${css({ fontSize: '14px', fontWeight: '500' })}`}
+						value={draftText()}
+						onInput={(e) => setDraftText(e.currentTarget.value)}
 						onKeyDown={handleEditKeyDown}
+						placeholder="Todo title..."
 						ref={(el) => requestAnimationFrame(() => el.focus())}
 					/>
 				</Show>
-				<div class={metaRow}>
-					<Show when={props.todo.due_date}>
-						<span class={chip} data-overdue={isOverdue()} data-warn={isDueSoon()}>
-							<CalendarIcon class={chipIcon} />
-							{formatDueDate()}
-						</span>
-					</Show>
-					<Show when={props.todo.description}>
-						<span class={chip}>
-							<AlignLeftIcon class={chipIcon} />
-							note
-						</span>
-					</Show>
-				</div>
+				<Show when={!expanded()}>
+					<div class={metaRow}>
+						<Show when={props.todo.due_date}>
+							<span class={chip} data-overdue={isOverdue()} data-warn={isDueSoon()}>
+								<CalendarIcon class={chipIcon} />
+								{formatDueDate()}
+							</span>
+						</Show>
+						<Show when={props.todo.description}>
+							<span class={chip}>
+								<AlignLeftIcon class={chipIcon} />
+								note
+							</span>
+						</Show>
+					</div>
+				</Show>
 				<Show when={expanded()}>
 					<div class={expandedArea}>
 						<div class={fieldRow}>
@@ -377,36 +386,54 @@ export function TodoItem(props: {
 							<input
 								class={fieldInput}
 								type="datetime-local"
-								value={props.todo.due_date || ''}
-								onChange={handleDueDateChange}
+								value={draftDueDate()}
+								onInput={(e) => setDraftDueDate(e.currentTarget.value)}
+								onKeyDown={handleEditKeyDown}
 							/>
 						</div>
 						<div class={fieldRow} style={{ 'align-items': 'flex-start' }}>
 							<span class={fieldLabel} style={{ 'margin-top': '6px' }}>Description</span>
 							<textarea
 								class={fieldTextarea}
-								value={props.todo.description || ''}
-								onChange={handleDescriptionChange}
+								value={draftDescription()}
+								onInput={(e) => setDraftDescription(e.currentTarget.value)}
+								onKeyDown={handleEditKeyDown}
 								placeholder="Add a description..."
 							/>
+						</div>
+						<div class={editBtnRow}>
+							<button
+								class={`${editBtn} ${css({ bg: 'gray.a3', color: 'fg.default', _hover: { bg: 'gray.a4' } })}`}
+								onClick={cancelEdit}
+							>
+								<XIcon class={css({ width: '3', height: '3' })} />
+								Cancel
+							</button>
+							<button
+								class={`${editBtn} ${css({ bg: 'indigo.9', color: 'white', _hover: { bg: 'indigo.10' } })}`}
+								onClick={saveEdit}
+							>
+								<CheckIcon class={css({ width: '3', height: '3' })} />
+								Save
+							</button>
 						</div>
 					</div>
 				</Show>
 			</div>
-			<div class={`todo-actions ${actionsCol}`}>
-				<button
-					class={actionBtn}
-					onClick={() => setExpanded(!expanded())}
-					title={expanded() ? 'Collapse' : 'Expand details'}
-				>
-					<Show when={expanded()} fallback={<ChevronDownIcon class={smallIcon} />}>
-						<ChevronUpIcon class={smallIcon} />
-					</Show>
-				</button>
-				<button class={deleteActionBtn} onClick={handleDelete} title="Delete">
-					<Trash2Icon class={smallIcon} />
-				</button>
-			</div>
+			<Show when={!expanded()}>
+				<div class={`todo-actions ${actionsCol}`}>
+					<button
+						class={actionBtn}
+						onClick={openEdit}
+						title="Edit"
+					>
+						<PencilIcon class={smallIcon} />
+					</button>
+					<button class={deleteActionBtn} onClick={handleDelete} title="Delete">
+						<Trash2Icon class={smallIcon} />
+					</button>
+				</div>
+			</Show>
 		</div>
 	)
 }
