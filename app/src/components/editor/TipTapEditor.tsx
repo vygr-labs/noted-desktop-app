@@ -13,22 +13,30 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view'
 import { Slice } from '@tiptap/pm/model'
 import { useEditorStore } from '../../stores/editor-store'
 import { useSyncStore } from '../../stores/sync-store'
+import { syncLog } from '../../lib/sync-log'
 import { debounce } from '../../lib/debounce'
 import { tiptapToPlaintext } from '../../lib/tiptap-to-plaintext'
 import { hasListPatterns, hasTablePattern, hasMarkdownPatterns, parseLinesToNodes, parseMarkdownTable, cleanTipTapContent, alignLeftContent } from '../../lib/text-cleanup'
 import { CodeBlockWithCopy } from './codeblock-with-copy'
 import { DetailsBlock } from './details-block'
 import { InlineCheckbox } from './inline-checkbox'
-import Collaboration from '@tiptap/extension-collaboration'
+import { ySyncPlugin, ySyncPluginKey } from 'y-prosemirror'
 import * as Y from 'yjs'
 
 const editorWrap = css({
 	minHeight: '200px',
 	flex: 1,
 	mt: '2',
+	// Promote to own compositing layer to reduce visual flash during
+	// y-tiptap's full-document-replace sync strategy
+	contain: 'content',
 	'& .tiptap': {
 		outline: 'none',
 		minHeight: '200px',
+	},
+	'& .tiptap .ProseMirror-yjs-cursor': {
+		// Prevent remote cursor elements from causing layout shifts
+		position: 'relative',
 	},
 	'& .tiptap p.is-editor-empty:first-child::before': {
 		content: 'attr(data-placeholder)',
@@ -283,12 +291,14 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	// Generation counter to detect stale async results after navigation
 	let editorGeneration = 0
 
-	const debouncedSave = debounce(async (jsonContent: string) => {
-		const plainText = tiptapToPlaintext(jsonContent)
-		await editorStore.saveNote({
-			content: jsonContent,
-			content_plain: plainText,
-		})
+	// Debounced save — serializes the editor state lazily when the timer fires,
+	// NOT synchronously in onUpdate. This keeps onUpdate fast (no JSON.stringify blocking paint).
+	const debouncedSave = debounce(() => {
+		if (!editor) return
+		editorStore.setLivePreview(editor.getText().slice(0, 160))
+		const json = JSON.stringify(editor.getJSON())
+		const plainText = tiptapToPlaintext(json)
+		editorStore.saveNote({ content: json, content_plain: plainText })
 	}, 500)
 
 	function getBaseExtensions(isCollab: boolean) {
@@ -296,7 +306,9 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 			StarterKit.configure({
 				heading: { levels: [1, 2, 3] },
 				codeBlock: false,
-				...(isCollab ? { history: false } : {}),
+				// StarterKit v3 includes Underline — don't add it separately
+				// StarterKit v3 uses 'undoRedo' (not 'history') — disable for collab
+				...(isCollab ? { undoRedo: false } : {}),
 			}),
 			CodeBlockWithCopy,
 			DetailsBlock,
@@ -304,7 +316,6 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 			TaskList,
 			TaskItem.configure({ nested: true }),
 			Placeholder.configure({ placeholder: 'Start writing...' }),
-			Underline,
 			Highlight.configure({ multicolor: false }),
 			Table.configure({ resizable: false }),
 			TableRow,
@@ -339,11 +350,9 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 			extensions,
 			content: parseContent(note.content),
 			editable: opts?.readonly ? false : !props.readonly,
-			onUpdate: ({ editor: ed }) => {
+			onUpdate: () => {
 				if (isUpdatingContent) return
-				editorStore.setLivePreview(ed.getText().slice(0, 160))
-				const json = JSON.stringify(ed.getJSON())
-				debouncedSave(json)
+				debouncedSave()
 			},
 			onTransaction: ({ editor: ed }) => {
 				setInTable(ed.isActive('table'))
@@ -357,19 +366,30 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 
 	/** Create a collaborative editor backed by a synced Yjs doc */
 	function createCollabEditor(note: Note, ydoc: Y.Doc) {
+		const fragment = ydoc.getXmlFragment('default')
 		const extensions = getBaseExtensions(true)
-		extensions.push(Collaboration.configure({ document: ydoc }))
+
+		// Use y-prosemirror directly instead of @tiptap/extension-collaboration.
+		// y-prosemirror does incremental ProseMirror updates (minimal DOM changes),
+		// while @tiptap/y-tiptap replaces the entire document on every Yjs change.
+		extensions.push(
+			Extension.create({
+				name: 'ySync',
+				addProseMirrorPlugins: () => [ySyncPlugin(fragment)],
+			})
+		)
 
 		editor = new Editor({
 			element: containerRef!,
 			extensions,
 			content: undefined, // content comes from Yjs
 			editable: !props.readonly,
-			onUpdate: ({ editor: ed }) => {
+			onUpdate: ({ transaction }) => {
 				if (isUpdatingContent) return
-				editorStore.setLivePreview(ed.getText().slice(0, 160))
-				const json = JSON.stringify(ed.getJSON())
-				debouncedSave(json)
+				// Skip saves for remote Yjs updates — the content is already
+				// in the Yjs doc and will be persisted via Yjs state saves.
+				if (transaction.getMeta(ySyncPluginKey)) return
+				debouncedSave()
 			},
 			onTransaction: ({ editor: ed }) => {
 				setInTable(ed.isActive('table'))
@@ -381,13 +401,18 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		setupCheckboxHandler()
 
 		// Persist synced content to DB so note.content gets populated
-		// (clears "Syncing" skeleton for joined notes)
-		if (editor.getText().trim()) {
+		// (clears "Syncing" skeleton for joined notes).
+		// Only refresh currentNote once here — not on every subsequent save.
+		if (editor.getText().trim() && !note.content) {
 			const json = JSON.stringify(editor.getJSON())
 			const plainText = tiptapToPlaintext(json)
 			editorStore.saveNote({ content: json, content_plain: plainText }).then(() => {
 				editorStore.refreshCurrentNote()
 			})
+		} else if (editor.getText().trim()) {
+			const json = JSON.stringify(editor.getJSON())
+			const plainText = tiptapToPlaintext(json)
+			editorStore.saveNote({ content: json, content_plain: plainText })
 		}
 	}
 
@@ -429,18 +454,21 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 			// Receiver: if we have the default title, use the owner's title
 			const remoteTitle = meta.get('title') as string | undefined
 			if (remoteTitle && note.title === 'Shared Note') {
+				// Update title in DB and refresh once to clear "Shared Note"
 				editorStore.saveNote({ title: remoteTitle }).then(() => {
 					editorStore.refreshCurrentNote()
 				})
 			}
-			// Also watch for future title changes from the owner
+			// Watch for future title changes from the owner — only save if actually changed
+			let lastKnownTitle = remoteTitle || note.title
 			meta.observe((event) => {
 				if (event.transaction.origin === 'local') return
 				const updated = meta.get('title') as string | undefined
-				if (updated) {
-					editorStore.saveNote({ title: updated }).then(() => {
-						editorStore.refreshCurrentNote()
-					})
+				if (updated && updated !== lastKnownTitle) {
+					lastKnownTitle = updated
+					editorStore.saveNote({ title: updated })
+					// Update the live title signal directly instead of refreshing the whole note
+					editorStore.setLiveTitle(updated)
 				}
 			})
 		}
@@ -491,14 +519,26 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				const fragment = handle.ydoc.getXmlFragment('default')
 				if (fragment.length === 0) {
 					const tempExtensions = getBaseExtensions(true)
-					tempExtensions.push(Collaboration.configure({ document: handle.ydoc }))
+					tempExtensions.push(Extension.create({
+						name: 'ySync',
+						addProseMirrorPlugins: () => [ySyncPlugin(fragment)],
+					}))
 					const tempEditor = new Editor({ extensions: tempExtensions })
 					tempEditor.commands.setContent(parseContent(note.content))
 					tempEditor.destroy()
 				}
 			}
 
-			// Destroy the placeholder editor (but NOT the sync doc)
+			// Swap editors: capture current DOM as a visual placeholder to
+			// prevent a blank flash while the collab editor initializes.
+			let placeholder: HTMLDivElement | null = null
+			if (editor && containerRef) {
+				placeholder = document.createElement('div')
+				placeholder.innerHTML = containerRef.innerHTML
+				placeholder.style.opacity = '0.5'
+				placeholder.style.pointerEvents = 'none'
+			}
+
 			if (editor) { editor.destroy(); editor = null }
 			currentEditor = null
 
@@ -509,14 +549,23 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				return
 			}
 
+			if (placeholder && containerRef) {
+				containerRef.appendChild(placeholder)
+			}
+
 			// Create the collaborative editor
 			createCollabEditor(note, handle.ydoc)
+
+			// Remove the placeholder now that the collab editor is mounted
+			if (placeholder && containerRef?.contains(placeholder)) {
+				placeholder.remove()
+			}
 
 			// Sync note title via Yjs _meta map
 			syncNoteTitle(note, handle.ydoc)
 		} catch (err) {
 			// Sync failed — fall back to local-only editing
-			console.error(`[editor] Sync failed for ${note.sync_id}:`, err)
+			syncLog.error('editor', `Sync failed for ${note.sync_id}:`, err)
 
 			if (gen !== editorGeneration) return
 

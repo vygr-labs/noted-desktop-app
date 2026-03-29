@@ -1,6 +1,7 @@
 import { HocuspocusProvider } from '@hocuspocus/provider'
 import * as Y from 'yjs'
 import type { Awareness } from 'y-protocols/awareness'
+import { syncLog } from './sync-log'
 
 export type DocState = 'loading' | 'syncing' | 'ready' | 'idle' | 'error' | 'destroyed'
 
@@ -166,6 +167,7 @@ export class DocStateMachine {
 		if (from === to) return
 		if (from === 'destroyed') return // terminal
 
+		syncLog.info('doc', `${this.config.syncId} ${from} → ${to}`)
 		this.state = to
 		for (const fn of this.listeners) {
 			try { fn(to, from) } catch { /* listener errors shouldn't break the machine */ }
@@ -197,7 +199,7 @@ export class DocStateMachine {
 			this.startSyncing()
 		} catch (err) {
 			const error = err instanceof Error ? err : new Error(String(err))
-			console.error(`[sync] Failed to load local state for ${this.config.syncId}:`, error)
+			syncLog.error('doc', `${this.config.syncId} failed to load local state:`, error)
 			this.error = error
 			this.config.onError?.(this.config.syncId, error)
 			this.transition('error')
@@ -210,6 +212,8 @@ export class DocStateMachine {
 		if (this.state === 'destroyed') return
 		this.transition('syncing')
 
+		syncLog.info('doc', `${this.config.syncId} creating provider → ${this.config.serverUrl}`)
+
 		// Create the provider AFTER local state is applied
 		const provider = new HocuspocusProvider({
 			url: this.config.serverUrl,
@@ -217,17 +221,22 @@ export class DocStateMachine {
 			document: this.ydoc,
 			token: this.config.authToken,
 			onSynced: ({ state }) => {
+				syncLog.info('doc', `${this.config.syncId} onSynced state=${state}`)
 				if (state) this.onProviderSynced()
 			},
 			onAuthenticationFailed: ({ reason }) => {
 				this.onProviderAuthFailed(reason)
 			},
-			onUnsyncedChanges: () => {
-				// Only used for signalUnshare flow; no-op here
-			},
 		})
 
 		this.provider = provider
+
+		// Belt-and-suspenders: if the provider already synced during construction,
+		// the config callback might have fired before we were ready. Check now.
+		if (provider.isSynced && this.state === 'syncing') {
+			syncLog.info('doc', `${this.config.syncId} already synced after construction`)
+			this.onProviderSynced()
+		}
 
 		// Set awareness
 		const awareness = provider.awareness
@@ -244,19 +253,17 @@ export class DocStateMachine {
 		// Watch for remote unshare signal
 		this.setupUnshareListener()
 
-		// Start sync timeout
+		// Start sync timeout — if the server is slow/unreachable, proceed to
+		// ready anyway using local state. The provider will keep reconnecting
+		// in the background and sync when the server becomes available.
 		this.syncTimer = setTimeout(() => {
 			if (this.state === 'syncing') {
-				// Provider already synced while we were setting up? Check.
 				if (provider.isSynced) {
 					this.onProviderSynced()
 					return
 				}
-				const error = new Error(`Sync timeout for ${this.config.syncId} (${this.config.syncTimeout}ms)`)
-				console.error(`[sync] ${error.message}`)
-				this.error = error
-				this.config.onError?.(this.config.syncId, error)
-				this.transition('error')
+				syncLog.warn('doc', `${this.config.syncId} sync timeout, proceeding with local state`)
+				this.transition('ready')
 			}
 		}, this.config.syncTimeout)
 	}
@@ -271,7 +278,7 @@ export class DocStateMachine {
 		if (this.state === 'destroyed') return
 		this.clearSyncTimer()
 		const error = new Error(`Authentication failed for ${this.config.syncId}: ${reason}`)
-		console.error(`[sync] ${error.message}`)
+		syncLog.error('doc', error.message)
 		this.error = error
 		this.config.onError?.(this.config.syncId, error)
 		this.transition('error')
@@ -325,7 +332,7 @@ export class DocStateMachine {
 			const state = Y.encodeStateAsUpdate(this.ydoc)
 			await this.config.saveLocal(this.config.syncId, state)
 		} catch (err) {
-			console.error(`[sync] Failed to save state for ${this.config.syncId}:`, err)
+			syncLog.error('doc', `${this.config.syncId} failed to save state:`, err)
 		}
 	}
 

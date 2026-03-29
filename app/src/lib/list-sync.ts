@@ -1,4 +1,5 @@
 import * as Y from 'yjs'
+import { syncLog } from './sync-log'
 
 interface SyncNoteMember {
 	sync_id: string
@@ -108,7 +109,7 @@ export class NoteListSync {
 			window.electronAPI.updateList(this.listId, { name, color, icon }).then(() => {
 				this.onRemoteChange?.()
 			}).catch((err: unknown) => {
-				console.error(`[list-sync] Failed to apply remote meta for list ${this.listId}:`, err)
+				syncLog.error('list-sync', `Failed to apply remote meta for list ${this.listId}:`, err)
 			})
 		}
 	}
@@ -142,7 +143,7 @@ export class NoteListSync {
 						title: note.title,
 					})
 				} catch (err) {
-					console.error(`[list-sync] Failed to join shared note ${note.sync_id}:`, err)
+					syncLog.error('list-sync', `Failed to join shared note ${note.sync_id}:`, err)
 				}
 			}
 

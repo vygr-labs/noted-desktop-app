@@ -1,4 +1,5 @@
 import * as Y from 'yjs'
+import { syncLog } from './sync-log'
 
 // Serializable todo fields that get synced via Yjs
 interface SyncTodo {
@@ -174,7 +175,7 @@ export class TodoListSync {
 			await window.electronAPI.syncTodosFromRemote(this.listId, remoteTodos)
 			this.onRemoteChange?.()
 		} catch (err) {
-			console.error(`[todo-sync] Failed to sync remote todos for list ${this.listId}:`, err)
+			syncLog.error('todo-sync', `Failed to sync remote todos for list ${this.listId}:`, err)
 		} finally {
 			this.applyingRemote = false
 		}

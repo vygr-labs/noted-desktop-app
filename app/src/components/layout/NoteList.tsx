@@ -54,10 +54,10 @@ export function NoteList() {
 	const isTrash = () => currentView() === 'trash'
 
 	// Load list-specific notes or trashed notes.
-	// Also re-fetch when the global notes signal changes (e.g. new notes joined via list sync).
+	// Re-fetch when notes are added/removed (length changes) — not on every content save.
 	createEffect(
 		on(
-			() => ({ view: store.currentView(), sort: store.noteSort(), _: store.notes() }),
+			() => ({ view: store.currentView(), sort: store.noteSort(), _len: (store.notes() || []).length }),
 			async ({ view, sort }) => {
 				if (typeof view === 'object' && view.type === 'list') {
 					const notes = await window.electronAPI.fetchNotesByList(

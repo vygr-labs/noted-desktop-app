@@ -1,10 +1,9 @@
-import { Editor } from '@tiptap/core'
+import { Editor, Extension } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
 import TaskList from '@tiptap/extension-task-list'
 import TaskItem from '@tiptap/extension-task-item'
-import Underline from '@tiptap/extension-underline'
 import Highlight from '@tiptap/extension-highlight'
-import Collaboration from '@tiptap/extension-collaboration'
+import { ySyncPlugin } from 'y-prosemirror'
 import * as Y from 'yjs'
 
 /**
@@ -26,13 +25,15 @@ export function seedYjsWithContent(ydoc: Y.Doc, jsonContent: string): boolean {
 	const extensions = [
 		StarterKit.configure({
 			heading: { levels: [1, 2, 3] },
-			history: false,
+			undoRedo: false,
 		}),
 		TaskList,
 		TaskItem.configure({ nested: true }),
-		Underline,
 		Highlight.configure({ multicolor: false }),
-		Collaboration.configure({ document: ydoc }),
+		Extension.create({
+			name: 'ySync',
+			addProseMirrorPlugins: () => [ySyncPlugin(fragment)],
+		}),
 	]
 
 	const tempEditor = new Editor({ extensions })
