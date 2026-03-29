@@ -2,10 +2,12 @@ import { Show, createSignal, onMount, onCleanup } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { Sidebar } from './Sidebar'
 import { NoteList } from './NoteList'
+import { NoteTabBar } from './NoteTabBar'
 import { EditorPane } from './EditorPane'
 import { Titlebar } from './Titlebar'
 import { TodoView } from '../todos/TodoView'
 import { useAppStore } from '../../stores/app-store'
+import { useSettingsStore } from '../../stores/settings-store'
 
 const outerShell = css({
 	display: 'flex',
@@ -72,6 +74,8 @@ const editorStyle = css({
 
 export function AppShell() {
 	const store = useAppStore()
+	const settings = useSettingsStore()
+	const isHorizontalLayout = () => settings.noteListLayout() === 'horizontal'
 	const SNAP_TARGET = 300
 	const SNAP_THRESHOLD = 8
 	const [noteListWidth, setNoteListWidth] = createSignal(300)
@@ -151,34 +155,39 @@ export function AppShell() {
 					</div>
 				}
 			>
-				<Show when={!store.focusMode()}>
-					<div
-						class={noteListStyle}
-						style={{ width: store.noteListCollapsed() ? '0px' : `${noteListWidth()}px` }}
-					>
-						<NoteList />
+				<Show when={!isHorizontalLayout()}>
+					<Show when={!store.focusMode()}>
 						<div
-							class={resizeHandle}
-							data-dragging={isDragging()}
-							onMouseDown={handleResizeStart}
-						/>
-						<Show when={showSnapGuide()}>
+							class={noteListStyle}
+							style={{ width: store.noteListCollapsed() ? '0px' : `${noteListWidth()}px` }}
+						>
+							<NoteList />
 							<div
-								style={{
-									position: 'absolute',
-									top: 0,
-									bottom: 0,
-									right: 0,
-									width: '2px',
-									background: 'var(--colors-indigo-a5)',
-									'z-index': 11,
-									'pointer-events': 'none',
-								}}
+								class={resizeHandle}
+								data-dragging={isDragging()}
+								onMouseDown={handleResizeStart}
 							/>
-						</Show>
-					</div>
+							<Show when={showSnapGuide()}>
+								<div
+									style={{
+										position: 'absolute',
+										top: 0,
+										bottom: 0,
+										right: 0,
+										width: '2px',
+										background: 'var(--colors-indigo-a5)',
+										'z-index': 11,
+										'pointer-events': 'none',
+									}}
+								/>
+							</Show>
+						</div>
+					</Show>
 				</Show>
 				<div class={editorStyle}>
+					<Show when={isHorizontalLayout() && !store.focusMode()}>
+						<NoteTabBar />
+					</Show>
 					<EditorPane />
 				</div>
 			</Show>

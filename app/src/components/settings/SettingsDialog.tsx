@@ -17,6 +17,9 @@ import {
 	ExternalLinkIcon,
 	TerminalIcon,
 	ShieldIcon,
+	LayoutListIcon,
+	ColumnsIcon,
+	RowsIcon,
 } from 'lucide-solid'
 
 // ─── Overlay + shell ──────────────────────────────────────
@@ -457,6 +460,33 @@ export function SettingsDialog() {
 								>
 									<FileIcon class={segmentedIcon} />
 									Plain Text
+								</div>
+							</div>
+						</div>
+
+						<div class={settingRow}>
+							<div class={settingInfo}>
+								<div class={settingLabel}>Note list layout</div>
+								<div class={settingDesc}>
+									Show notes as a vertical list or horizontal tabs
+								</div>
+							</div>
+							<div class={segmentedGroup}>
+								<div
+									class={segmentedOption}
+									data-active={settings.noteListLayout() === 'vertical'}
+									onClick={() => settings.setNoteListLayout('vertical')}
+								>
+									<RowsIcon class={segmentedIcon} />
+									Vertical
+								</div>
+								<div
+									class={segmentedOption}
+									data-active={settings.noteListLayout() === 'horizontal'}
+									onClick={() => settings.setNoteListLayout('horizontal')}
+								>
+									<ColumnsIcon class={segmentedIcon} />
+									Horizontal
 								</div>
 							</div>
 						</div>

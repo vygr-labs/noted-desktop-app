@@ -27,38 +27,25 @@ function createScrollReveal(delay: number = 0) {
   }
 }
 
-function createTypingAnimation(lines: string[], charDelay = 60, pauseDelay = 400) {
-  const fullText = lines.join('\n')
-  const [displayed, setDisplayed] = createSignal('')
-  const [cursorHidden, setCursorHidden] = createSignal(false)
+function createStaggeredFade(text: string, staggerMs = 30) {
+  const [visible, setVisible] = createSignal(false)
 
   onMount(() => {
-    let i = 0
-    let timeout: number
-
-    const type = () => {
-      if (i < fullText.length) {
-        i++
-        setDisplayed(fullText.slice(0, i))
-
-        // Pause after newline
-        if (fullText[i - 1] === '\n') {
-          timeout = window.setTimeout(type, pauseDelay)
-        } else {
-          timeout = window.setTimeout(type, charDelay)
-        }
-      } else {
-        // Done typing — hide cursor after 3s
-        timeout = window.setTimeout(() => setCursorHidden(true), 3000)
-      }
-    }
-
-    // Start after a brief initial delay
-    timeout = window.setTimeout(type, 500)
+    const timeout = window.setTimeout(() => setVisible(true), 400)
     onCleanup(() => clearTimeout(timeout))
   })
 
-  return { displayed, cursorHidden }
+  const lines = text.split('\n')
+  let charIndex = 0
+  const lineData = lines.map((line) =>
+    line.split('').map((char) => ({
+      char,
+      index: char === ' ' ? -1 : charIndex++,
+    })),
+  )
+  const totalChars = charIndex
+
+  return { visible, lineData, totalChars, staggerMs }
 }
 
 /* ================================================================
@@ -224,11 +211,7 @@ function Nav() {
    ================================================================ */
 
 function HeroCard() {
-  const { displayed, cursorHidden } = createTypingAnimation(
-    ['Your thoughts,', 'beautifully noted.'],
-    60,
-    400,
-  )
+  const { visible, lineData, staggerMs } = createStaggeredFade('Your thoughts,\nbeautifully noted.')
 
   return (
     <div
@@ -268,7 +251,7 @@ function HeroCard() {
         </Flex>
       </Box>
 
-      {/* Typing Headline */}
+      {/* Staggered Fade Headline */}
       <h1
         class={`hero-gradient-text ${css({
           fontSize: { base: '4xl', md: '6xl', lg: '7xl' },
@@ -281,13 +264,26 @@ function HeroCard() {
       >
         <span class={css({ srOnly: true })}>Your thoughts, beautifully noted.</span>
         <span aria-hidden="true">
-          {displayed().split('\n').map((line, i) => (
+          {lineData.map((line, i) => (
             <>
               {i > 0 && <br />}
-              {line}
+              {line.map((item) => (
+                <span
+                  style={{
+                    display: 'inline-block',
+                    opacity: item.index === -1 ? '1' : visible() ? '1' : '0.15',
+                    transform: item.index === -1 ? 'none' : visible() ? 'translateY(0)' : 'translateY(0.1em)',
+                    filter: item.index === -1 ? 'none' : visible() ? 'blur(0px)' : 'blur(8px)',
+                    transition: item.index === -1 ? 'none' : 'opacity 0.5s ease, transform 0.5s ease, filter 0.5s ease',
+                    'transition-delay': item.index === -1 ? '0s' : `${item.index * staggerMs}ms`,
+                    'min-width': item.char === ' ' ? '0.3em' : undefined,
+                  }}
+                >
+                  {item.char}
+                </span>
+              ))}
             </>
           ))}
-          <span class={`typing-cursor${cursorHidden() ? ' typing-cursor--hidden' : ''}`}>|</span>
         </span>
       </h1>
 

@@ -11,6 +11,8 @@ export type AppTheme = 'light' | 'dark' | 'warm' | 'slate' | 'system'
 const THEME_CYCLE: AppTheme[] = ['light', 'warm', 'slate', 'dark', 'system']
 const QUICK_CYCLE: AppTheme[] = ['light', 'warm', 'slate', 'dark']
 
+export type NoteListLayout = 'vertical' | 'horizontal'
+
 interface SettingsStore {
 	defaultNoteType: () => 'rich' | 'plain'
 	setDefaultNoteType: (v: 'rich' | 'plain') => void
@@ -19,6 +21,8 @@ interface SettingsStore {
 	theme: () => AppTheme
 	setTheme: (v: AppTheme) => void
 	cycleTheme: () => void
+	noteListLayout: () => NoteListLayout
+	setNoteListLayout: (v: NoteListLayout) => void
 	popoutSkipTaskbar: () => boolean
 	setPopoutSkipTaskbar: (v: boolean) => void
 	syncServerUrl: () => string
@@ -57,6 +61,7 @@ export function SettingsStoreProvider(props: ParentProps) {
 	)
 	const [showSettingsDialog, setShowSettingsDialog] = createSignal(false)
 	const [theme, _setTheme] = createSignal<AppTheme>('system')
+	const [noteListLayout, _setNoteListLayout] = createSignal<NoteListLayout>('vertical')
 	const [popoutSkipTaskbar, _setPopoutSkipTaskbar] = createSignal(false)
 	const [syncServerUrl, _setSyncServerUrl] = createSignal('')
 	const [syncToken, _setSyncToken] = createSignal('')
@@ -72,6 +77,11 @@ export function SettingsStoreProvider(props: ParentProps) {
 		if (savedTheme === 'light' || savedTheme === 'dark' || savedTheme === 'warm' || savedTheme === 'slate' || savedTheme === 'system') {
 			_setTheme(savedTheme)
 			applyTheme(savedTheme)
+		}
+
+		const savedLayout = await window.electronAPI.getSetting('noteListLayout')
+		if (savedLayout === 'vertical' || savedLayout === 'horizontal') {
+			_setNoteListLayout(savedLayout)
 		}
 
 		const savedSkip = await window.electronAPI.getSetting('popoutSkipTaskbar')
@@ -109,6 +119,11 @@ export function SettingsStoreProvider(props: ParentProps) {
 		setTheme(next)
 	}
 
+	function setNoteListLayout(v: NoteListLayout) {
+		_setNoteListLayout(v)
+		window.electronAPI.setSetting('noteListLayout', v)
+	}
+
 	function setPopoutSkipTaskbar(v: boolean) {
 		_setPopoutSkipTaskbar(v)
 		window.electronAPI.setSetting('popoutSkipTaskbar', String(v))
@@ -133,6 +148,8 @@ export function SettingsStoreProvider(props: ParentProps) {
 		theme,
 		setTheme,
 		cycleTheme,
+		noteListLayout,
+		setNoteListLayout,
 		popoutSkipTaskbar,
 		setPopoutSkipTaskbar,
 		syncServerUrl,

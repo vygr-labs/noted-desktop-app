@@ -80,27 +80,6 @@
 }
 
 /* ================================================================
-   Typing Cursor
-   ================================================================ */
-
-@keyframes blink-cursor {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-
-.typing-cursor {
-  -webkit-text-fill-color: #7a0d02;
-  font-weight: 200;
-  animation: blink-cursor 1.06s step-end infinite;
-}
-
-.typing-cursor--hidden {
-  animation: none;
-  opacity: 0;
-  transition: opacity 0.5s ease;
-}
-
-/* ================================================================
    Scroll Reveal
    ================================================================ */
 
