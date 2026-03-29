@@ -81,7 +81,7 @@ Share codes use per-document secrets (`syncId.docSecret`) for security. See [syn
 
 ## Quick Capture
 
-`Ctrl+Shift+N` opens a quick capture window — type a note and it's saved instantly.
+`Ctrl+Alt+N` opens a quick capture window — type a note and it's saved instantly.
 
 ## Popout Windows
 

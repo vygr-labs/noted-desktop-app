@@ -8,7 +8,7 @@
 | `Ctrl+F` | Find in current note |
 | `Ctrl+H` | Find & replace in current note |
 | `Ctrl+[` | Toggle note list sidebar |
-| `Ctrl+Shift+N` | Quick capture |
+| `Ctrl+Alt+N` | Quick capture |
 
 ## Editor (Rich Text)
 

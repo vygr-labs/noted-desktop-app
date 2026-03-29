@@ -183,7 +183,7 @@ function Nav() {
               </span>
             </a>
             <Flex display={{ base: 'none', md: 'flex' }} alignItems="center" gap="6">
-              <a href="#features" class={navLinkClass}>Features</a>
+              <a href="#features" onClick={(e) => { e.preventDefault(); document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' }) }} class={navLinkClass}>Features</a>
               <a href="/download" class={navLinkClass}>Download</a>
               <a href="https://github.com/vygr-labs/noted-desktop-app" target="_blank" rel="noopener noreferrer" class={navLinkClass}>GitHub</a>
             </Flex>
@@ -402,6 +402,7 @@ function ThemeCard() {
 
   return (
     <div
+      id="features"
       ref={reveal}
       class={`${bentoCardClass} ${css({
         display: 'flex',
@@ -1032,7 +1033,6 @@ export default function Home() {
       <Nav />
       <main style={{ 'background-color': 'var(--surface-dim)' }}>
         <div
-          id="features"
           class={css({
             display: 'grid',
             gap: '5',
