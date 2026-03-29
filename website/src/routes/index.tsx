@@ -74,10 +74,13 @@ const THEME_LABELS: ThemeName[] = ['light', 'dark', 'warm', 'slate']
    ================================================================ */
 
 const navLinkClass = css({
-  fontSize: 'sm',
+  fontSize: 'xs',
   fontWeight: 'medium',
   color: 'fg.muted',
   textDecoration: 'none',
+  fontFamily: "'JetBrains Mono', monospace",
+  textTransform: 'uppercase',
+  letterSpacing: '0.1em',
   transition: 'color 0.3s cubic-bezier(0.23, 1, 0.32, 1)',
   _hover: { color: 'indigo.9' },
 })
@@ -205,7 +208,7 @@ function Nav() {
                 transition: 'transform 0.2s cubic-bezier(0.23, 1, 0.32, 1)',
                 _active: { transform: 'scale(0.95)' },
               })}
-              style={{ 'background-color': '#a01a00' }}
+              style={{ 'background-color': '#7a0d02' }}
             >
               Download
             </a>
@@ -259,7 +262,7 @@ function HeroCard() {
           <Box color="#b0b4ba" flexShrink={0}>
             <TerminalIcon />
           </Box>
-          <span style={{ ...monoLabelStyle, color: '#a01a00' }}>
+          <span style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)' }}>
             Open Source &amp; Local First
           </span>
         </Flex>
@@ -328,7 +331,7 @@ function HeroCard() {
             _hover: { transform: 'translateY(-2px)' },
             _active: { transform: 'translateY(0)' },
           })}
-          style={{ 'background-color': '#a01a00' }}
+          style={{ 'background-color': '#7a0d02' }}
         >
           Download Free
         </a>
@@ -458,7 +461,7 @@ function ThemeCard() {
                 transition: 'all 0.25s cubic-bezier(0.23, 1, 0.32, 1)',
               })}
               style={{
-                'background-color': active() === name ? '#a01a00' : 'var(--surface-high)',
+                'background-color': active() === name ? '#7a0d02' : 'var(--surface-high)',
                 color: active() === name ? 'white' : 'var(--on-surface-variant)',
               }}
             >
@@ -743,10 +746,10 @@ function SyncCard() {
           {/* Sync arrows */}
           <Flex flexDirection="column" alignItems="center" gap="0.5">
             <svg width="24" height="12" viewBox="0 0 24 12" fill="none">
-              <path d="M0 6h20M16 2l4 4-4 4" stroke="#a01a00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M0 6h20M16 2l4 4-4 4" stroke="#7a0d02" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             <svg width="24" height="12" viewBox="0 0 24 12" fill="none">
-              <path d="M24 6H4M8 2L4 6l4 4" stroke="#a01a00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5" />
+              <path d="M24 6H4M8 2L4 6l4 4" stroke="#7a0d02" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5" />
             </svg>
           </Flex>
 
@@ -847,11 +850,11 @@ function OpenSourceCard() {
           }}
         >
           <p>
-            <span style={{ color: '#a01a00' }}>$ </span>
+            <span style={{ color: '#7a0d02' }}>$ </span>
             <span style={{ color: 'var(--on-surface)' }}>git clone https://github.com/vygr-labs/noted-desktop-app</span>
           </p>
           <p style={{ 'margin-top': '0.25rem' }}>
-            <span style={{ color: '#a01a00' }}>$ </span>
+            <span style={{ color: '#7a0d02' }}>$ </span>
             <span style={{ color: 'var(--on-surface)' }}>npm install && npm start</span>
           </p>
           <p style={{ 'margin-top': '0.25rem', color: 'var(--on-surface-variant)' }}>
@@ -924,7 +927,7 @@ function CtaCard() {
             _hover: { transform: 'translateY(-2px)' },
             _active: { transform: 'translateY(0)' },
           })}
-          style={{ 'background-color': 'white', color: '#a01a00' }}
+          style={{ 'background-color': 'white', color: '#7a0d02' }}
         >
           <DownloadIcon />
           Get Noted for Desktop
