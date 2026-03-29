@@ -948,12 +948,36 @@ export function EditorPane() {
 
 
 
+	// Preserve scroll position per note
+	const scrollPositions = new Map<string, number>()
+	let scrollContainerRef: HTMLDivElement | undefined
+	let previousNoteId: string | null = null
+
+	createEffect(
+		on(
+			() => editorStore.currentNote()?.id,
+			(noteId) => {
+				// Save scroll position for the previous note
+				if (previousNoteId && scrollContainerRef) {
+					scrollPositions.set(previousNoteId, scrollContainerRef.scrollTop)
+				}
+				// Restore scroll position for the new note
+				if (noteId && scrollContainerRef) {
+					const saved = scrollPositions.get(noteId)
+					requestAnimationFrame(() => {
+						if (scrollContainerRef) {
+							scrollContainerRef.scrollTop = saved ?? 0
+						}
+					})
+				}
+				previousNoteId = noteId ?? null
+			}
+		)
+	)
+
 	function handleScroll(e: Event) {
-
 		const target = e.target as HTMLElement
-
 		setIsScrolled(target.scrollTop > 0)
-
 	}
 
 
@@ -1395,7 +1419,7 @@ export function EditorPane() {
 
 
 							<div
-
+								ref={scrollContainerRef}
 								class={editorContent}
 
 								onScroll={handleScroll}
