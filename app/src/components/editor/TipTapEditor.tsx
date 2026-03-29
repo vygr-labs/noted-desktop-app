@@ -395,15 +395,15 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					const saved = cursorPositions.get(newId)
 					requestAnimationFrame(() => {
 						if (editor) {
-							if (saved) {
-								const docSize = editor.state.doc.content.size
-								const from = Math.min(saved.from, docSize)
-								const to = Math.min(saved.to, docSize)
-								editor.commands.setTextSelection({ from, to })
-							} else {
-								editor.commands.setTextSelection(editor.state.doc.content.size)
-							}
-							editor.commands.focus()
+							// Restore cursor via raw transaction — no scrollIntoView
+							const docSize = editor.state.doc.content.size
+							const from = saved ? Math.min(saved.from, docSize) : docSize
+							const to = saved ? Math.min(saved.to, docSize) : docSize
+							const tr = editor.state.tr.setSelection(
+								editor.state.selection.constructor.create(editor.state.doc, from, to) as any
+							)
+							editor.view.dispatch(tr)
+							editor.view.focus()
 						}
 					})
 				}
