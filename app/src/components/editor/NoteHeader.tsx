@@ -221,12 +221,10 @@ export function NoteHeader(props: { note: Note; readonly?: boolean }) {
 						{wordCount()} {wordCount() === 1 ? 'word' : 'words'}
 					</span>
 				</Show>
-				<Show when={editorStore.isSaving()}>
-					<div class={saveIndicator}>
-						<div class={saveDot} />
-						<span class={saveText}>Saving</span>
-					</div>
-				</Show>
+				<div class={saveIndicator} style={{ visibility: editorStore.isSaving() ? 'visible' : 'hidden' }}>
+					<div class={saveDot} />
+					<span class={saveText}>Saving</span>
+				</div>
 				<div class={actionsRow}>
 					<Show
 						when={!props.readonly}

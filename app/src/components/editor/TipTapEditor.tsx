@@ -15,7 +15,7 @@ import { useEditorStore } from '../../stores/editor-store'
 import { useAppStore } from '../../stores/app-store'
 import { useSettingsStore } from '../../stores/settings-store'
 import { createCollabSession, type CollabSession } from '../../lib/collab'
-import { ySyncPlugin, yCursorPlugin, yUndoPlugin } from 'y-prosemirror'
+import { ySyncPlugin, ySyncPluginKey, yCursorPlugin, yUndoPlugin } from 'y-prosemirror'
 import { debounce } from '../../lib/debounce'
 import { tiptapToPlaintext } from '../../lib/tiptap-to-plaintext'
 import { hasListPatterns, hasTablePattern, hasMarkdownPatterns, parseLinesToNodes, parseMarkdownTable, cleanTipTapContent, alignLeftContent } from '../../lib/text-cleanup'
@@ -313,10 +313,16 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 
 	const debouncedSave = debounce(() => {
 		if (!editor) return
-		log('debouncedSave firing')
-		const json = JSON.stringify(editor.getJSON())
-		const plainText = tiptapToPlaintext(json)
-		editorStore.saveNote({ content: json, content_plain: plainText })
+		// Use requestIdleCallback to avoid blocking the main thread
+		// during JSON serialization of large documents
+		const cb = typeof requestIdleCallback !== 'undefined' ? requestIdleCallback : setTimeout
+		cb(() => {
+			if (!editor) return
+			log('debouncedSave firing')
+			const json = JSON.stringify(editor.getJSON())
+			const plainText = tiptapToPlaintext(json)
+			editorStore.saveNote({ content: json, content_plain: plainText })
+		})
 	}, 500)
 
 	function getBaseExtensions(isCollab: boolean) {
@@ -478,10 +484,19 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					collabReady = true
 					log('collab editor onCreate')
 				},
-				onUpdate: ({ editor: ed }) => {
+				onUpdate: ({ editor: ed, transaction }) => {
+					const isYjs = !!transaction.getMeta(ySyncPluginKey)
+					log('collab onUpdate', { ready: collabReady, isYjs, textLen: ed.getText().length, docChanged: transaction.docChanged })
 					if (!collabReady || isUpdatingContent) return
+					if (isYjs) return
 					editorStore.setLivePreview(ed.getText().slice(0, 160))
 					debouncedSave()
+				},
+				onTransaction: ({ transaction }) => {
+					const isYjs = !!transaction.getMeta(ySyncPluginKey)
+					if (transaction.docChanged) {
+						log('collab onTransaction docChanged', { isYjs })
+					}
 				},
 				onTransaction: ({ editor: ed }) => {
 					setInTable(ed.isActive('table'))
