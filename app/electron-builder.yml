@@ -23,9 +23,38 @@ nsis:
   include: installer/installer.nsh
 
 linux:
-  target: AppImage
+  target:
+    - AppImage
+    - deb
+    - rpm
+    - snap
+    - tar.gz
   category: Utility
   icon: assets/icon.png
+
+deb:
+  depends:
+    - libgtk-3-0
+    - libnotify4
+    - libnss3
+    - libxss1
+    - libxtst6
+    - libatspi2.0-0
+    - libuuid1
+
+rpm:
+  depends:
+    - gtk3
+    - libnotify
+    - nss
+    - libXScrnSaver
+    - libXtst
+    - at-spi2-core
+    - libuuid
+
+snap:
+  grade: stable
+  confinement: strict
 
 mac:
   target: dmg
