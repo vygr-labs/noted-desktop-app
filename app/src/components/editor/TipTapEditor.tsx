@@ -648,7 +648,7 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				// Must recreate if: switching to/from collab, or switching between different collab docs
 				const needsRecreate = newSyncId !== previousSyncId || !!newSyncId
 
-				debouncedSave.cancel()
+				debouncedSave.flush()
 				if (needsRecreate) {
 					createEditorInstance(note)
 				} else if (editor) {

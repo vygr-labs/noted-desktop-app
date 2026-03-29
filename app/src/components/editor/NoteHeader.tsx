@@ -106,6 +106,7 @@ export function NoteHeader(props: { note: Note; readonly?: boolean }) {
 	const appStore = useAppStore()
 	const [localTitle, setLocalTitle] = createSignal(props.note.title)
 	let titleTimeout: ReturnType<typeof setTimeout> | null = null
+	let pendingTitle: string | null = null
 	let titleInputRef: HTMLInputElement | undefined
 
 	// Update local title when note changes
@@ -113,9 +114,12 @@ export function NoteHeader(props: { note: Note; readonly?: boolean }) {
 		on(
 			() => props.note.id,
 			() => {
-				if (titleTimeout) {
+				// Flush any pending title save before switching
+				if (titleTimeout && pendingTitle !== null) {
 					clearTimeout(titleTimeout)
 					titleTimeout = null
+					editorStore.saveNote({ title: pendingTitle })
+					pendingTitle = null
 				}
 				setLocalTitle(props.note.title)
 
@@ -152,9 +156,12 @@ export function NoteHeader(props: { note: Note; readonly?: boolean }) {
 	function handleTitleChange(value: string) {
 		setLocalTitle(value)
 		editorStore.setLiveTitle(value || 'Untitled')
+		pendingTitle = value || 'Untitled'
 		if (titleTimeout) clearTimeout(titleTimeout)
-		titleTimeout = setTimeout(() => {
-			editorStore.saveNote({ title: value || 'Untitled' })
+		titleTimeout = setTimeout(async () => {
+			await editorStore.saveNote({ title: pendingTitle! })
+			pendingTitle = null
+			appStore.bumpListNotes()
 		}, 300)
 	}
 

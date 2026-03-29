@@ -1066,9 +1066,9 @@ export function EditorPane() {
 
 		toolbarPosition() === 'top' || toolbarPosition() === 'bottom'
 
-	const showToolbar = (note: Note) =>
+	const showToolbar = (note: Note | null) =>
 
-		note.note_type === 'rich' && !isTrash()
+		note?.note_type === 'rich' && !isTrash()
 
 
 

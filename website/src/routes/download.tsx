@@ -142,25 +142,25 @@ const platforms = [
   {
     name: 'Linux (AppImage)',
     icon: () => <LinuxIcon />,
-    file: 'noted-linux-x64.AppImage',
+    file: 'noted-linux-x86_64.AppImage',
     requirement: 'Any modern Linux distro',
   },
   {
     name: 'Linux (Debian)',
     icon: () => <LinuxIcon />,
-    file: 'noted-linux-x64.deb',
+    file: 'noted-linux-amd64.deb',
     requirement: 'Ubuntu, Debian, Mint, Pop!_OS',
   },
   {
     name: 'Linux (RPM)',
     icon: () => <LinuxIcon />,
-    file: 'noted-linux-x64.rpm',
+    file: 'noted-linux-x86_64.rpm',
     requirement: 'Fedora, RHEL, openSUSE',
   },
   {
     name: 'Linux (Snap)',
     icon: () => <LinuxIcon />,
-    file: 'noted-linux-x64.snap',
+    file: 'noted-linux-amd64.snap',
     requirement: 'Any distro with Snapd',
   },
 ]
@@ -281,7 +281,7 @@ function VersionCard(props: { staggerRef?: (el: HTMLElement) => void }) {
               <span style={{ ...monoLabelStyle, color: '#30a46c', 'font-size': '0.625rem' }}>STABLE</span>
             </Box>
             <span style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)' }}>
-              v1.0.0
+              v1.2.0
             </span>
           </Flex>
           <p class={css({ fontSize: 'sm', lineHeight: 'relaxed' })} style={{ color: 'var(--on-surface-variant)' }}>
@@ -383,7 +383,7 @@ function detectPlatform(): { file: string; name: string } | null {
   const ua = navigator.userAgent.toLowerCase()
   if (ua.includes('win')) return { file: 'noted-win-x64.exe', name: 'Windows' }
   if (ua.includes('mac')) return { file: 'noted-mac-arm64.dmg', name: 'macOS' }
-  if (ua.includes('linux')) return { file: 'noted-linux-x64.AppImage', name: 'Linux' }
+  if (ua.includes('linux')) return { file: 'noted-linux-x86_64.AppImage', name: 'Linux' }
   return null
 }
 
