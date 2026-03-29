@@ -126,12 +126,12 @@ const navLinkClass = css({
   color: 'fg.muted',
   textDecoration: 'none',
   transition: 'color 0.3s cubic-bezier(0.23, 1, 0.32, 1)',
-  _hover: { color: 'flame.9' },
+  _hover: { color: 'indigo.9' },
 })
 
 const bentoCardClass = css({
   p: { base: '6', lg: '8' },
-  borderRadius: 'xl',
+  borderRadius: 'md',
   cursor: 'default',
   overflow: 'hidden',
   transition: 'all 0.3s cubic-bezier(0.23, 1, 0.32, 1)',
@@ -200,14 +200,22 @@ function Nav() {
         zIndex: 50,
         backdropFilter: 'blur(24px)',
         WebkitBackdropFilter: 'blur(24px)',
+        px: '6',
+        pt: '3',
       })}
-      style={{
-        'background-color': 'var(--nav-bg)',
-        'border-bottom': '1px solid var(--surface-border)',
-      }}
+      style={{ 'background-color': 'transparent' }}
     >
-      <Box maxW="7xl" mx="auto" px="6">
-        <Flex justifyContent="space-between" alignItems="center" py="4">
+      <Box
+        maxW="7xl"
+        mx="auto"
+        px="6"
+        borderRadius="xl"
+        style={{
+          'background-color': 'var(--surface-low)',
+          border: '1px solid var(--surface-border)',
+        }}
+      >
+        <Flex justifyContent="space-between" alignItems="center" py="3">
           <Flex alignItems="center" gap="8">
             <a href="/" class={css({ textDecoration: 'none' })}>
               <span
@@ -236,7 +244,7 @@ function Nav() {
                 alignItems: 'center',
                 px: '5',
                 py: '2',
-                borderRadius: 'full',
+                borderRadius: 'md',
                 color: 'white',
                 fontWeight: 'semibold',
                 fontSize: 'sm',
@@ -244,7 +252,7 @@ function Nav() {
                 transition: 'transform 0.2s cubic-bezier(0.23, 1, 0.32, 1)',
                 _active: { transform: 'scale(0.95)' },
               })}`}
-              style={{ 'box-shadow': '0 4px 14px rgba(206, 33, 0, 0.2)' }}
+              style={{ 'box-shadow': '0 4px 14px rgba(160, 26, 0, 0.2)' }}
             >
               Download
             </a>
@@ -272,7 +280,7 @@ function HeroCard() {
         textAlign: 'center',
         px: { base: '6', md: '8', lg: '12' },
         py: { base: '10', md: '14', lg: '16' },
-        borderRadius: 'xl',
+        borderRadius: 'md',
         overflow: 'hidden',
       })}
       style={{
@@ -289,16 +297,16 @@ function HeroCard() {
           gap="2"
           px="3"
           py="1.5"
-          borderRadius="full"
+          borderRadius="md"
           style={{
             'background-color': 'var(--surface-high)',
             border: '1px solid var(--surface-border)',
           }}
         >
-          <Box color="flame.9" flexShrink={0}>
+          <Box color="white" flexShrink={0}>
             <TerminalIcon />
           </Box>
-          <span style={{ ...monoLabelStyle, color: '#ff690a' }}>
+          <span style={{ ...monoLabelStyle, color: '#a01a00' }}>
             Open Source &amp; Local First
           </span>
         </Flex>
@@ -358,7 +366,7 @@ function HeroCard() {
             justifyContent: 'center',
             px: '7',
             py: '3.5',
-            borderRadius: 'full',
+            borderRadius: 'md',
             color: 'white',
             fontWeight: 'bold',
             fontSize: 'md',
@@ -367,7 +375,7 @@ function HeroCard() {
             _hover: { transform: 'translateY(-2px)' },
             _active: { transform: 'translateY(0)' },
           })}`}
-          style={{ 'box-shadow': '0 8px 24px rgba(206, 33, 0, 0.25)' }}
+          style={{ 'box-shadow': '0 8px 24px rgba(160, 26, 0, 0.25)' }}
         >
           Download Free
         </a>
@@ -383,7 +391,7 @@ function HeroCard() {
             gap: '2',
             px: '7',
             py: '3.5',
-            borderRadius: 'full',
+            borderRadius: 'md',
             color: 'fg.default',
             fontWeight: 'bold',
             fontSize: 'md',
@@ -461,8 +469,8 @@ function ThemeCard() {
           w="10"
           h="10"
           borderRadius="lg"
-          color="flame.9"
-          style={{ 'background-color': 'rgba(255, 105, 10, 0.1)' }}
+          color="white"
+          style={{ 'background-color': '#a01a00' }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <circle cx="13.5" cy="6.5" r="2.5" />
@@ -487,7 +495,7 @@ function ThemeCard() {
               class={css({
                 px: '3',
                 py: '1.5',
-                borderRadius: 'full',
+                borderRadius: 'md',
                 fontSize: 'xs',
                 fontWeight: 'semibold',
                 textTransform: 'capitalize',
@@ -496,7 +504,7 @@ function ThemeCard() {
                 transition: 'all 0.25s cubic-bezier(0.23, 1, 0.32, 1)',
               })}
               style={{
-                'background-color': active() === name ? '#ff690a' : 'var(--surface-high)',
+                'background-color': active() === name ? '#a01a00' : 'var(--surface-high)',
                 color: active() === name ? 'white' : 'var(--on-surface-variant)',
               }}
             >
@@ -553,8 +561,8 @@ function EditorCard() {
         h="10"
         borderRadius="lg"
         mb="5"
-        color="flame.9"
-        style={{ 'background-color': 'rgba(255, 105, 10, 0.1)' }}
+        color="white"
+        style={{ 'background-color': '#a01a00' }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7" />
@@ -604,8 +612,8 @@ function SpeedCard() {
         h="10"
         borderRadius="lg"
         mb="5"
-        color="flame.9"
-        style={{ 'background-color': 'rgba(255, 105, 10, 0.1)' }}
+        color="white"
+        style={{ 'background-color': '#a01a00' }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2" />
@@ -616,7 +624,7 @@ function SpeedCard() {
         my="3"
         fontSize="2xl"
         fontWeight="extrabold"
-        color="flame.9"
+        color="white"
         style={{ 'font-family': "'JetBrains Mono', monospace" }}
       >
         &lt; 50ms
@@ -642,8 +650,8 @@ function PrivacyCard() {
         h="10"
         borderRadius="lg"
         mb="5"
-        color="flame.9"
-        style={{ 'background-color': 'rgba(255, 105, 10, 0.1)' }}
+        color="white"
+        style={{ 'background-color': '#a01a00' }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
@@ -675,8 +683,8 @@ function PlatformCard() {
         h="10"
         borderRadius="lg"
         mb="5"
-        color="flame.9"
-        style={{ 'background-color': 'rgba(255, 105, 10, 0.1)' }}
+        color="white"
+        style={{ 'background-color': '#a01a00' }}
       >
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
           <rect x="2" y="3" width="20" height="14" rx="2" ry="2" />
@@ -740,8 +748,8 @@ function SyncCard() {
           h="10"
           borderRadius="lg"
           mb="5"
-          color="flame.9"
-          style={{ 'background-color': 'rgba(255, 105, 10, 0.1)' }}
+          color="white"
+          style={{ 'background-color': '#a01a00' }}
         >
           <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="16 16 12 12 8 16" />
@@ -781,10 +789,10 @@ function SyncCard() {
           {/* Sync arrows */}
           <Flex flexDirection="column" alignItems="center" gap="0.5">
             <svg width="24" height="12" viewBox="0 0 24 12" fill="none">
-              <path d="M0 6h20M16 2l4 4-4 4" stroke="#ff690a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
+              <path d="M0 6h20M16 2l4 4-4 4" stroke="#a01a00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" />
             </svg>
             <svg width="24" height="12" viewBox="0 0 24 12" fill="none">
-              <path d="M24 6H4M8 2L4 6l4 4" stroke="#ff690a" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5" />
+              <path d="M24 6H4M8 2L4 6l4 4" stroke="#a01a00" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" opacity="0.5" />
             </svg>
           </Flex>
 
@@ -888,7 +896,7 @@ function OpenSourceCard() {
           }}
         >
           <p>
-            <span style={{ color: '#ff690a' }}>$ </span>
+            <span style={{ color: '#a01a00' }}>$ </span>
             <span style={{ color: 'var(--on-surface)' }}>git clone noted && npm start</span>
           </p>
           <p style={{ 'margin-top': '0.25rem', color: 'var(--on-surface-variant)' }}>
@@ -912,7 +920,7 @@ function CtaCard() {
       id="download"
       ref={reveal}
       class={`hero-cta-gradient ${css({
-        borderRadius: 'xl',
+        borderRadius: 'md',
         overflow: 'hidden',
         textAlign: 'center',
         px: { base: '6', md: '12', lg: '20' },
@@ -953,7 +961,7 @@ function CtaCard() {
             gap: '3',
             px: '8',
             py: '4',
-            borderRadius: 'full',
+            borderRadius: 'md',
             fontWeight: 'bold',
             fontSize: 'lg',
             textDecoration: 'none',
@@ -961,7 +969,7 @@ function CtaCard() {
             _hover: { transform: 'translateY(-2px)' },
             _active: { transform: 'translateY(0)' },
           })}
-          style={{ 'background-color': 'white', color: '#ce2100' }}
+          style={{ 'background-color': 'white', color: '#a01a00' }}
         >
           <DownloadIcon />
           Get Noted for Desktop
@@ -978,7 +986,7 @@ function CtaCard() {
             gap: '2',
             px: '8',
             py: '4',
-            borderRadius: 'full',
+            borderRadius: 'md',
             color: 'white',
             fontWeight: 'bold',
             fontSize: 'lg',
@@ -997,29 +1005,30 @@ function CtaCard() {
 }
 
 /* ================================================================
-   Footer
+   Footer Card (full-width bento card)
    ================================================================ */
 
-function Footer() {
+function FooterCard() {
   return (
-    <Box
-      as="footer"
-      px="8"
-      py="12"
+    <div
+      class={css({
+        borderRadius: 'md',
+        px: { base: '6', md: '8' },
+        py: { base: '8', md: '10' },
+      })}
       style={{
-        'background-color': 'var(--surface-dim)',
-        'border-top': '1px solid var(--surface-border)',
+        'grid-column': '1 / -1',
+        'background-color': 'var(--surface-low)',
+        border: '1px solid var(--surface-border)',
       }}
     >
       <Flex
-        maxW="7xl"
-        mx="auto"
         flexDirection={{ base: 'column', md: 'row' }}
         justifyContent="space-between"
         alignItems="center"
-        gap="8"
+        gap="6"
       >
-        <Flex flexDirection="column" alignItems={{ base: 'center', md: 'flex-start' }} gap="4">
+        <Flex flexDirection="column" alignItems={{ base: 'center', md: 'flex-start' }} gap="3">
           <span class={css({ fontSize: 'xl', fontWeight: 'bold', letterSpacing: '-0.05em', color: 'fg.default' })}>
             noted.
           </span>
@@ -1049,13 +1058,13 @@ function Footer() {
             href="https://github.com"
             target="_blank"
             rel="noopener noreferrer"
-            class={css({ color: 'fg.subtle', transition: 'color 0.3s', _hover: { color: 'flame.9' } })}
+            class={css({ color: 'fg.subtle', transition: 'color 0.3s', _hover: { color: 'indigo.9' } })}
           >
             <GitHubIcon />
           </a>
         </Flex>
       </Flex>
-    </Box>
+    </div>
   )
 }
 
@@ -1090,9 +1099,9 @@ export default function Home() {
           <SyncCard />
           <OpenSourceCard />
           <CtaCard />
+          <FooterCard />
         </div>
       </main>
-      <Footer />
     </>
   )
 }
