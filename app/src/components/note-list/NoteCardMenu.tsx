@@ -118,12 +118,18 @@ export function NoteCardMenu(props: {
 	onRefresh: () => void
 }) {
 	const store = useAppStore()
-	// Capture note data eagerly — the <Show> parent may unmount this component
-	// during async operations, making props.note stale
+	// Capture everything eagerly — the <Show> parent may unmount this component
+	// during async operations, making all props stale
 	const noteId = props.note.id
 	const noteTitle = props.note.title
 	const noteType = props.note.note_type
 	const noteListId = props.note.list_id
+	const noteContent = props.note.content
+	const noteContentPlain = props.note.content_plain
+	const noteIsPinned = props.note.is_pinned
+	const isTrash = props.isTrash
+	const onClose = props.onClose
+	const onRefresh = props.onRefresh
 	const [showMoveList, setShowMoveList] = createSignal(false)
 	let menuRef: HTMLDivElement | undefined
 
@@ -149,7 +155,7 @@ export function NoteCardMenu(props: {
 	// Close on Escape
 	onMount(() => {
 		function handleKey(e: KeyboardEvent) {
-			if (e.key === 'Escape') props.onClose()
+			if (e.key === 'Escape') onClose()
 		}
 		window.addEventListener('keydown', handleKey)
 		onCleanup(() => window.removeEventListener('keydown', handleKey))
@@ -157,60 +163,60 @@ export function NoteCardMenu(props: {
 
 	async function handlePin() {
 		await window.electronAPI.updateNote(noteId, {
-			is_pinned: !props.note.is_pinned,
+			is_pinned: !noteIsPinned,
 		})
-		props.onRefresh()
-		props.onClose()
+		onRefresh()
+		onClose()
 	}
 
 	async function handleDuplicate() {
 		const note = await window.electronAPI.createNote({
 			title: `${noteTitle || 'Untitled'} (copy)`,
-			content: props.note.content,
-			content_plain: props.note.content_plain,
+			content: noteContent,
+			content_plain: noteContentPlain,
 			note_type: noteType,
 			list_id: noteListId,
 		})
-		props.onRefresh()
+		onRefresh()
 		store.setSelectedNoteId(note.id)
-		props.onClose()
+		onClose()
 	}
 
 	async function handleTrash() {
 		if (store.selectedNoteId() === noteId) {
 			store.setSelectedNoteId(null)
 		}
-		props.onClose()
+		onClose()
 		await window.electronAPI.trashNote(noteId)
-		props.onRefresh()
+		onRefresh()
 	}
 
 	async function handleRestore() {
-		props.onClose()
+		onClose()
 		await window.electronAPI.restoreNote(noteId)
-		props.onRefresh()
+		onRefresh()
 	}
 
 	async function handleDeletePermanently() {
 		if (store.selectedNoteId() === noteId) {
 			store.setSelectedNoteId(null)
 		}
-		props.onClose()
+		onClose()
 		await window.electronAPI.deleteNotePermanently(noteId)
-		props.onRefresh()
+		onRefresh()
 	}
 
 	async function handleMoveToList(listId: string | null) {
 		await window.electronAPI.updateNote(noteId, {
 			list_id: listId,
 		})
-		props.onRefresh()
-		props.onClose()
+		onRefresh()
+		onClose()
 	}
 
 	return (
 		<>
-			<div class={menuOverlay} onClick={props.onClose} onContextMenu={(e) => { e.preventDefault(); props.onClose() }} />
+			<div class={menuOverlay} onClick={onClose} onContextMenu={(e) => { e.preventDefault(); onClose() }} />
 			<div
 				ref={menuRef}
 				class={menuStyle}
@@ -220,7 +226,7 @@ export function NoteCardMenu(props: {
 				}}
 			>
 				<Show
-					when={!props.isTrash}
+					when={!isTrash}
 					fallback={
 						<>
 							<div class={menuItem} onClick={handleRestore}>
@@ -236,10 +242,10 @@ export function NoteCardMenu(props: {
 					}
 				>
 					<div class={menuItem} onClick={handlePin}>
-						<Show when={props.note.is_pinned} fallback={<PinIcon class={iconSize} />}>
+						<Show when={noteIsPinned} fallback={<PinIcon class={iconSize} />}>
 							<PinOffIcon class={iconSize} />
 						</Show>
-						{props.note.is_pinned ? 'Unpin' : 'Pin to top'}
+						{noteIsPinned ? 'Unpin' : 'Pin to top'}
 					</div>
 					<div class={menuItem} onClick={handleDuplicate}>
 						<CopyIcon class={iconSize} />
@@ -259,7 +265,7 @@ export function NoteCardMenu(props: {
 						<div class={subMenu}>
 							<div
 								class={subMenuItem}
-								data-active={!props.note.list_id}
+								data-active={!noteListId}
 								onClick={() => handleMoveToList(null)}
 							>
 								No list
@@ -268,7 +274,7 @@ export function NoteCardMenu(props: {
 								{(list) => (
 									<div
 										class={subMenuItem}
-										data-active={props.note.list_id === list.id}
+										data-active={noteListId === list.id}
 										onClick={() => handleMoveToList(list.id)}
 									>
 										<div
