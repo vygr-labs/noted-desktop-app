@@ -27,14 +27,13 @@ const editorWrap = css({
 	minHeight: '200px',
 	flex: 1,
 	mt: '2',
-	// Promote to own compositing layer to reduce visual flash during
-	// y-tiptap's full-document-replace sync strategy
 	contain: 'content',
 	'& .tiptap': {
 		outline: 'none',
 		minHeight: '200px',
 		overflow: 'visible',
-		paddingTop: '1.5em', // Space for cursor labels on the first line
+		paddingTop: '1.5em',
+		animation: 'fade-in 0.15s ease-out',
 	},
 	'& .ProseMirror-yjs-cursor': {
 		position: 'relative',
@@ -355,6 +354,7 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	}
 
 	function destroyEditor() {
+		const dt0 = performance.now()
 		log('destroyEditor', { hasCollab: !!collab, hasEditor: !!editor })
 		if (collab) {
 			// Save Yjs state before destroying
@@ -375,6 +375,7 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		}
 		if (editor) { editor.destroy(); editor = null }
 		currentEditor = null
+		log(`destroyEditor took: ${(performance.now() - dt0).toFixed(1)}ms`)
 	}
 
 	function setupCheckboxHandler() {
@@ -409,23 +410,10 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	}
 
 	function createEditorInstance(note: Note) {
-		log('createEditorInstance', { id: note.id, sync_id: note.sync_id, is_owner: note.is_owner, hasContent: !!note.content })
-
-		// Capture current HTML as placeholder to prevent blank flash during editor swap
-		let placeholder: HTMLDivElement | null = null
-		if (editor && containerRef) {
-			placeholder = document.createElement('div')
-			placeholder.innerHTML = containerRef.innerHTML
-			placeholder.style.opacity = '0.5'
-			placeholder.style.pointerEvents = 'none'
-		}
+		log('createEditorInstance', { id: note.id, sync_id: note.sync_id, is_owner: note.is_owner, hasContent: !!note.content, contentLen: note.content?.length || 0 })
 
 		destroyEditor()
 		if (!containerRef) return
-
-		if (placeholder) {
-			containerRef.appendChild(placeholder)
-		}
 
 		const isShared = !!(note.sync_id && note.sync_secret)
 
@@ -572,16 +560,18 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 			})
 		} else {
 			// ── Local mode ──
-			log('creating local editor with content length:', note.content?.length || 0)
+			// Create editor with empty content (fast ~50ms), then set real content.
+			// This avoids the 600ms block from parsing large docs during construction.
+			const t0 = performance.now()
+			log('creating local editor (empty shell)')
 			let editorReady = false
 			editor = new Editor({
 				element: containerRef,
 				extensions: getBaseExtensions(false),
-				content: parseContent(note.content),
+				content: '',
 				editable: !props.readonly,
 				onCreate: () => {
 					editorReady = true
-					log('local editor onCreate')
 				},
 				onUpdate: ({ editor: ed }) => {
 					if (!editorReady || isUpdatingContent) return
@@ -592,19 +582,38 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					setInTable(ed.isActive('table'))
 				},
 			})
+			const t1 = performance.now()
+			log(`empty editor created: ${(t1 - t0).toFixed(1)}ms`)
+
+			// Show plain text instantly, then swap to rich content in next frame
+			if (note.content) {
+				// Immediately show plain text as temporary content (instant, no parsing)
+				if (note.content_plain) {
+					isUpdatingContent = true
+					editor.commands.setContent(`<p>${note.content_plain.slice(0, 3000).replace(/\n/g, '</p><p>')}</p>`)
+					isUpdatingContent = false
+					log('plain text preview set')
+				}
+
+				// Then parse and set the full rich content
+				const editorRef = editor
+				setTimeout(() => {
+					if (!editorRef || editorRef !== editor) return
+					const st = performance.now()
+					isUpdatingContent = true
+					editorRef.commands.setContent(parseContent(note.content))
+					isUpdatingContent = false
+					log(`setContent (deferred): ${(performance.now() - st).toFixed(1)}ms`)
+				}, 0)
+			}
 		}
 
 		currentEditor = editor
 		setInTable(editor.isActive('table'))
 		editor.view.dom.spellcheck = !!note.spellcheck
 		setupCheckboxHandler()
-		log('editor setup complete, text length:', editor.getText().length, 'hasPlaceholder:', !!placeholder)
+		log('editor setup complete, text length:', editor.getText().length)
 
-		// Remove placeholder now that new editor is mounted
-		if (placeholder && containerRef?.contains(placeholder)) {
-			log('removing placeholder')
-			placeholder.remove()
-		}
 	}
 
 	onMount(() => {
@@ -643,11 +652,32 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				if (needsRecreate) {
 					createEditorInstance(note)
 				} else if (editor) {
-					// Local-to-local switch — update content in place (fast, no destroy)
-					isUpdatingContent = true
-					editor.commands.setContent(parseContent(note.content))
+					// Local-to-local switch — update content in place (no destroy)
 					editor.setEditable(!props.readonly)
-					isUpdatingContent = false
+
+					// Show plain text instantly, then swap to rich content
+					if (note.content_plain && (note.content?.length || 0) > 50000) {
+						isUpdatingContent = true
+						editor.commands.setContent(`<p>${note.content_plain.slice(0, 3000).replace(/\n/g, '</p><p>')}</p>`)
+						isUpdatingContent = false
+						log('plain text preview set (switch)')
+
+						const editorRef = editor
+						setTimeout(() => {
+							if (!editorRef || editorRef !== editor) return
+							const st = performance.now()
+							isUpdatingContent = true
+							editorRef.commands.setContent(parseContent(note.content))
+							isUpdatingContent = false
+							log(`setContent (deferred switch): ${(performance.now() - st).toFixed(1)}ms`)
+						}, 0)
+					} else {
+						const st = performance.now()
+						isUpdatingContent = true
+						editor.commands.setContent(parseContent(note.content))
+						isUpdatingContent = false
+						log(`setContent: ${(performance.now() - st).toFixed(1)}ms`)
+					}
 				}
 
 				if (!note.sync_id && !editorStore.isNewNote()) {

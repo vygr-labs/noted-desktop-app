@@ -1,7 +1,7 @@
 {
   "name": "noted",
   "type": "module",
-  "version": "1.0.0",
+  "version": "1.2.0",
   "description": "A minimal, distraction-free note-taking app",
   "author": {
     "name": "Voyager Technologies Limited",

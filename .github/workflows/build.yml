@@ -141,10 +141,17 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Get version
         id: version
         run: echo "version=$(node -p "require('./app/package.json').version")" >> $GITHUB_OUTPUT
+
+      - name: Create git tag
+        run: |
+          git tag "v${{ steps.version.outputs.version }}"
+          git push origin "v${{ steps.version.outputs.version }}"
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -158,6 +165,7 @@ jobs:
           tag_name: v${{ steps.version.outputs.version }}
           name: noted. v${{ steps.version.outputs.version }}
           draft: true
+          make_latest: true
           generate_release_notes: true
           files: |
             artifacts/**/*.exe
