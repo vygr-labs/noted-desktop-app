@@ -681,9 +681,21 @@ export function EditorPane() {
 		const code = await window.electronAPI.shareNote(noteId)
 		if (code) {
 			setShareCode(code)
-			await editorStore.refreshCurrentNote()
-			appStore.refetchNotes()
 			setShowShareMenu(true)
+			// Batch the refresh — update currentNote with sync fields directly
+			// to avoid the full unmount/remount cycle from refreshCurrentNote
+			const current = editorStore.currentNote()
+			if (current) {
+				const parts = code.split('.')
+				editorStore.setCurrentNote({
+					...current,
+					sync_id: parts[0],
+					sync_secret: parts.slice(1).join('.'),
+					is_shared: 1,
+					is_owner: 1,
+				})
+			}
+			appStore.refetchNotes()
 		}
 	}
 
@@ -1128,7 +1140,9 @@ export function EditorPane() {
 
 			>
 
-				{(note) => (
+				{() => {
+				const note = () => editorStore.currentNote()!
+				return (
 
 					<>
 
@@ -1686,7 +1700,8 @@ export function EditorPane() {
 
 					</>
 
-				)}
+				)
+			}}
 
 			</Show>
 

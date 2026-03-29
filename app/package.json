@@ -5,6 +5,22 @@
   "description": "A minimal, distraction-free note-taking app",
   "author": "Voyager Technologies Limited",
   "license": "AGPL-3.0-only",
+  "keywords": [
+    "note-taking",
+    "notes",
+    "editor",
+    "electron",
+    "solidjs",
+    "tiptap",
+    "desktop-app",
+    "productivity",
+    "markdown",
+    "open-source",
+    "collaboration",
+    "sqlite",
+    "cross-platform",
+    "rich-text-editor"
+  ],
   "main": "src/backend/build/main.js",
   "scripts": {
     "prepare": "panda codegen",

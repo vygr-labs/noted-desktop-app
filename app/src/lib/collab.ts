@@ -26,8 +26,15 @@ export function createCollabSession(opts: {
 	serverUrl: string
 	authToken?: string
 	userName?: string
+	/** Called after Y.Doc + fragment are created but BEFORE the provider connects.
+	 *  Use this to seed the Yjs doc with local content for the owner's first share. */
+	onBeforeConnect?: (ydoc: Y.Doc, fragment: Y.XmlFragment) => void
 }): CollabSession {
 	const ydoc = new Y.Doc()
+	const fragment = ydoc.getXmlFragment('default')
+
+	// Let caller seed content before the provider connects
+	opts.onBeforeConnect?.(ydoc, fragment)
 
 	// Build token: "authToken:docSecret" or just "docSecret"
 	const token = opts.authToken
@@ -47,8 +54,6 @@ export function createCollabSession(opts: {
 	const color = PEER_COLORS[Math.floor(Math.random() * PEER_COLORS.length)]
 	const name = opts.userName || `User-${Math.random().toString(36).slice(2, 6).toUpperCase()}`
 	awareness.setLocalStateField('user', { name, color })
-
-	const fragment = ydoc.getXmlFragment('default')
 
 	function destroy() {
 		provider.destroy()
