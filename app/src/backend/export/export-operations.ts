@@ -6,7 +6,7 @@ import path from 'node:path'
 import os from 'node:os'
 import archiver from 'archiver'
 import db from '../database/db.js'
-import { tiptapToHtml, wrapHtmlDocument, wrapWordDocument } from './tiptap-to-html.js'
+import { tiptapToHtml, wrapHtmlDocument, wrapWordDocument, wrapPdfDocument } from './tiptap-to-html.js'
 import { tiptapToMarkdown } from './tiptap-to-markdown.js'
 
 interface NoteRow {
@@ -37,6 +37,9 @@ async function generatePdf(html: string, filePath: string): Promise<void> {
 
 	const win = new BrowserWindow({ show: false, width: 800, height: 1100 })
 	await win.loadFile(tmpFile)
+
+	// Wait for embedded fonts to finish loading before rendering
+	await win.webContents.executeJavaScript('document.fonts.ready.then(() => true)')
 
 	const pdfBuffer = await win.webContents.printToPDF({
 		printBackground: true,
@@ -101,7 +104,10 @@ export async function exportNote(noteId: string, format: string): Promise<boolea
 			fs.writeFileSync(filePath, wrapWordDocument(note.title, bodyHtml), 'utf-8')
 			break
 		case 'pdf':
-			await generatePdf(wrapHtmlDocument(note.title, bodyHtml), filePath)
+			await generatePdf(wrapPdfDocument(note.title, bodyHtml, {
+				createdAt: note.created_at,
+				updatedAt: note.updated_at,
+			}), filePath)
 			break
 		default:
 			fs.writeFileSync(filePath, note.content_plain || note.title, 'utf-8')

@@ -61,53 +61,6 @@ function createTypingAnimation(lines: string[], charDelay = 60, pauseDelay = 400
   return { displayed, cursorHidden }
 }
 
-function createAnimatedCounter(
-  target: number,
-  duration: number = 2000,
-  formatter: (n: number) => string,
-) {
-  const [value, setValue] = createSignal(formatter(0))
-  let triggered = false
-
-  const ref = (el: HTMLElement) => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting && !triggered) {
-          triggered = true
-          observer.unobserve(el)
-
-          const start = performance.now()
-          let rafId: number
-
-          const tick = (now: number) => {
-            const elapsed = now - start
-            const progress = Math.min(elapsed / duration, 1)
-            // Cubic ease-out
-            const eased = 1 - Math.pow(1 - progress, 3)
-            const current = Math.floor(eased * target)
-            setValue(formatter(current))
-
-            if (progress < 1) {
-              rafId = requestAnimationFrame(tick)
-            } else {
-              setValue(formatter(target))
-            }
-          }
-
-          rafId = requestAnimationFrame(tick)
-          onCleanup(() => cancelAnimationFrame(rafId))
-        }
-      },
-      { threshold: 0.15 },
-    )
-
-    requestAnimationFrame(() => observer.observe(el))
-    onCleanup(() => observer.disconnect())
-  }
-
-  return { value, ref }
-}
-
 /* ================================================================
    Constants
    ================================================================ */
@@ -231,14 +184,14 @@ function Nav() {
             </a>
             <Flex display={{ base: 'none', md: 'flex' }} alignItems="center" gap="6">
               <a href="#features" class={navLinkClass}>Features</a>
-              <a href="#download" class={navLinkClass}>Download</a>
-              <a href="https://github.com" target="_blank" rel="noopener noreferrer" class={navLinkClass}>GitHub</a>
+              <a href="/download" class={navLinkClass}>Download</a>
+              <a href="https://github.com/vygr-labs/noted-desktop-app" target="_blank" rel="noopener noreferrer" class={navLinkClass}>GitHub</a>
             </Flex>
           </Flex>
 
           <Flex alignItems="center" gap="4">
             <a
-              href="#download"
+              href="/download"
               class={css({
                 display: 'inline-flex',
                 alignItems: 'center',
@@ -358,7 +311,7 @@ function HeroCard() {
         class="animate-fade-in-up-delay-2"
       >
         <a
-          href="#download"
+          href="/download"
           class={css({
             w: { base: 'full', sm: 'auto' },
             display: 'inline-flex',
@@ -380,7 +333,7 @@ function HeroCard() {
           Download Free
         </a>
         <a
-          href="https://github.com"
+          href="https://github.com/vygr-labs/noted-desktop-app"
           target="_blank"
           rel="noopener noreferrer"
           class={css({
@@ -627,7 +580,7 @@ function SpeedCard() {
         color="#b0b4ba"
         style={{ 'font-family': "'JetBrains Mono', monospace" }}
       >
-        &lt; 50ms
+        Instant
       </Box>
       <p class={css({ fontSize: 'sm', lineHeight: 'relaxed' })} style={{ color: 'var(--on-surface-variant)' }}>
         Instant startup. Zero loading states. Buttery-smooth editing.
@@ -825,21 +778,11 @@ function SyncCard() {
    ================================================================ */
 
 function OpenSourceCard() {
-  const stars = createAnimatedCounter(
-    14200,
-    2000,
-    (n) => (n >= 1000 ? `${(n / 1000).toFixed(1)}k` : String(n)),
-  )
-  const contributors = createAnimatedCounter(800, 2000, (n) => `${n}+`)
   const reveal = createScrollReveal(0.6)
 
   return (
     <div
-      ref={(el) => {
-        reveal(el)
-        stars.ref(el)
-        contributors.ref(el)
-      }}
+      ref={reveal}
       class={`${bentoCardClass}`}
       style={{
         'background-color': 'var(--surface-low)',
@@ -853,32 +796,39 @@ function OpenSourceCard() {
         justifyContent="space-between"
         gap="6"
       >
-        {/* Text + Stats */}
         <Box>
           <Flex alignItems="center" gap="2" mb="3">
-            <Box color="fg.default">
+            <Box color="#b0b4ba">
               <GitHubIcon size={20} />
             </Box>
             <h3 class={css({ fontSize: 'lg', fontWeight: 'bold', color: 'fg.default' })}>Open Source</h3>
           </Flex>
           <p class={css({ fontSize: 'sm', lineHeight: 'relaxed', mb: '4' })} style={{ color: 'var(--on-surface-variant)' }}>
-            Transparent, community-driven, no vendor lock-in. Audit the code or contribute.
+            Transparent, community-driven, no vendor lock-in. Audit the code, contribute features, or self-host.
           </p>
-          <Flex alignItems="center" gap="5">
-            <Box>
-              <Box fontSize="xl" fontWeight="bold" color="fg.default" style={{ 'font-family': "'JetBrains Mono', monospace" }}>
-                {stars.value()}
-              </Box>
-              <span style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)' }}>Stars</span>
-            </Box>
-            <Box h="8" w="1px" style={{ 'background-color': 'var(--surface-border)' }} />
-            <Box>
-              <Box fontSize="xl" fontWeight="bold" color="fg.default" style={{ 'font-family': "'JetBrains Mono', monospace" }}>
-                {contributors.value()}
-              </Box>
-              <span style={{ ...monoLabelStyle, color: 'var(--on-surface-variant)' }}>Contributors</span>
-            </Box>
-          </Flex>
+          <a
+            href="https://github.com/vygr-labs/noted-desktop-app"
+            target="_blank"
+            rel="noopener noreferrer"
+            class={css({
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: '2',
+              px: '4',
+              py: '2',
+              borderRadius: 'sm',
+              color: 'fg.default',
+              fontWeight: 'semibold',
+              fontSize: 'sm',
+              textDecoration: 'none',
+              transition: 'all 0.3s cubic-bezier(0.23, 1, 0.32, 1)',
+              _hover: { transform: 'translateY(-1px)' },
+            })}
+            style={{ border: '1px solid var(--surface-border)' }}
+          >
+            <GitHubIcon size={16} />
+            Star on GitHub
+          </a>
         </Box>
 
         {/* Mini Terminal */}
@@ -897,7 +847,11 @@ function OpenSourceCard() {
         >
           <p>
             <span style={{ color: '#a01a00' }}>$ </span>
-            <span style={{ color: 'var(--on-surface)' }}>git clone noted && npm start</span>
+            <span style={{ color: 'var(--on-surface)' }}>git clone https://github.com/vygr-labs/noted-desktop-app</span>
+          </p>
+          <p style={{ 'margin-top': '0.25rem' }}>
+            <span style={{ color: '#a01a00' }}>$ </span>
+            <span style={{ color: 'var(--on-surface)' }}>npm install && npm start</span>
           </p>
           <p style={{ 'margin-top': '0.25rem', color: 'var(--on-surface-variant)' }}>
             Editor ready <span style={{ color: '#30a46c' }}>&#10003;</span>
@@ -943,7 +897,7 @@ function CtaCard() {
         class={css({ maxW: 'xl', mx: 'auto', fontSize: 'lg', mb: '10', lineHeight: 'relaxed' })}
         style={{ color: 'rgba(255, 255, 255, 0.8)' }}
       >
-        Join thousands of writers and thinkers who have found their focus.
+        A distraction-free editor for writers, developers, and deep thinkers.
       </p>
       <Flex
         flexDirection={{ base: 'column', sm: 'row' }}
@@ -952,7 +906,7 @@ function CtaCard() {
         gap="4"
       >
         <a
-          href="#"
+          href="/download"
           class={css({
             w: { base: 'full', sm: 'auto' },
             display: 'inline-flex',
@@ -975,7 +929,7 @@ function CtaCard() {
           Get Noted for Desktop
         </a>
         <a
-          href="https://github.com"
+          href="https://github.com/vygr-labs/noted-desktop-app"
           target="_blank"
           rel="noopener noreferrer"
           class={css({
@@ -1038,7 +992,7 @@ function FooterCard() {
         </Flex>
 
         <Flex gap="8">
-          <For each={[{ label: 'Features', href: '#features' }, { label: 'Download', href: '#download' }, { label: 'GitHub', href: 'https://github.com' }]}>
+          <For each={[{ label: 'Features', href: '#features' }, { label: 'Download', href: '/download' }, { label: 'GitHub', href: 'https://github.com/vygr-labs/noted-desktop-app' }]}>
             {(link) => (
               <a
                 href={link.href}
@@ -1055,7 +1009,7 @@ function FooterCard() {
 
         <Flex alignItems="center" gap="4">
           <a
-            href="https://github.com"
+            href="https://github.com/vygr-labs/noted-desktop-app"
             target="_blank"
             rel="noopener noreferrer"
             class={css({ color: 'fg.subtle', transition: 'color 0.3s', _hover: { color: 'indigo.9' } })}
