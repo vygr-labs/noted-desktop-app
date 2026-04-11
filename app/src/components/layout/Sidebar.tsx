@@ -509,17 +509,40 @@ export function Sidebar() {
 		return (store.notes() || []).filter(n => n.is_shared).length
 	})
 
+	let lastNoteId: string | null = null
+
+	function saveNoteSelection() {
+		const current = store.selectedNoteId()
+		if (current) lastNoteId = current
+	}
+
+	function tryRestoreNoteSelection() {
+		const prev = store.currentView()
+		return (prev === 'todos' || prev === 'search') && lastNoteId
+	}
+
 	function handleNavClick(view: 'all' | 'today' | 'synced' | 'todos' | 'trash' | 'search') {
-		store.setCurrentView(view)
-		// Only clear editor when switching to non-note views
 		if (view === 'todos' || view === 'search') {
+			saveNoteSelection()
+			store.setCurrentView(view)
 			store.setSelectedNoteId(null)
+		} else {
+			const shouldRestore = tryRestoreNoteSelection()
+			store.setCurrentView(view)
+			if (shouldRestore) {
+				store.setSelectedNoteId(lastNoteId)
+				lastNoteId = null
+			}
 		}
 	}
 
 	function handleListClick(listId: string) {
+		const shouldRestore = tryRestoreNoteSelection()
 		store.setCurrentView({ type: 'list', listId })
-		// Keep the editor open — the note persists across list switches
+		if (shouldRestore) {
+			store.setSelectedNoteId(lastNoteId)
+			lastNoteId = null
+		}
 	}
 
 	function handleListContextMenu(e: MouseEvent, listId: string, hidden: boolean) {
@@ -632,349 +655,134 @@ export function Sidebar() {
 
 	return (
 		<>
-		<Show
-			when={!store.sidebarCollapsed()}
-			fallback={
-				/* ─── Collapsed sidebar ──────────────────── */
-				<div class={collapsedContainer}>
-					<div
-						class={collapsedItem}
-						data-active={isActive('search')}
-						onClick={() => store.setCommandPaletteOpen(true)}
-						title="Search (Ctrl+Shift+F)"
-					>
-						<div class={`nav-indicator ${collapsedIndicator}`} />
-						<SearchIcon class={iconStyle} />
-					</div>
-					<div
-						class={collapsedItem}
-						data-active={isActive('today')}
-						onClick={() => handleNavClick('today')}
-						title="Today"
-					>
-						<div class={`nav-indicator ${collapsedIndicator}`} />
-						<CalendarIcon class={iconStyle} />
-					</div>
-					<div
-						class={collapsedItem}
-						data-active={isActive('all')}
-						onClick={() => handleNavClick('all')}
-						title="All Notes"
-					>
-						<div class={`nav-indicator ${collapsedIndicator}`} />
-						<FileTextIcon class={iconStyle} />
-					</div>
-					<Show when={syncedCount() > 0}>
+			<Show
+				when={!store.sidebarCollapsed()}
+				fallback={
+					/* ─── Collapsed sidebar ──────────────────── */
+					<div class={collapsedContainer}>
 						<div
 							class={collapsedItem}
-							data-active={isActive('synced')}
-							onClick={() => handleNavClick('synced')}
-							title="Synced Notes"
+							data-active={isActive('search')}
+							onClick={() => store.setCommandPaletteOpen(true)}
+							title="Search (Ctrl+Shift+F)"
 						>
 							<div class={`nav-indicator ${collapsedIndicator}`} />
-							<Share2Icon class={iconStyle} />
+							<SearchIcon class={iconStyle} />
 						</div>
-					</Show>
-					<div
-						class={collapsedItem}
-						data-active={isActive('todos')}
-						onClick={() => handleNavClick('todos')}
-						title="To-dos"
-					>
-						<div class={`nav-indicator ${collapsedIndicator}`} />
-						<CheckSquareIcon class={iconStyle} />
-					</div>
-
-					{/* Lists */}
-					<Show when={store.lists()?.length}>
-						<div class={collapsedDivider} />
-						<For each={store.lists()}>
-							{(list) => {
-								const count = createMemo(() =>
-									(store.notes() || []).filter(
-										(n) => n.list_id === list.id && !n.is_trashed
-									).length
-								)
-								return (
-									<div
-										class={collapsedItem}
-										data-active={isListActive(list.id)}
-										onClick={() => handleListClick(list.id)}
-										title={list.name}
-									>
-										<div class={`nav-indicator ${collapsedIndicator}`} />
-										<div style={{ position: 'relative', display: 'flex', 'align-items': 'center', 'justify-content': 'center' }}>
-											<FolderIcon class={iconStyle} />
-											<Show when={count() > 0}>
-												<span class={collapsedBadge}>{count()}</span>
-											</Show>
-										</div>
-									</div>
-								)
-							}}
-						</For>
-					</Show>
-
-					<div class={css({ flex: 1 })} />
-
-					<div
-						class={collapsedItem}
-						data-active={isActive('trash')}
-						onClick={() => handleNavClick('trash')}
-						title="Trash"
-					>
-						<div class={`nav-indicator ${collapsedIndicator}`} />
-						<Trash2Icon class={iconStyle} />
-					</div>
-
-					<div class={collapsedDivider} />
-
-					<div
-						class={collapsedItem}
-						onClick={handleNewNote}
-						title="New Note"
-					>
-						<PlusIcon class={iconStyle} />
-					</div>
-					<div
-						class={collapsedItem}
-						onClick={() => settingsStore.cycleTheme()}
-						title={`Theme: ${settingsStore.theme()}`}
-					>
-						<SunIcon class={iconStyle} />
-					</div>
-					<div
-						class={collapsedItem}
-						onClick={() => settingsStore.setShowSettingsDialog(true)}
-						title="Settings"
-					>
-						<SettingsIcon class={iconStyle} />
-					</div>
-					<div style={{ position: 'relative' }} data-bulk-export>
 						<div
 							class={collapsedItem}
-							onClick={() => setShowBulkExport(!showBulkExport())}
-							title="Export all notes"
+							data-active={isActive('today')}
+							onClick={() => handleNavClick('today')}
+							title="Today"
 						>
-							<DownloadIcon class={iconStyle} />
+							<div class={`nav-indicator ${collapsedIndicator}`} />
+							<CalendarIcon class={iconStyle} />
 						</div>
-						<Show when={showBulkExport()}>
-							<div class={bulkExportMenu} style={{ left: '100%', bottom: 'auto', top: 0 }}>
-								<For each={BULK_EXPORT_FORMATS}>
-									{(fmt) => (
-										<button
-											class={bulkExportMenuItem}
-											onClick={() => {
-												setShowBulkExport(false)
-												window.electronAPI.exportAllNotes(fmt.key)
-											}}
-										>
-											{fmt.label}
-										</button>
-									)}
-								</For>
-							</div>
-						</Show>
-					</div>
-					<div
-						class={collapsedItem}
-						onClick={() => store.setSidebarCollapsed(false)}
-						title="Expand sidebar"
-					>
-						<PanelLeftOpenIcon class={iconStyle} />
-					</div>
-				</div>
-			}
-		>
-			{/* ─── Expanded sidebar ──────────────────────── */}
-			<div class={container}>
-				{/* Top — Search */}
-				<div class={topArea}>
-					<div
-						class={searchBtn}
-						onClick={() => store.setCommandPaletteOpen(true)}
-					>
-						<SearchIcon class={css({ width: '3.5', height: '3.5', flexShrink: 0 })} />
-						<span>Search</span>
-						<span class={searchKbd}>Ctrl+Shift+F</span>
-					</div>
-				</div>
-
-				{/* Main navigation */}
-				<div class={navSection}>
-					<div
-						class={navItem}
-						data-active={isActive('today')}
-						onClick={() => handleNavClick('today')}
-					>
-						<div class={`nav-indicator ${navIndicator}`} />
-						<CalendarIcon class={iconStyle} />
-						<span>Today</span>
-						<Show when={todayCount() > 0}>
-							<span class={badge} data-accent="true">{todayCount()}</span>
-						</Show>
-					</div>
-					<div
-						class={navItem}
-						data-active={isActive('all')}
-						onClick={() => handleNavClick('all')}
-					>
-						<div class={`nav-indicator ${navIndicator}`} />
-						<FileTextIcon class={iconStyle} />
-						<span>All Notes</span>
-						<Show when={(store.notes() || []).length > 0}>
-							<span class={badge}>{(store.notes() || []).length}</span>
-						</Show>
-					</div>
-					<Show when={syncedCount() > 0}>
 						<div
-							class={navItem}
-							data-active={isActive('synced')}
-							onClick={() => handleNavClick('synced')}
+							class={collapsedItem}
+							data-active={isActive('all')}
+							onClick={() => handleNavClick('all')}
+							title="All Notes"
 						>
-							<div class={`nav-indicator ${navIndicator}`} />
-							<Share2Icon class={iconStyle} />
-							<span>Synced</span>
-							<span class={badge}>{syncedCount()}</span>
+							<div class={`nav-indicator ${collapsedIndicator}`} />
+							<FileTextIcon class={iconStyle} />
 						</div>
-					</Show>
-					<div
-						class={navItem}
-						data-active={isActive('todos')}
-						onClick={() => handleNavClick('todos')}
-					>
-						<div class={`nav-indicator ${navIndicator}`} />
-						<CheckSquareIcon class={iconStyle} />
-						<span>To-dos</span>
-						<Show when={todoCount() > 0}>
-							<span class={badge} data-accent="true">{todoCount()}</span>
-						</Show>
-					</div>
-				</div>
-
-				<div class={divider} />
-
-				{/* Lists */}
-				<div class={sectionHeader}>
-					<span class={sectionLabel}>Lists</span>
-					<button
-						class={sectionAddBtn}
-						onClick={() => setShowInlineInput(true)}
-						title="New list"
-					>
-						<PlusIcon class={css({ width: '3', height: '3' })} />
-					</button>
-				</div>
-				<div class={listScroll}>
-					<For each={store.lists()}>
-						{(list) => (
+						<Show when={syncedCount() > 0}>
 							<div
-								class={listItemRow}
-								onContextMenu={(e) => handleListContextMenu(e, list.id, false)}
+								class={collapsedItem}
+								data-active={isActive('synced')}
+								onClick={() => handleNavClick('synced')}
+								title="Synced Notes"
 							>
-								<div
-									class={navItem}
-									style={{ flex: 1 }}
-									data-active={isListActive(list.id)}
-									onClick={() => handleListClick(list.id)}
-								>
-									<div class={`nav-indicator ${navIndicator}`} />
-									<FolderIcon class={iconStyle} />
-									<span class={listName}>{list.name}</span>
-								</div>
+								<div class={`nav-indicator ${collapsedIndicator}`} />
+								<Share2Icon class={iconStyle} />
 							</div>
-						)}
-					</For>
-					{/* Inline create input */}
-					<Show when={showInlineInput()}>
-						<div class={inlineInput}>
-							<FolderIcon class={iconStyle} style={{ color: 'var(--colors-fg-muted)' }} />
-							<input
-								ref={(el) => requestAnimationFrame(() => el.focus())}
-								class={inlineInputField}
-								value={newListName()}
-								onInput={(e) => setNewListName(e.currentTarget.value)}
-								onKeyDown={handleListInputKeyDown}
-								onBlur={handleListInputBlur}
-								placeholder="List name..."
-							/>
+						</Show>
+						<div
+							class={collapsedItem}
+							data-active={isActive('todos')}
+							onClick={() => handleNavClick('todos')}
+							title="To-dos"
+						>
+							<div class={`nav-indicator ${collapsedIndicator}`} />
+							<CheckSquareIcon class={iconStyle} />
 						</div>
-					</Show>
-				</div>
 
-				{/* Hidden Lists */}
-				<Show when={(store.hiddenLists() || []).length > 0}>
-					<div
-						class={hiddenHeader}
-						onClick={() => setShowHiddenLists(!showHiddenLists())}
-					>
-						<ChevronRightIcon
-							class={css({ width: '3', height: '3', transition: 'transform 0.15s' })}
-							style={{ transform: showHiddenLists() ? 'rotate(90deg)' : 'rotate(0deg)' }}
-						/>
-						<span>Hidden ({(store.hiddenLists() || []).length})</span>
-					</div>
-					<Show when={showHiddenLists()}>
-						<div style={{ animation: 'fade-in 0.15s ease' }}>
-							<For each={store.hiddenLists()}>
-								{(list) => (
-									<div
-										class={listItemRow}
-										onContextMenu={(e) => handleListContextMenu(e, list.id, true)}
-									>
+						{/* Lists */}
+						<Show when={store.lists()?.length}>
+							<div class={collapsedDivider} />
+							<For each={store.lists()}>
+								{(list) => {
+									const count = createMemo(() =>
+										(store.notes() || []).filter(
+											(n) => n.list_id === list.id && !n.is_trashed
+										).length
+									)
+									return (
 										<div
-											class={navItem}
-											style={{ flex: 1, opacity: 0.6 }}
+											class={collapsedItem}
 											data-active={isListActive(list.id)}
 											onClick={() => handleListClick(list.id)}
+											title={list.name}
 										>
-											<div class={`nav-indicator ${navIndicator}`} />
-											<EyeOffIcon class={iconStyle} />
-											<span class={listName}>{list.name}</span>
+											<div class={`nav-indicator ${collapsedIndicator}`} />
+											<div style={{ position: 'relative', display: 'flex', 'align-items': 'center', 'justify-content': 'center' }}>
+												<FolderIcon class={iconStyle} />
+												<Show when={count() > 0}>
+													<span class={collapsedBadge}>{count()}</span>
+												</Show>
+											</div>
 										</div>
-									</div>
-								)}
+									)
+								}}
 							</For>
-						</div>
-					</Show>
-				</Show>
+						</Show>
 
-				{/* Bottom */}
-				<div class={divider} />
-				<div class={bottomArea}>
-					<div
-						class={navItem}
-						data-active={isActive('trash')}
-						onClick={() => handleNavClick('trash')}
-					>
-						<div class={`nav-indicator ${navIndicator}`} />
-						<Trash2Icon class={iconStyle} />
-						<span>Trash</span>
-					</div>
-					<div class={bottomToolbar}>
-						<button class={toolbarBtn} onClick={handleNewNote} title="New Note">
-							<PlusIcon class={smallIcon} />
-						</button>
-						<button class={toolbarBtn} onClick={() => setShowJoinDialog(true)} title="Join shared note">
-							<LinkIcon class={smallIcon} />
-						</button>
-						<button
-							class={toolbarBtn}
+						<div class={css({ flex: 1 })} />
+
+						<div
+							class={collapsedItem}
+							data-active={isActive('trash')}
+							onClick={() => handleNavClick('trash')}
+							title="Trash"
+						>
+							<div class={`nav-indicator ${collapsedIndicator}`} />
+							<Trash2Icon class={iconStyle} />
+						</div>
+
+						<div class={collapsedDivider} />
+
+						<div
+							class={collapsedItem}
+							onClick={handleNewNote}
+							title="New Note"
+						>
+							<PlusIcon class={iconStyle} />
+						</div>
+						<div
+							class={collapsedItem}
+							onClick={() => settingsStore.cycleTheme()}
+							title={`Theme: ${settingsStore.theme()}`}
+						>
+							<SunIcon class={iconStyle} />
+						</div>
+						<div
+							class={collapsedItem}
 							onClick={() => settingsStore.setShowSettingsDialog(true)}
 							title="Settings"
 						>
-							<SettingsIcon class={smallIcon} />
-						</button>
+							<SettingsIcon class={iconStyle} />
+						</div>
 						<div style={{ position: 'relative' }} data-bulk-export>
-							<button
-								class={toolbarBtn}
+							<div
+								class={collapsedItem}
 								onClick={() => setShowBulkExport(!showBulkExport())}
 								title="Export all notes"
 							>
-								<DownloadIcon class={smallIcon} />
-							</button>
+								<DownloadIcon class={iconStyle} />
+							</div>
 							<Show when={showBulkExport()}>
-								<div class={bulkExportMenu}>
+								<div class={bulkExportMenu} style={{ left: '100%', bottom: 'auto', top: 0 }}>
 									<For each={BULK_EXPORT_FORMATS}>
 										{(fmt) => (
 											<button
@@ -991,100 +799,315 @@ export function Sidebar() {
 								</div>
 							</Show>
 						</div>
-						<button
-							class={toolbarBtn}
-							onClick={() => settingsStore.cycleTheme()}
-							title={`Theme: ${settingsStore.theme()}`}
+						<div
+							class={collapsedItem}
+							onClick={() => store.setSidebarCollapsed(false)}
+							title="Expand sidebar"
 						>
-							<SunIcon class={smallIcon} />
-						</button>
-						<div class={css({ flex: 1 })} />
-						<button
-							class={toolbarBtn}
-							onClick={() => store.setSidebarCollapsed(true)}
-							title="Collapse sidebar"
-						>
-							<PanelLeftCloseIcon class={smallIcon} />
-						</button>
+							<PanelLeftOpenIcon class={iconStyle} />
+						</div>
 					</div>
-				</div>
-			</div>
-
-		</Show>
-		<Show when={listContextMenu()}>
-			{(menu) => (
-				<div
-					class={contextMenu}
-					style={{ left: `${menu().x}px`, top: `${menu().y}px` }}
-					onMouseDown={(e) => e.stopPropagation()}
-				>
-					<Show when={menu().hidden}>
-						<button class={contextMenuItem} onClick={handleUnhideFromMenu}>
-							<EyeIcon class={css({ width: '3.5', height: '3.5' })} />
-							Show list
-						</button>
-					</Show>
-					<Show when={!menu().hidden}>
-						<button class={contextMenuItem} onClick={handleHideFromMenu}>
-							<EyeOffIcon class={css({ width: '3.5', height: '3.5' })} />
-							Hide list
-						</button>
-					</Show>
-					<button class={contextMenuDanger} onClick={handleDeleteFromMenu}>
-						<Trash2Icon class={css({ width: '3.5', height: '3.5' })} />
-						Delete list
-					</button>
-				</div>
-			)}
-		</Show>
-		<ConfirmDialog
-			open={!!deleteListConfirm()}
-			title="Delete list?"
-			description={`"${deleteListConfirm()?.name}" and all its notes will be moved to trash.`}
-			confirmLabel="Delete"
-			destructive
-			onConfirm={confirmDeleteList}
-			onCancel={() => setDeleteListConfirm(null)}
-		/>
-		<Show when={showJoinDialog()}>
-			<div
-				class={css({ position: 'fixed', inset: 0, bg: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 })}
-				onClick={() => setShowJoinDialog(false)}
+				}
 			>
-				<div
-					class={css({ bg: 'gray.2', borderRadius: 'lg', p: '6', width: '360px', boxShadow: '0 24px 64px -8px rgba(0, 0, 0, 0.35)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'gray.a3' })}
-					onClick={(e) => e.stopPropagation()}
-				>
-					<div class={css({ fontSize: 'md', fontWeight: 'semibold', mb: '2', color: 'fg.default' })}>Join shared note</div>
-					<div class={css({ fontSize: 'sm', color: 'fg.subtle', mb: '4' })}>Paste a share code or link to join a shared note.</div>
-					<input
-						class={css({ width: '100%', bg: 'gray.a2', border: '1px solid', borderColor: 'gray.a4', borderRadius: 'md', px: '3', py: '2', fontSize: '13px', color: 'fg.default', fontFamily: 'mono', outline: 'none', mb: '4', _focus: { borderColor: 'indigo.8' } })}
-						value={joinCode()}
-						onInput={(e) => setJoinCode(e.currentTarget.value)}
-						onKeyDown={(e) => {
-							if (e.key === 'Enter') handleJoin()
-							if (e.key === 'Escape') setShowJoinDialog(false)
-						}}
-						placeholder="Paste share code or link..."
-						ref={(el) => requestAnimationFrame(() => el.focus())}
-					/>
-					<div class={css({ display: 'flex', justifyContent: 'flex-end', gap: '2' })}>
-						<button
-							class={css({ px: '4', py: '1.5', borderRadius: 'md', fontSize: 'sm', fontWeight: 'medium', cursor: 'pointer', bg: 'bg.muted', color: 'fg.default', _hover: { bg: 'bg.emphasized' } })}
-							onClick={() => setShowJoinDialog(false)}
+				{/* ─── Expanded sidebar ──────────────────────── */}
+				<div class={container}>
+					{/* Top — Search */}
+					<div class={topArea}>
+						<div
+							class={searchBtn}
+							onClick={() => store.setCommandPaletteOpen(true)}
 						>
-							Cancel
-						</button>
-						<button
-							class={css({ px: '4', py: '1.5', borderRadius: 'md', fontSize: 'sm', fontWeight: 'medium', cursor: 'pointer', bg: 'indigo.9', color: 'white', _hover: { bg: 'indigo.10' } })}
-							onClick={handleJoin}
+							<SearchIcon class={css({ width: '3.5', height: '3.5', flexShrink: 0 })} />
+							<span>Search</span>
+							<span class={searchKbd}>Ctrl+Shift+F</span>
+						</div>
+					</div>
+
+					{/* Main navigation */}
+					<div class={navSection}>
+						<div
+							class={navItem}
+							data-active={isActive('today')}
+							onClick={() => handleNavClick('today')}
 						>
-							Join
+							<div class={`nav-indicator ${navIndicator}`} />
+							<CalendarIcon class={iconStyle} />
+							<span>Today</span>
+							<Show when={todayCount() > 0}>
+								<span class={badge} data-accent="true">{todayCount()}</span>
+							</Show>
+						</div>
+						<div
+							class={navItem}
+							data-active={isActive('all')}
+							onClick={() => handleNavClick('all')}
+						>
+							<div class={`nav-indicator ${navIndicator}`} />
+							<FileTextIcon class={iconStyle} />
+							<span>All Notes</span>
+							<Show when={(store.notes() || []).length > 0}>
+								<span class={badge}>{(store.notes() || []).length}</span>
+							</Show>
+						</div>
+						<Show when={syncedCount() > 0}>
+							<div
+								class={navItem}
+								data-active={isActive('synced')}
+								onClick={() => handleNavClick('synced')}
+							>
+								<div class={`nav-indicator ${navIndicator}`} />
+								<Share2Icon class={iconStyle} />
+								<span>Synced</span>
+								<span class={badge}>{syncedCount()}</span>
+							</div>
+						</Show>
+						<div
+							class={navItem}
+							data-active={isActive('todos')}
+							onClick={() => handleNavClick('todos')}
+						>
+							<div class={`nav-indicator ${navIndicator}`} />
+							<CheckSquareIcon class={iconStyle} />
+							<span>To-dos</span>
+							<Show when={todoCount() > 0}>
+								<span class={badge} data-accent="true">{todoCount()}</span>
+							</Show>
+						</div>
+					</div>
+
+					<div class={divider} />
+
+					{/* Lists */}
+					<div class={sectionHeader}>
+						<span class={sectionLabel}>Lists</span>
+						<button
+							class={sectionAddBtn}
+							onClick={() => setShowInlineInput(true)}
+							title="New list"
+						>
+							<PlusIcon class={css({ width: '3', height: '3' })} />
 						</button>
 					</div>
+					<div class={listScroll}>
+						<For each={store.lists()}>
+							{(list) => (
+								<div
+									class={listItemRow}
+									onContextMenu={(e) => handleListContextMenu(e, list.id, false)}
+								>
+									<div
+										class={navItem}
+										style={{ flex: 1 }}
+										data-active={isListActive(list.id)}
+										onClick={() => handleListClick(list.id)}
+									>
+										<div class={`nav-indicator ${navIndicator}`} />
+										<FolderIcon class={iconStyle} />
+										<span class={listName}>{list.name}</span>
+									</div>
+								</div>
+							)}
+						</For>
+						{/* Inline create input */}
+						<Show when={showInlineInput()}>
+							<div class={inlineInput}>
+								<FolderIcon class={iconStyle} style={{ color: 'var(--colors-fg-muted)' }} />
+								<input
+									ref={(el) => requestAnimationFrame(() => el.focus())}
+									class={inlineInputField}
+									value={newListName()}
+									onInput={(e) => setNewListName(e.currentTarget.value)}
+									onKeyDown={handleListInputKeyDown}
+									onBlur={handleListInputBlur}
+									placeholder="List name..."
+								/>
+							</div>
+						</Show>
+					</div>
+
+					{/* Hidden Lists */}
+					<Show when={(store.hiddenLists() || []).length > 0}>
+						<div
+							class={hiddenHeader}
+							onClick={() => setShowHiddenLists(!showHiddenLists())}
+						>
+							<ChevronRightIcon
+								class={css({ width: '3', height: '3', transition: 'transform 0.15s' })}
+								style={{ transform: showHiddenLists() ? 'rotate(90deg)' : 'rotate(0deg)' }}
+							/>
+							<span>Hidden ({(store.hiddenLists() || []).length})</span>
+						</div>
+						<Show when={showHiddenLists()}>
+							<div style={{ animation: 'fade-in 0.15s ease' }}>
+								<For each={store.hiddenLists()}>
+									{(list) => (
+										<div
+											class={listItemRow}
+											onContextMenu={(e) => handleListContextMenu(e, list.id, true)}
+										>
+											<div
+												class={navItem}
+												style={{ flex: 1, opacity: 0.6 }}
+												data-active={isListActive(list.id)}
+												onClick={() => handleListClick(list.id)}
+											>
+												<div class={`nav-indicator ${navIndicator}`} />
+												<EyeOffIcon class={iconStyle} />
+												<span class={listName}>{list.name}</span>
+											</div>
+										</div>
+									)}
+								</For>
+							</div>
+						</Show>
+					</Show>
+
+					{/* Bottom */}
+					<div class={divider} />
+					<div class={bottomArea}>
+						<div
+							class={navItem}
+							data-active={isActive('trash')}
+							onClick={() => handleNavClick('trash')}
+						>
+							<div class={`nav-indicator ${navIndicator}`} />
+							<Trash2Icon class={iconStyle} />
+							<span>Trash</span>
+						</div>
+						<div class={bottomToolbar}>
+							<button class={toolbarBtn} onClick={handleNewNote} title="New Note">
+								<PlusIcon class={smallIcon} />
+							</button>
+							<button class={toolbarBtn} onClick={() => setShowJoinDialog(true)} title="Join shared note">
+								<LinkIcon class={smallIcon} />
+							</button>
+							<button
+								class={toolbarBtn}
+								onClick={() => settingsStore.setShowSettingsDialog(true)}
+								title="Settings"
+							>
+								<SettingsIcon class={smallIcon} />
+							</button>
+							<div style={{ position: 'relative' }} data-bulk-export>
+								<button
+									class={toolbarBtn}
+									onClick={() => setShowBulkExport(!showBulkExport())}
+									title="Export all notes"
+								>
+									<DownloadIcon class={smallIcon} />
+								</button>
+								<Show when={showBulkExport()}>
+									<div class={bulkExportMenu}>
+										<For each={BULK_EXPORT_FORMATS}>
+											{(fmt) => (
+												<button
+													class={bulkExportMenuItem}
+													onClick={() => {
+														setShowBulkExport(false)
+														window.electronAPI.exportAllNotes(fmt.key)
+													}}
+												>
+													{fmt.label}
+												</button>
+											)}
+										</For>
+									</div>
+								</Show>
+							</div>
+							<button
+								class={toolbarBtn}
+								onClick={() => settingsStore.cycleTheme()}
+								title={`Theme: ${settingsStore.theme()}`}
+							>
+								<SunIcon class={smallIcon} />
+							</button>
+							<div class={css({ flex: 1 })} />
+							<button
+								class={toolbarBtn}
+								onClick={() => store.setSidebarCollapsed(true)}
+								title="Collapse sidebar"
+							>
+								<PanelLeftCloseIcon class={smallIcon} />
+							</button>
+						</div>
+					</div>
 				</div>
-			</div>
-		</Show>
+
+			</Show>
+			<Show when={listContextMenu()}>
+				{(menu) => (
+					<div
+						class={contextMenu}
+						style={{ left: `${menu().x}px`, top: `${menu().y}px` }}
+						onMouseDown={(e) => e.stopPropagation()}
+					>
+						<Show when={menu().hidden}>
+							<button class={contextMenuItem} onClick={handleUnhideFromMenu}>
+								<EyeIcon class={css({ width: '3.5', height: '3.5' })} />
+								Show list
+							</button>
+						</Show>
+						<Show when={!menu().hidden}>
+							<button class={contextMenuItem} onClick={handleHideFromMenu}>
+								<EyeOffIcon class={css({ width: '3.5', height: '3.5' })} />
+								Hide list
+							</button>
+						</Show>
+						<button class={contextMenuDanger} onClick={handleDeleteFromMenu}>
+							<Trash2Icon class={css({ width: '3.5', height: '3.5' })} />
+							Delete list
+						</button>
+					</div>
+				)}
+			</Show>
+			<ConfirmDialog
+				open={!!deleteListConfirm()}
+				title="Delete list?"
+				description={`"${deleteListConfirm()?.name}" and all its notes will be moved to trash.`}
+				confirmLabel="Delete"
+				destructive
+				onConfirm={confirmDeleteList}
+				onCancel={() => setDeleteListConfirm(null)}
+			/>
+			<Show when={showJoinDialog()}>
+				<div
+					class={css({ position: 'fixed', inset: 0, bg: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50 })}
+					onClick={() => setShowJoinDialog(false)}
+				>
+					<div
+						class={css({ bg: 'gray.2', borderRadius: 'lg', p: '6', width: '360px', boxShadow: '0 24px 64px -8px rgba(0, 0, 0, 0.35)', borderWidth: '1px', borderStyle: 'solid', borderColor: 'gray.a3' })}
+						onClick={(e) => e.stopPropagation()}
+					>
+						<div class={css({ fontSize: 'md', fontWeight: 'semibold', mb: '2', color: 'fg.default' })}>Join shared note</div>
+						<div class={css({ fontSize: 'sm', color: 'fg.subtle', mb: '4' })}>Paste a share code or link to join a shared note.</div>
+						<input
+							class={css({ width: '100%', bg: 'gray.a2', border: '1px solid', borderColor: 'gray.a4', borderRadius: 'md', px: '3', py: '2', fontSize: '13px', color: 'fg.default', fontFamily: 'mono', outline: 'none', mb: '4', _focus: { borderColor: 'indigo.8' } })}
+							value={joinCode()}
+							onInput={(e) => setJoinCode(e.currentTarget.value)}
+							onKeyDown={(e) => {
+								if (e.key === 'Enter') handleJoin()
+								if (e.key === 'Escape') setShowJoinDialog(false)
+							}}
+							placeholder="Paste share code or link..."
+							ref={(el) => requestAnimationFrame(() => el.focus())}
+						/>
+						<div class={css({ display: 'flex', justifyContent: 'flex-end', gap: '2' })}>
+							<button
+								class={css({ px: '4', py: '1.5', borderRadius: 'md', fontSize: 'sm', fontWeight: 'medium', cursor: 'pointer', bg: 'bg.muted', color: 'fg.default', _hover: { bg: 'bg.emphasized' } })}
+								onClick={() => setShowJoinDialog(false)}
+							>
+								Cancel
+							</button>
+							<button
+								class={css({ px: '4', py: '1.5', borderRadius: 'md', fontSize: 'sm', fontWeight: 'medium', cursor: 'pointer', bg: 'indigo.9', color: 'white', _hover: { bg: 'indigo.10' } })}
+								onClick={handleJoin}
+							>
+								Join
+							</button>
+						</div>
+					</div>
+				</div>
+			</Show>
 		</>
 	)
 }
