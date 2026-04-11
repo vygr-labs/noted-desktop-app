@@ -653,11 +653,14 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					createEditorInstance(note)
 				} else if (editor) {
 					// Local-to-local switch — update content in place (no destroy)
+					// Set isUpdatingContent BEFORE setEditable because TipTap's
+					// setEditable emits an 'update' event which triggers onUpdate
+					// while the editor still has the OLD note's content loaded.
+					isUpdatingContent = true
 					editor.setEditable(!props.readonly)
 
 					// Show plain text instantly, then swap to rich content
 					if (note.content_plain && (note.content?.length || 0) > 50000) {
-						isUpdatingContent = true
 						editor.commands.setContent(`<p>${note.content_plain.slice(0, 3000).replace(/\n/g, '</p><p>')}</p>`)
 						isUpdatingContent = false
 						log('plain text preview set (switch)')
@@ -673,7 +676,6 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 						}, 0)
 					} else {
 						const st = performance.now()
-						isUpdatingContent = true
 						editor.commands.setContent(parseContent(note.content))
 						isUpdatingContent = false
 						log(`setContent: ${(performance.now() - st).toFixed(1)}ms`)
