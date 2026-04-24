@@ -428,22 +428,9 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				syncSecret: note.sync_secret!,
 				serverUrl,
 				authToken: authToken || undefined,
-				// Owner: seed content into Y.Doc BEFORE provider connects
-				// This ensures content is visible immediately and gets sent to the server
-				onBeforeConnect: (ydoc, fragment) => {
-					if (note.is_owner && note.content && fragment.length === 0) {
-						log('seeding before connect (owner)')
-						const tempExtensions = getBaseExtensions(true)
-						tempExtensions.push(Extension.create({
-							name: 'ySync',
-							addProseMirrorPlugins: () => [ySyncPlugin(fragment)],
-						}))
-						const tempEditor = new Editor({ extensions: tempExtensions })
-						tempEditor.commands.setContent(parseContent(note.content))
-						tempEditor.destroy()
-						log('seed done, fragment length:', fragment.length)
-					}
-				},
+				// Seeding local content happens in the `synced` handler below, once we
+				// know whether the server already has state. Seeding here would merge
+				// (concatenate) with any existing server state, duplicating the note.
 			})
 
 			log('collab created, fragment length:', collab.fragment.length)

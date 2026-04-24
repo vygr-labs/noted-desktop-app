@@ -1,4 +1,6 @@
 import path from 'node:path'
+import fs from 'node:fs'
+import os from 'node:os'
 import {
 	app,
 	BrowserWindow,
@@ -141,6 +143,59 @@ const spawnAppWindow = async () => {
 
 	appWindow.on('closed', () => {
 		appWindow = null
+	})
+
+	// Dev-only: when boot:both runs two instances side-by-side, focusing one
+	// raises the other too (without stealing its keyboard focus).
+	if (electronIsDev) {
+		wirePeerFocusSync(appWindow, isPeer)
+	}
+}
+
+function wirePeerFocusSync(win: BrowserWindow, isPeer: boolean) {
+	const dir = path.join(os.tmpdir(), 'noted-dev-focus-sync')
+	try {
+		fs.mkdirSync(dir, { recursive: true })
+	} catch {}
+	const mySignal = path.join(dir, isPeer ? 'peer.signal' : 'primary.signal')
+	const peerSignal = path.join(dir, isPeer ? 'primary.signal' : 'peer.signal')
+
+	try {
+		fs.writeFileSync(mySignal, '')
+	} catch {}
+	try {
+		fs.writeFileSync(peerSignal, '', { flag: 'wx' })
+	} catch {}
+
+	let suppressUntil = 0
+
+	const raise = () => {
+		if (!appWindow || appWindow.isDestroyed()) return
+		suppressUntil = Date.now() + 400
+		if (appWindow.isMinimized()) appWindow.restore()
+		// Flip alwaysOnTop to raise the window without stealing keyboard focus.
+		appWindow.setAlwaysOnTop(true)
+		setTimeout(() => {
+			if (appWindow && !appWindow.isDestroyed()) {
+				appWindow.setAlwaysOnTop(false)
+			}
+		}, 80)
+	}
+
+	const watcher = fs.watch(mySignal, () => raise())
+
+	win.on('focus', () => {
+		if (Date.now() < suppressUntil) return
+		suppressUntil = Date.now() + 400
+		try {
+			fs.writeFileSync(peerSignal, String(Date.now()))
+		} catch {}
+	})
+
+	win.on('closed', () => {
+		try {
+			watcher.close()
+		} catch {}
 	})
 }
 
