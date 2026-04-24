@@ -16,6 +16,7 @@ import { useAppStore } from '../../stores/app-store'
 import { useSettingsStore } from '../../stores/settings-store'
 import { createCollabSession, type CollabSession } from '../../lib/collab'
 import { ySyncPlugin, ySyncPluginKey, yCursorPlugin, yUndoPlugin } from 'y-prosemirror'
+import * as Y from 'yjs'
 import { debounce } from '../../lib/debounce'
 import { tiptapToPlaintext } from '../../lib/tiptap-to-plaintext'
 import { hasListPatterns, hasTablePattern, hasMarkdownPatterns, parseLinesToNodes, parseMarkdownTable, cleanTipTapContent, alignLeftContent } from '../../lib/text-cleanup'
@@ -305,6 +306,7 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	let containerRef: HTMLDivElement | undefined
 	let editor: Editor | null = null
 	let collab: CollabSession | null = null
+	let collabSyncId: string | null = null
 	const editorStore = useEditorStore()
 	const appStore = useAppStore()
 	const settings = useSettingsStore()
@@ -357,21 +359,28 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		const dt0 = performance.now()
 		log('destroyEditor', { hasCollab: !!collab, hasEditor: !!editor })
 		if (collab) {
-			// Save Yjs state before destroying
-			if (collab.ydoc && props.note.sync_id) {
+			// Save Yjs state before destroying so the next open can hydrate instantly.
+			// Use the captured syncId — props.note may already point to the new note
+			// when destroy runs during a switch.
+			// Guard: only save when the fragment actually has content. Otherwise a
+			// race (destroy fires before the async cache load resolves) would clobber
+			// a good cache with an empty 2-byte Y.Doc header.
+			if (collab.ydoc && collabSyncId && collab.fragment.length > 0) {
 				try {
-					const Y = collab.ydoc.constructor as any
-					const state = Y.encodeStateAsUpdate
-						? Y.encodeStateAsUpdate(collab.ydoc)
-						: null
-					// Fire and forget — save to local DB for offline resilience
-					if (state) {
-						window.electronAPI.saveYjsState(props.note.sync_id, state)
+					const state = Y.encodeStateAsUpdate(collab.ydoc)
+					log('saving yjs state', { syncId: collabSyncId, bytes: state?.byteLength, fragmentLen: collab.fragment.length })
+					if (state && state.byteLength > 0) {
+						window.electronAPI.saveYjsState(collabSyncId, state)
+							.then(() => log('yjs state saved'))
+							.catch((e) => log('yjs state save failed', e))
 					}
-				} catch { /* ignore */ }
+				} catch (e) { log('encodeStateAsUpdate threw', e) }
+			} else {
+				log('skipping yjs save (empty fragment or no syncId)', { hasSyncId: !!collabSyncId, fragmentLen: collab.fragment?.length ?? -1 })
 			}
 			collab.destroy()
 			collab = null
+			collabSyncId = null
 		}
 		if (editor) { editor.destroy(); editor = null }
 		currentEditor = null
@@ -423,14 +432,16 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 			const serverUrl = settings.syncServerUrl()
 			const authToken = settings.syncToken()
 
+			collabSyncId = note.sync_id!
 			collab = createCollabSession({
 				syncId: note.sync_id!,
 				syncSecret: note.sync_secret!,
 				serverUrl,
 				authToken: authToken || undefined,
-				// Seeding local content happens in the `synced` handler below, once we
-				// know whether the server already has state. Seeding here would merge
-				// (concatenate) with any existing server state, duplicating the note.
+				// Hydrate from the locally-cached Yjs update so the note renders
+				// instantly with real formatting. The server's state merges cleanly
+				// on connect (version-vector aware, no duplication).
+				loadCachedState: (syncId) => window.electronAPI.loadYjsState(syncId),
 			})
 
 			log('collab created, fragment length:', collab.fragment.length)
@@ -632,14 +643,24 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				const note = props.note
 				const newSyncId = note.sync_id || null
 
-				// Must recreate if: switching to/from collab, or switching between different collab docs
-				const needsRecreate = newSyncId !== previousSyncId || !!newSyncId
+				// Must recreate if sync_id changed (covers local↔collab and collab↔collab).
+				// The `sync_id` effect also fires on sync_id changes — whichever effect
+				// runs first does the recreate; the other sees previousSyncId already
+				// updated and skips. Previously we forced recreate whenever the target
+				// was a collab doc, which caused a double create-then-destroy race
+				// that clobbered the Yjs cache with empty state.
+				const needsRecreate = newSyncId !== previousSyncId
 
 				debouncedSave.flush()
 				if (needsRecreate) {
 					createEditorInstance(note)
-				} else if (editor) {
-					// Local-to-local switch — update content in place (no destroy)
+				} else if (editor && !newSyncId) {
+					// Local-to-local switch — update content in place (no destroy).
+					// Skip this for collab editors: the `sync_id` effect may have
+					// already recreated the editor, leaving `previousSyncId` in sync
+					// and making `needsRecreate` false; writing `note.content` here
+					// would go through ySyncPlugin and duplicate the Yjs fragment
+					// when the cached state applies on top.
 					// Set isUpdatingContent BEFORE setEditable because TipTap's
 					// setEditable emits an 'update' event which triggers onUpdate
 					// while the editor still has the OLD note's content loaded.
