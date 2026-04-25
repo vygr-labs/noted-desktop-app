@@ -1,6 +1,6 @@
 import { Show, createSignal, onMount, onCleanup } from 'solid-js'
 import { css } from '../../../styled-system/css'
-import { PlusIcon, ArrowUpDownIcon, PanelLeftCloseIcon } from 'lucide-solid'
+import { PlusIcon, ArrowUpDownIcon, PanelLeftCloseIcon, EyeIcon } from 'lucide-solid'
 import { useAppStore } from '../../stores/app-store'
 
 const headerStyle = css({
@@ -89,7 +89,9 @@ export function NoteListHeader(props: {
 }) {
 	const store = useAppStore()
 	const [showSort, setShowSort] = createSignal(false)
+	const [showView, setShowView] = createSignal(false)
 	let sortContainerRef: HTMLDivElement | undefined
+	let viewContainerRef: HTMLDivElement | undefined
 
 	const sortOptions: { value: NoteSortOrder; label: string }[] = [
 		{ value: 'created_at', label: 'Date created' },
@@ -107,6 +109,9 @@ export function NoteListHeader(props: {
 		function handleClickOutside(e: MouseEvent) {
 			if (showSort() && sortContainerRef && !sortContainerRef.contains(e.target as Node)) {
 				setShowSort(false)
+			}
+			if (showView() && viewContainerRef && !viewContainerRef.contains(e.target as Node)) {
+				setShowView(false)
 			}
 		}
 		document.addEventListener('mousedown', handleClickOutside)
@@ -139,6 +144,32 @@ export function NoteListHeader(props: {
 									{opt.label}
 								</div>
 							))}
+						</div>
+					</Show>
+				</div>
+				<div ref={viewContainerRef} style={{ position: 'relative' }}>
+					<button
+						class={actionBtn}
+						onClick={() => setShowView(!showView())}
+						title="View options"
+					>
+						<EyeIcon class={iconSize} />
+					</button>
+					<Show when={showView()}>
+						<div class={dropdown}>
+							<div
+								class={dropdownItem}
+								data-active={store.showNotePreview()}
+								onClick={() => {
+									store.setShowNotePreview(!store.showNotePreview())
+									setShowView(false)
+								}}
+							>
+								<span class={checkMark}>
+									{store.showNotePreview() ? '✓' : ''}
+								</span>
+								Show preview
+							</div>
 						</div>
 					</Show>
 				</div>

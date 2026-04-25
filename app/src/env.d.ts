@@ -253,6 +253,7 @@ interface ElectronAPI {
 
 	// Daily notes
 	getOrCreateDailyNote: (date: string) => Promise<Note>
+	fetchAllDailyNotes: () => Promise<Note[]>
 
 	// Quick capture
 	openQuickCapture: () => Promise<void>

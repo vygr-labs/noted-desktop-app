@@ -66,6 +66,15 @@ export function fetchDailyNote(date: string): Note | undefined {
 		.get(date) as Note | undefined
 }
 
+export function fetchAllDailyNotes(): Note[] {
+	return db
+		.prepare(
+			`SELECT * FROM notes WHERE is_daily = 1 AND is_trashed = 0
+			 ORDER BY daily_date DESC`
+		)
+		.all() as Note[]
+}
+
 export function createNote(data: {
 	title?: string
 	content?: string | null

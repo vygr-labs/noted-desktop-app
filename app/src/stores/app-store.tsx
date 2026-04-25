@@ -36,6 +36,8 @@ interface AppStore {
 	setNoteSearchOpen: (v: boolean) => void
 	noteSort: () => NoteSortOrder
 	setNoteSort: (sort: NoteSortOrder) => void
+	showNotePreview: () => boolean
+	setShowNotePreview: (v: boolean) => void
 	selectedTodoListId: () => string | null
 	setSelectedTodoListId: (id: string | null) => void
 
@@ -93,6 +95,7 @@ export function AppStoreProvider(props: ParentProps) {
 	const [commandPaletteOpen, setCommandPaletteOpen] = createSignal(false)
 	const [noteSearchOpen, setNoteSearchOpen] = createSignal(false)
 	const [noteSort, _setNoteSort] = createSignal<NoteSortOrder>('updated_at')
+	const [showNotePreview, _setShowNotePreview] = createSignal(true)
 	const [selectedTodoListId, setSelectedTodoListId] = createSignal<string | null>(null)
 	const [noteTagsMap, setNoteTagsMap] = createSignal<Record<string, Tag[]>>({})
 	const [listNotesVersion, setListNotesVersion] = createSignal(0)
@@ -104,12 +107,20 @@ export function AppStoreProvider(props: ParentProps) {
 		window.electronAPI.setSetting('noteSort', sort)
 	}
 
+	function setShowNotePreview(v: boolean) {
+		_setShowNotePreview(v)
+		window.electronAPI.setSetting('showNotePreview', v ? '1' : '0')
+	}
+
 	// Load saved sort on startup + listen for cross-window todo changes
 	onMount(async () => {
 		const saved = await window.electronAPI.getSetting('noteSort')
 		if (saved === 'updated_at' || saved === 'created_at' || saved === 'title') {
 			_setNoteSort(saved)
 		}
+
+		const savedPreview = await window.electronAPI.getSetting('showNotePreview')
+		if (savedPreview === '0') _setShowNotePreview(false)
 
 		window.electronAPI.onPopoutTodosChanged(() => {
 			refetchTodos()
@@ -178,6 +189,8 @@ export function AppStoreProvider(props: ParentProps) {
 		setNoteSearchOpen,
 		noteSort,
 		setNoteSort,
+		showNotePreview,
+		setShowNotePreview,
 		selectedTodoListId,
 		setSelectedTodoListId,
 

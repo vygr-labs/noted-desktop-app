@@ -117,6 +117,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	// Daily notes
 	getOrCreateDailyNote: (date: string) =>
 		ipcRenderer.invoke('daily:get-or-create', date),
+	fetchAllDailyNotes: () => ipcRenderer.invoke('daily:fetch-all'),
 
 	// Quick capture
 	openQuickCapture: () => ipcRenderer.invoke('quick-capture:open'),

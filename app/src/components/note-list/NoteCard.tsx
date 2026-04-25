@@ -2,6 +2,7 @@ import { Show, For, createSignal } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { formatCreatedDate, formatRelativeEdited } from '../../lib/date-utils'
 import { useEditorStore } from '../../stores/editor-store'
+import { useAppStore } from '../../stores/app-store'
 import { PinIcon, EllipsisIcon, LockIcon, Share2Icon, ArrowDownLeftIcon } from 'lucide-solid'
 import { NoteCardMenu, type MenuPosition } from './NoteCardMenu'
 
@@ -157,6 +158,7 @@ export function NoteCard(props: {
 	tags?: Tag[]
 }) {
 	const editorStore = useEditorStore()
+	const appStore = useAppStore()
 	const [menuPos, setMenuPos] = createSignal<MenuPosition | null>(null)
 
 	const isSyncing = () => props.note.is_shared && !props.note.content && !props.note.content_plain
@@ -236,7 +238,7 @@ export function NoteCard(props: {
 						<div class={css({ height: '10px', width: '65%', borderRadius: 'xs', bg: 'gray.a3' })} />
 					</div>
 				</Show>
-				<Show when={!isSyncing() && preview()}>
+				<Show when={!isSyncing() && appStore.showNotePreview() && preview()}>
 					<div class={previewText}>{preview()}</div>
 				</Show>
 				<div class={metaRow}>
