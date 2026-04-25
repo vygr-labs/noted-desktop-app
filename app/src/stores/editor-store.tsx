@@ -65,6 +65,15 @@ export function EditorStoreProvider(props: ParentProps) {
 		setIsSaving(true)
 		await window.electronAPI.updateNote(note.id, data)
 		setIsSaving(false)
+
+		// Surgically bump updated_at on the in-memory note so the editor header
+		// reflects the save immediately. We deliberately don't refetch the note
+		// list — that would cause the note to jump to the top while typing when
+		// sorting by date modified.
+		const latest = currentNote()
+		if (latest && latest.id === note.id) {
+			setCurrentNote({ ...latest, updated_at: new Date().toISOString() })
+		}
 	}
 
 	// When selected note changes, load it

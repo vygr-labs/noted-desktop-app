@@ -113,7 +113,15 @@ export function NoteHeader(props: { note: Note; readonly?: boolean }) {
 	createEffect(
 		on(
 			() => props.note.id,
-			() => {
+			(newId, prevId) => {
+				// SolidJS `on` doesn't auto-compare — it fires the callback whenever
+				// a tracked signal in `deps` changes, even if the returned value is
+				// the same. `props.note` reads the currentNote signal, so any
+				// surgical update to currentNote (e.g. saveNote bumping updated_at)
+				// triggers this effect. Without this guard, setLocalTitle would
+				// clobber the user's in-progress typing with the stale title.
+				if (prevId !== undefined && newId === prevId) return
+
 				// Flush any pending title save before switching
 				if (titleTimeout && pendingTitle !== null) {
 					clearTimeout(titleTimeout)

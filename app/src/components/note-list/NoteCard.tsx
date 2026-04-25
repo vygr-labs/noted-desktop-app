@@ -245,7 +245,11 @@ export function NoteCard(props: {
 					<span class={metaText}>
 						{formatCreatedDate(props.note.created_at)}
 						{' · '}
-						{formatRelativeEdited(props.note.updated_at)}
+						{formatRelativeEdited(
+							(props.isActive && editorStore.currentNote()?.id === props.note.id
+								? editorStore.currentNote()!.updated_at
+								: props.note.updated_at)
+						)}
 					</span>
 					<Show when={visibleTags().length > 0}>
 						<div class={tagDotsRow}>

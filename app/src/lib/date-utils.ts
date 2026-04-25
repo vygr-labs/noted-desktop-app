@@ -2,8 +2,17 @@ export function getTodayDate(): string {
 	return new Date().toISOString().split('T')[0]
 }
 
+export function parseDbDate(s: string): Date {
+	// SQLite CURRENT_TIMESTAMP returns UTC as "YYYY-MM-DD HH:MM:SS" with no
+	// timezone suffix. JS parses such strings as local time, so we coerce to UTC.
+	if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2}$/.test(s)) {
+		return new Date(s.replace(' ', 'T') + 'Z')
+	}
+	return new Date(s)
+}
+
 export function formatDate(dateStr: string): string {
-	const date = new Date(dateStr)
+	const date = parseDbDate(dateStr)
 	const now = new Date()
 	const diffMs = now.getTime() - date.getTime()
 	const diffMins = Math.floor(diffMs / 60000)

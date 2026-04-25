@@ -29,8 +29,11 @@ const editorWrap = css({
 	flex: 1,
 	mt: '2',
 	contain: 'content',
+	display: 'flex',
+	flexDirection: 'column',
 	'& .tiptap': {
 		outline: 'none',
+		flex: 1,
 		minHeight: '200px',
 		overflow: 'visible',
 		paddingTop: '1.5em',
@@ -643,52 +646,12 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				const note = props.note
 				const newSyncId = note.sync_id || null
 
-				// Must recreate if sync_id changed (covers local↔collab and collab↔collab).
-				// The `sync_id` effect also fires on sync_id changes — whichever effect
-				// runs first does the recreate; the other sees previousSyncId already
-				// updated and skips. Previously we forced recreate whenever the target
-				// was a collab doc, which caused a double create-then-destroy race
-				// that clobbered the Yjs cache with empty state.
-				const needsRecreate = newSyncId !== previousSyncId
-
+				// Always recreate on note switch. In-place setContent preserves the
+				// editor's undo history, which would let the user undo edits from a
+				// previous note (or rewind into a previous note's content). TipTap v3
+				// has no public API to clear history, so recreate is the reliable fix.
 				debouncedSave.flush()
-				if (needsRecreate) {
-					createEditorInstance(note)
-				} else if (editor && !newSyncId) {
-					// Local-to-local switch — update content in place (no destroy).
-					// Skip this for collab editors: the `sync_id` effect may have
-					// already recreated the editor, leaving `previousSyncId` in sync
-					// and making `needsRecreate` false; writing `note.content` here
-					// would go through ySyncPlugin and duplicate the Yjs fragment
-					// when the cached state applies on top.
-					// Set isUpdatingContent BEFORE setEditable because TipTap's
-					// setEditable emits an 'update' event which triggers onUpdate
-					// while the editor still has the OLD note's content loaded.
-					isUpdatingContent = true
-					editor.setEditable(!props.readonly)
-
-					// Show plain text instantly, then swap to rich content
-					if (note.content_plain && (note.content?.length || 0) > 50000) {
-						editor.commands.setContent(`<p>${note.content_plain.slice(0, 3000).replace(/\n/g, '</p><p>')}</p>`)
-						isUpdatingContent = false
-						log('plain text preview set (switch)')
-
-						const editorRef = editor
-						setTimeout(() => {
-							if (!editorRef || editorRef !== editor) return
-							const st = performance.now()
-							isUpdatingContent = true
-							editorRef.commands.setContent(parseContent(note.content))
-							isUpdatingContent = false
-							log(`setContent (deferred switch): ${(performance.now() - st).toFixed(1)}ms`)
-						}, 0)
-					} else {
-						const st = performance.now()
-						editor.commands.setContent(parseContent(note.content))
-						isUpdatingContent = false
-						log(`setContent: ${(performance.now() - st).toFixed(1)}ms`)
-					}
-				}
+				createEditorInstance(note)
 
 				if (!note.sync_id && !editorStore.isNewNote()) {
 					const saved = cursorPositions.get(newId)

@@ -126,6 +126,8 @@ const editorContent = css({
 
 	overflow: 'auto',
 
+	cursor: 'text',
+
 })
 
 
@@ -134,9 +136,15 @@ const contentInner = css({
 
 	width: '100%',
 
+	minHeight: '100%',
+
 	px: '10',
 
 	py: '6',
+
+	display: 'flex',
+
+	flexDirection: 'column',
 
 })
 
@@ -1058,6 +1066,30 @@ export function EditorPane() {
 		setIsScrolled(target.scrollTop > 0)
 	}
 
+	function handleBackgroundClick(e: MouseEvent) {
+		// Only treat clicks on the scroll container itself as "focus end" —
+		// that's the empty space below the document. Clicks in the gap above
+		// the editor (within contentInner's padding, between TagsBar and the
+		// editor body) shouldn't jump the cursor to the end.
+		if (e.target !== scrollContainerRef) return
+
+		const note = editorStore.currentNote()
+		if (!note) return
+		if (isNoteLocked(note)) return
+
+		if (note.note_type === 'rich') {
+			const editor = getEditorInstance()
+			editor?.commands.focus('end')
+		} else {
+			const textarea = scrollContainerRef?.querySelector('textarea')
+			if (textarea) {
+				textarea.focus()
+				const len = textarea.value.length
+				textarea.setSelectionRange(len, len)
+			}
+		}
+	}
+
 
 
 	const isTrash = () => appStore.currentView() === 'trash'
@@ -1575,6 +1607,8 @@ export function EditorPane() {
 								class={editorContent}
 
 								onScroll={handleScroll}
+
+								onClick={handleBackgroundClick}
 
 								style={{ position: 'relative' }}
 

@@ -2,6 +2,7 @@ import { createSignal, For, Show, onMount, onCleanup } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { useAppStore } from '../../stores/app-store'
 import { SearchIcon, FileTextIcon, ClockIcon } from 'lucide-solid'
+import { parseDbDate } from '../../lib/date-utils'
 
 const overlay = css({
 	position: 'fixed',
@@ -307,7 +308,7 @@ export function CommandPalette() {
 										</Show>
 									</div>
 									<span class={resultMeta}>
-										{new Date(note.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+										{parseDbDate(note.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
 									</span>
 								</div>
 							)}
