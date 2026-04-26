@@ -4,6 +4,9 @@
 const { contextBridge, ipcRenderer } = require('electron')
 
 contextBridge.exposeInMainWorld('electronAPI', {
+	// External links (system browser)
+	openExternal: (url: string) => ipcRenderer.invoke('app:open-external', url),
+
 	// Dark mode
 	darkModeToggle: () => ipcRenderer.invoke('dark-mode:toggle'),
 	darkModeUpdate: (newTheme: 'light' | 'dark') =>

@@ -7,6 +7,7 @@ import TaskItem from '@tiptap/extension-task-item'
 import Placeholder from '@tiptap/extension-placeholder'
 import Underline from '@tiptap/extension-underline'
 import Highlight from '@tiptap/extension-highlight'
+import Link from '@tiptap/extension-link'
 import { Table, TableRow, TableHeader, TableCell } from '@tiptap/extension-table'
 import { Plugin, PluginKey } from '@tiptap/pm/state'
 import { Decoration, DecorationSet } from '@tiptap/pm/view'
@@ -69,6 +70,21 @@ const editorWrap = css({
 		float: 'left',
 		pointerEvents: 'none',
 		height: 0,
+	},
+	'& .tiptap a': {
+		color: 'indigo.11',
+		textDecoration: 'underline',
+		textUnderlineOffset: '2px',
+		textDecorationColor: 'indigo.a6',
+		cursor: 'text',
+		transition: 'color 0.1s, text-decoration-color 0.1s',
+	},
+	'& .tiptap a:hover': {
+		color: 'indigo.10',
+		textDecorationColor: 'indigo.a8',
+	},
+	'&.mod-down .tiptap a': {
+		cursor: 'pointer',
 	},
 })
 
@@ -251,6 +267,37 @@ function createPasteFormatterPlugin() {
 	})
 }
 
+// ─── Linkify existing plain-text URLs ────────────────────
+// Notes saved before the Link extension was added have plain-text URLs.
+// Apply link marks once after load so they become clickable. Subsequent
+// loads are idempotent: text already wrapped in a link mark is skipped.
+const URL_PATTERN = /\bhttps?:\/\/[^\s<>"'`]+|\bwww\.[^\s<>"'`]+/g
+
+function linkifyExistingUrls(editor: Editor) {
+	const linkType = editor.schema.marks.link
+	if (!linkType) return
+	const tr = editor.state.tr
+	let changed = false
+	editor.state.doc.descendants((node, pos) => {
+		if (!node.isText || !node.text) return
+		if (node.marks.some((m) => m.type === linkType)) return
+		URL_PATTERN.lastIndex = 0
+		let match: RegExpExecArray | null
+		while ((match = URL_PATTERN.exec(node.text)) !== null) {
+			const raw = match[0].replace(/[.,;:!?)]+$/, '')
+			const from = pos + match.index
+			const to = from + raw.length
+			const href = raw.startsWith('http') ? raw : `https://${raw}`
+			tr.addMark(from, to, linkType.create({ href }))
+			changed = true
+		}
+	})
+	if (changed) {
+		tr.setMeta('addToHistory', false)
+		editor.view.dispatch(tr)
+	}
+}
+
 // ─── Clean content ───────────────────────────────────────
 
 export function cleanEditorContent() {
@@ -343,6 +390,12 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 			TaskItem.configure({ nested: true }),
 			Placeholder.configure({ placeholder: 'Start writing...' }),
 			Highlight.configure({ multicolor: false }),
+			Link.configure({
+				openOnClick: false,
+				autolink: true,
+				linkOnPaste: true,
+				HTMLAttributes: { rel: 'noopener noreferrer nofollow' },
+			}),
 			Table.configure({ resizable: false }),
 			TableRow,
 			TableHeader,
@@ -388,6 +441,44 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		if (editor) { editor.destroy(); editor = null }
 		currentEditor = null
 		log(`destroyEditor took: ${(performance.now() - dt0).toFixed(1)}ms`)
+	}
+
+	let containerListenersAttached = false
+
+	function setupLinkHandler() {
+		// Single click should place the cursor (default ProseMirror behavior).
+		// Cmd/Ctrl + click opens the link in the system browser via the main
+		// process's setWindowOpenHandler. We must preventDefault on every link
+		// click — the rendered `<a target="_blank">` would otherwise trigger
+		// the browser's native open behavior on plain clicks too.
+		const linkClick = (e: MouseEvent) => {
+			const anchor = (e.target as HTMLElement).closest('a')
+			if (!anchor) return
+			// preventDefault blocks any default link behavior. window.open
+			// requests from `target="_blank"` are denied in main.ts, so the
+			// only path that opens an external link is our explicit IPC call
+			// below — guaranteed gated by the modifier-key check.
+			e.preventDefault()
+			if (!(e.metaKey || e.ctrlKey)) return
+			const href = anchor.getAttribute('href')
+			if (href) window.electronAPI.openExternal(href)
+		}
+		// Capture phase: ensures our preventDefault runs before any other
+		// click handler. Don't stopPropagation — ProseMirror still needs the
+		// event to place the cursor at the click position.
+		containerRef!.addEventListener('click', linkClick, true)
+		containerRef!.addEventListener('auxclick', linkClick, true)
+
+		// Toggle a class on the container while the modifier key is held so
+		// the CSS can switch link cursors to a pointer — gives a visual hint
+		// that Cmd/Ctrl+click will open the link.
+		const onKey = (e: KeyboardEvent) => {
+			const pressed = e.ctrlKey || e.metaKey
+			containerRef!.classList.toggle('mod-down', pressed)
+		}
+		window.addEventListener('keydown', onKey)
+		window.addEventListener('keyup', onKey)
+		window.addEventListener('blur', () => containerRef!.classList.remove('mod-down'))
 	}
 
 	function setupCheckboxHandler() {
@@ -603,6 +694,7 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					const st = performance.now()
 					isUpdatingContent = true
 					editorRef.commands.setContent(parseContent(note.content))
+					linkifyExistingUrls(editorRef)
 					isUpdatingContent = false
 					log(`setContent (deferred): ${(performance.now() - st).toFixed(1)}ms`)
 				}, 0)
@@ -612,7 +704,13 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		currentEditor = editor
 		setInTable(editor.isActive('table'))
 		editor.view.dom.spellcheck = !!note.spellcheck
-		setupCheckboxHandler()
+		// Container-level DOM listeners only need to be attached once — the
+		// containerRef div persists across editor recreations on note switch.
+		if (!containerListenersAttached) {
+			setupCheckboxHandler()
+			setupLinkHandler()
+			containerListenersAttached = true
+		}
 		log('editor setup complete, text length:', editor.getText().length)
 
 	}

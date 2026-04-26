@@ -107,6 +107,9 @@ interface NoteWithTags extends Note {
 // ==================== Electron API ====================
 
 interface ElectronAPI {
+	// External links (system browser)
+	openExternal: (url: string) => Promise<boolean>
+
 	// Dark mode
 	darkModeToggle: () => Promise<boolean>
 	darkModeUpdate: (newTheme: 'light' | 'dark') => void

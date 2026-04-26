@@ -8,6 +8,7 @@ import {
 	nativeTheme,
 	globalShortcut,
 	screen,
+	shell,
 } from 'electron'
 import log from 'electron-log'
 import electronUpdater from 'electron-updater'
@@ -73,6 +74,24 @@ const getAssetPath = (...paths: string[]): string => {
 	return path.join(RESOURCES_PATH, ...paths)
 }
 
+// The renderer should never navigate away or spawn child windows. Both paths
+// are denied unconditionally — opening external URLs is opt-in via the
+// `app:open-external` IPC, called only by deliberate user actions (e.g. the
+// Cmd/Ctrl+click handler on editor links).
+function wireExternalLinks(win: BrowserWindow) {
+	win.webContents.setWindowOpenHandler(() => ({ action: 'deny' }))
+	win.webContents.on('will-navigate', (event, target) => {
+		const current = win.webContents.getURL()
+		try {
+			const next = new URL(target)
+			const cur = new URL(current)
+			if (next.origin !== cur.origin) event.preventDefault()
+		} catch {
+			event.preventDefault()
+		}
+	})
+}
+
 function registerZoomShortcuts(win: BrowserWindow) {
 	win.webContents.on('before-input-event', (event, input) => {
 		if (!input.control && !input.meta) return
@@ -130,6 +149,7 @@ const spawnAppWindow = async () => {
 	})
 
 	registerZoomShortcuts(appWindow)
+	wireExternalLinks(appWindow)
 
 	if (electronIsDev) appWindow.webContents.openDevTools({ mode: 'bottom' })
 
@@ -222,6 +242,8 @@ function spawnQuickCaptureWindow() {
 		},
 	})
 
+	wireExternalLinks(quickCaptureWindow)
+
 	quickCaptureWindow.loadURL(
 		electronIsDev
 			? 'http://localhost:7241/quick-capture'
@@ -292,6 +314,7 @@ function spawnPopoutWindow(opts: { view: string; listId?: string; title?: string
 	)
 
 	registerZoomShortcuts(popout)
+	wireExternalLinks(popout)
 
 	popout.once('ready-to-show', () => {
 		popout.show()
@@ -345,6 +368,13 @@ app.on('window-all-closed', () => {
 
 function registerAppHandlers() {
 	// Dark mode handlers
+	ipcMain.handle('app:open-external', (_, target: string) => {
+		if (typeof target !== 'string') return false
+		if (!/^(https?|mailto):/i.test(target)) return false
+		shell.openExternal(target)
+		return true
+	})
+
 	ipcMain.handle('dark-mode:toggle', () => {
 		if (nativeTheme.shouldUseDarkColors) {
 			nativeTheme.themeSource = 'light'
