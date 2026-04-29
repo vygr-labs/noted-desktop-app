@@ -9086,6 +9086,7 @@ __metadata:
     "@tiptap/extension-bubble-menu": "npm:^3.20.4"
     "@tiptap/extension-collaboration": "npm:^3.20.5"
     "@tiptap/extension-highlight": "npm:^3.20.4"
+    "@tiptap/extension-link": "npm:^3.20.5"
     "@tiptap/extension-placeholder": "npm:^3.20.4"
     "@tiptap/extension-table": "npm:^3.20.4"
     "@tiptap/extension-table-cell": "npm:^3.20.4"
