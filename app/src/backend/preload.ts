@@ -139,9 +139,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 		ipcRenderer.on('popout:todos-changed', () => callback())
 	},
 
-	// Notes refresh
+	// Notes refresh (fired by quick-capture — a note was added)
 	onNotesRefresh: (callback: () => void) => {
 		ipcRenderer.on('notes:refresh', () => callback())
+	},
+
+	// External DB change (fired by the db-watcher when noted-cli or another
+	// process commits a write — any table may have changed).
+	onExternalDbChange: (callback: () => void) => {
+		ipcRenderer.on('db:external-change', () => callback())
 	},
 
 	// Window controls

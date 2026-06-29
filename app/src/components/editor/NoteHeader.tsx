@@ -1,4 +1,4 @@
-import { createSignal, createEffect, on, Show, createMemo } from 'solid-js'
+import { createSignal, createEffect, on, onCleanup, Show, createMemo } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { useEditorStore } from '../../stores/editor-store'
 import { useAppStore } from '../../stores/app-store'
@@ -107,28 +107,33 @@ export function NoteHeader(props: { note: Note; readonly?: boolean }) {
 	const [localTitle, setLocalTitle] = createSignal(props.note.title)
 	let titleTimeout: ReturnType<typeof setTimeout> | null = null
 	let pendingTitle: string | null = null
+	// The note id the pending title belongs to. Captured when typing so a flush
+	// always saves to the right note even if the selection has already changed.
+	let pendingTitleNoteId: string | null = null
 	let titleInputRef: HTMLInputElement | undefined
 
-	// Update local title when note changes
+	function flushPendingTitle() {
+		if (titleTimeout && pendingTitle !== null && pendingTitleNoteId) {
+			clearTimeout(titleTimeout)
+			titleTimeout = null
+			editorStore.saveNote({ title: pendingTitle }, pendingTitleNoteId)
+			pendingTitle = null
+			pendingTitleNoteId = null
+		}
+	}
+
+	// `createMemo` dedupes by ===, so this effect only fires on a genuine note
+	// switch — not on every surgical currentNote update (e.g. saveNote bumping
+	// updated_at), which would otherwise clobber in-progress typing.
+	const noteId = createMemo(() => props.note.id)
+
+	// Update local title when the note changes
 	createEffect(
 		on(
-			() => props.note.id,
-			(newId, prevId) => {
-				// SolidJS `on` doesn't auto-compare — it fires the callback whenever
-				// a tracked signal in `deps` changes, even if the returned value is
-				// the same. `props.note` reads the currentNote signal, so any
-				// surgical update to currentNote (e.g. saveNote bumping updated_at)
-				// triggers this effect. Without this guard, setLocalTitle would
-				// clobber the user's in-progress typing with the stale title.
-				if (prevId !== undefined && newId === prevId) return
-
-				// Flush any pending title save before switching
-				if (titleTimeout && pendingTitle !== null) {
-					clearTimeout(titleTimeout)
-					titleTimeout = null
-					editorStore.saveNote({ title: pendingTitle })
-					pendingTitle = null
-				}
+			noteId,
+			() => {
+				// Flush the previous note's pending title (to ITS id) before switching.
+				flushPendingTitle()
 				setLocalTitle(props.note.title)
 
 				// Auto-focus and select title for new notes
@@ -145,6 +150,20 @@ export function NoteHeader(props: { note: Note; readonly?: boolean }) {
 			{ defer: true }
 		)
 	)
+
+	// When the open note is reloaded after an external (CLI) change, adopt the
+	// fresh title.
+	createEffect(
+		on(
+			() => editorStore.reloadNonce(),
+			() => setLocalTitle(props.note.title),
+			{ defer: true }
+		)
+	)
+
+	// Persist any pending title if the header unmounts (note deselected) so the
+	// edit isn't lost when the 300ms debounce never gets to fire.
+	onCleanup(flushPendingTitle)
 
 	// Also handle the initial mount for a new note
 	requestAnimationFrame(() => {
@@ -164,11 +183,15 @@ export function NoteHeader(props: { note: Note; readonly?: boolean }) {
 	function handleTitleChange(value: string) {
 		setLocalTitle(value)
 		editorStore.setLiveTitle(value || 'Untitled')
+		editorStore.markDirty()
 		pendingTitle = value || 'Untitled'
+		pendingTitleNoteId = props.note.id
 		if (titleTimeout) clearTimeout(titleTimeout)
 		titleTimeout = setTimeout(async () => {
-			await editorStore.saveNote({ title: pendingTitle! })
+			const targetId = pendingTitleNoteId
+			await editorStore.saveNote({ title: pendingTitle! }, targetId ?? undefined)
 			pendingTitle = null
+			pendingTitleNoteId = null
 			appStore.bumpListNotes()
 		}, 300)
 	}

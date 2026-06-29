@@ -127,7 +127,20 @@ export function AppStoreProvider(props: ParentProps) {
 		})
 
 		window.electronAPI.onNotesRefresh(() => {
+			// Quick-capture only ever adds a note, so refetching the note list is
+			// enough — no need to re-pull lists/tags on every capture.
 			refetchNotes()
+		})
+
+		window.electronAPI.onExternalDbChange(() => {
+			// noted-cli (or another process) committed a write. It may have touched
+			// any table, so refresh every resource the sidebar/views depend on.
+			refetchNotes()
+			refetchLists()
+			refetchTags()
+			refetchTodos()
+			refetchTodoLists()
+			refetchSearch()
 		})
 
 		// Handle noted://share/... deep links

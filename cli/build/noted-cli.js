@@ -153,6 +153,9 @@ function ensureSchema(db) {
     }
 }
 // ─── Argument parsing ────────────────────────────────────
+// Flags that never take a value — they must not swallow the following
+// positional (e.g. `search --json roadmap` must keep "roadmap" as the query).
+const BOOLEAN_FLAGS = new Set(['json', 'append']);
 function parseArgs(argv) {
     const raw = argv.slice(2);
     const command = raw[0] || 'help';
@@ -164,7 +167,10 @@ function parseArgs(argv) {
         if (arg.startsWith('--')) {
             const key = arg.slice(2);
             const next = raw[i + 1];
-            if (next && !next.startsWith('--')) {
+            // `next !== undefined` (not truthiness) so an explicit empty value
+            // like `--title ""` is kept as '' rather than collapsing to `true`,
+            // which lets callers clear a title/body.
+            if (!BOOLEAN_FLAGS.has(key) && next !== undefined && !next.startsWith('--')) {
                 flags[key] = next;
                 i += 2;
             }
@@ -180,6 +186,14 @@ function parseArgs(argv) {
     }
     return { command, args, flags };
 }
+// Parse a `--limit` value, honouring an explicit 0 (which `parseInt(x) || def`
+// would wrongly treat as falsy and replace with the default).
+function parseLimit(val, def) {
+    if (typeof val !== 'string')
+        return def;
+    const n = parseInt(val, 10);
+    return Number.isFinite(n) && n >= 0 ? n : def;
+}
 // ─── Read stdin (for piped content) ──────────────────────
 function readStdin() {
     return new Promise((resolve) => {
@@ -193,14 +207,110 @@ function readStdin() {
         process.stdin.on('end', () => resolve(data));
     });
 }
-// ─── Commands ────────────────────────────────────────────
-function textToTipTapJson(text) {
-    const lines = text.split('\n');
-    const content = [];
+function parseInlineMarkdown(text) {
+    if (!text)
+        return [];
+    const nodes = [];
+    // Matches: **bold**, *italic*, ~~strike~~, `code`, [text](url)
+    const inlineRegex = /(\*\*(.+?)\*\*|\*(.+?)\*|~~(.+?)~~|`([^`]+)`|\[(.+?)\]\((.+?)\))/g;
+    let lastIndex = 0;
+    let match;
+    while ((match = inlineRegex.exec(text)) !== null) {
+        if (match.index > lastIndex) {
+            nodes.push({ type: 'text', text: text.slice(lastIndex, match.index) });
+        }
+        if (match[2]) {
+            nodes.push({ type: 'text', text: match[2], marks: [{ type: 'bold' }] });
+        }
+        else if (match[3]) {
+            nodes.push({ type: 'text', text: match[3], marks: [{ type: 'italic' }] });
+        }
+        else if (match[4]) {
+            nodes.push({ type: 'text', text: match[4], marks: [{ type: 'strike' }] });
+        }
+        else if (match[5]) {
+            nodes.push({ type: 'text', text: match[5], marks: [{ type: 'code' }] });
+        }
+        else if (match[6] && match[7]) {
+            nodes.push({ type: 'text', text: match[6], marks: [{ type: 'link', attrs: { href: match[7] } }] });
+        }
+        lastIndex = match.index + match[0].length;
+    }
+    if (lastIndex < text.length) {
+        nodes.push({ type: 'text', text: text.slice(lastIndex) });
+    }
+    return nodes.length > 0 ? nodes : [{ type: 'text', text }];
+}
+function makeTextBlock(type, text, attrs) {
+    const content = parseInlineMarkdown(text);
+    return { type, content, ...(attrs ? { attrs } : {}) };
+}
+function parseCellContent(text) {
+    if (!text)
+        return [];
+    // Checkbox inside a table cell: [ ] or [x]
+    const checkMatch = text.match(/^\[([ xX])\]\s*(.*)/);
+    if (checkMatch) {
+        const checked = checkMatch[1].toLowerCase() === 'x';
+        const rest = checkMatch[2];
+        const nodes = [{ type: 'inlineCheckbox', attrs: { checked } }];
+        if (rest) {
+            nodes.push({ type: 'text', text: ' ' });
+            nodes.push(...parseInlineMarkdown(rest));
+        }
+        return nodes;
+    }
+    return parseInlineMarkdown(text);
+}
+function parseMarkdownTable(lines) {
+    const tableLines = lines
+        .map((l) => l.trim())
+        .filter((l) => l.startsWith('|') && l.endsWith('|'));
+    if (tableLines.length < 2)
+        return null;
+    // Find the separator row (e.g. |---|---|)
+    const sepIdx = tableLines.findIndex((l) => /^\|[\s\-:|]+\|$/.test(l));
+    if (sepIdx < 1)
+        return null;
+    function parseCells(line) {
+        return line
+            .slice(1, -1) // remove leading/trailing |
+            .split('|')
+            .map((c) => c.trim());
+    }
+    const headerRows = tableLines.slice(0, sepIdx);
+    const bodyRows = tableLines.slice(sepIdx + 1);
+    const rows = [];
+    for (const row of headerRows) {
+        const cells = parseCells(row);
+        rows.push({
+            type: 'tableRow',
+            content: cells.map((cell) => ({
+                type: 'tableHeader',
+                content: [{ type: 'paragraph', content: cell ? parseCellContent(cell) : undefined }],
+            })),
+        });
+    }
+    for (const row of bodyRows) {
+        const cells = parseCells(row);
+        rows.push({
+            type: 'tableRow',
+            content: cells.map((cell) => ({
+                type: 'tableCell',
+                content: [{ type: 'paragraph', content: cell ? parseCellContent(cell) : undefined }],
+            })),
+        });
+    }
+    if (rows.length === 0)
+        return null;
+    return { type: 'table', content: rows };
+}
+function parseLinesToNodes(lines) {
+    const nodes = [];
     let i = 0;
     while (i < lines.length) {
         const line = lines[i];
-        // Code block
+        // Fenced code block
         if (/^\s*```/.test(line)) {
             const codeLines = [];
             i++;
@@ -210,28 +320,22 @@ function textToTipTapJson(text) {
             }
             if (i < lines.length)
                 i++;
-            content.push({
+            nodes.push({
                 type: 'codeBlock',
-                content: codeLines.length > 0
-                    ? [{ type: 'text', text: codeLines.join('\n') }]
-                    : undefined,
+                content: codeLines.length > 0 ? [{ type: 'text', text: codeLines.join('\n') }] : undefined,
             });
-            continue;
-        }
-        // Heading
-        const hm = line.match(/^(#{1,3})\s+(.+)/);
-        if (hm) {
-            content.push({
-                type: 'heading',
-                attrs: { level: hm[1].length },
-                content: [{ type: 'text', text: hm[2].trim() }],
-            });
-            i++;
             continue;
         }
         // Horizontal rule
         if (/^\s*(---+|\*\*\*+|___+)\s*$/.test(line)) {
-            content.push({ type: 'horizontalRule' });
+            nodes.push({ type: 'horizontalRule' });
+            i++;
+            continue;
+        }
+        // Heading
+        const headingMatch = line.match(/^(#{1,3})\s+(.+)/);
+        if (headingMatch) {
+            nodes.push(makeTextBlock('heading', headingMatch[2].trim(), { level: headingMatch[1].length }));
             i++;
             continue;
         }
@@ -242,51 +346,118 @@ function textToTipTapJson(text) {
                 quoteLines.push(lines[i].replace(/^\s*>\s?/, ''));
                 i++;
             }
-            const inner = textToTipTapJson(quoteLines.join('\n'));
-            const parsed = JSON.parse(inner);
-            content.push({ type: 'blockquote', content: parsed.content || [] });
+            const innerNodes = parseLinesToNodes(quoteLines);
+            nodes.push({
+                type: 'blockquote',
+                content: innerNodes.length > 0 ? innerNodes : [{ type: 'paragraph' }],
+            });
             continue;
         }
-        // Bullet list
-        if (/^\s*[-*•]\s+/.test(line) && !/^\s*[-*•]\s+\[[ xX]\]/.test(line)) {
-            const items = [];
+        // Markdown table
+        if (/^\s*\|.*\|\s*$/.test(line)) {
+            const tableLines = [];
+            while (i < lines.length && /^\s*\|.*\|\s*$/.test(lines[i])) {
+                tableLines.push(lines[i]);
+                i++;
+            }
+            const table = parseMarkdownTable(tableLines);
+            if (table) {
+                nodes.push(table);
+                continue;
+            }
+            // Not a valid table — rewind and reprocess as normal lines
+            i -= tableLines.length;
+        }
+        // Task list: - [ ] or - [x]
+        if (/^\s*[-*•]\s+\[[ xX]\]\s+/.test(line)) {
+            const taskItems = [];
             while (i < lines.length) {
-                const m = lines[i].match(/^\s*[-*•]\s+(.*)/);
-                if (!m || /^\s*[-*•]\s+\[[ xX]\]/.test(lines[i]))
+                const tm = lines[i].match(/^\s*[-*•]\s+\[([ xX])\]\s+(.*)/);
+                if (!tm)
                     break;
-                items.push({
-                    type: 'listItem',
-                    content: [{ type: 'paragraph', content: m[1].trim() ? [{ type: 'text', text: m[1].trim() }] : undefined }],
+                taskItems.push({
+                    type: 'taskItem',
+                    attrs: { checked: tm[1].toLowerCase() === 'x' },
+                    content: [makeTextBlock('paragraph', tm[2].trim())],
                 });
                 i++;
             }
-            content.push({ type: 'bulletList', content: items });
+            nodes.push({ type: 'taskList', content: taskItems });
             continue;
         }
-        // Ordered list
+        // Bullet list (- or •, or * followed by space+text — standalone * is italic)
+        if (/^\s*[-•]\s+/.test(line) || /^\s*\*\s+[^*]/.test(line)) {
+            const listItems = [];
+            while (i < lines.length) {
+                const bm = lines[i].match(/^\s*[-*•]\s+(.*)/);
+                if (!bm)
+                    break;
+                if (/^\s*[-*•]\s+\[[ xX]\]\s+/.test(lines[i]))
+                    break;
+                listItems.push({
+                    type: 'listItem',
+                    content: [makeTextBlock('paragraph', bm[1].trim())],
+                });
+                i++;
+            }
+            nodes.push({ type: 'bulletList', content: listItems });
+            continue;
+        }
+        // Ordered list: 1. text, 2) text
         if (/^\s*\d+[.)]\s+/.test(line)) {
-            const items = [];
+            const listItems = [];
             while (i < lines.length) {
-                const m = lines[i].match(/^\s*\d+[.)]\s+(.*)/);
-                if (!m)
+                const om = lines[i].match(/^\s*\d+[.)]\s+(.*)/);
+                if (!om)
                     break;
-                items.push({
+                listItems.push({
                     type: 'listItem',
-                    content: [{ type: 'paragraph', content: m[1].trim() ? [{ type: 'text', text: m[1].trim() }] : undefined }],
+                    content: [makeTextBlock('paragraph', om[1].trim())],
                 });
                 i++;
             }
-            content.push({ type: 'orderedList', content: items });
+            nodes.push({ type: 'orderedList', content: listItems });
             continue;
         }
-        // Regular line — skip blank lines (blocks have CSS margins)
+        // Regular line — parse inline markdown, skip blank lines (CSS margins)
         const trimmed = line.trim();
         if (trimmed) {
-            content.push({ type: 'paragraph', content: [{ type: 'text', text: trimmed }] });
+            nodes.push(makeTextBlock('paragraph', trimmed));
         }
         i++;
     }
-    return JSON.stringify({ type: 'doc', content });
+    return nodes;
+}
+function textToTipTapJson(text) {
+    return JSON.stringify({ type: 'doc', content: parseLinesToNodes(text.split('\n')) });
+}
+// Render markdown to a TipTap `content` value for a rich note. Returns null for
+// empty/whitespace input so we store NULL (an empty document the editor renders
+// as a clean blank note) instead of `{"type":"doc","content":[]}`, which is an
+// invalid ProseMirror doc (the schema requires at least one block). Mirrors the
+// null-guard cmdCreate already uses.
+function renderRichContent(plain) {
+    return plain && plain.trim() ? textToTipTapJson(plain) : null;
+}
+// Flatten a TipTap node's text for content_plain (FTS / word count). Block
+// boundaries at the top level become newlines; inline marks are ignored.
+function extractText(node) {
+    if (node.type === 'text')
+        return node.text || '';
+    if (!node.content)
+        return '';
+    return node.content.map(extractText).join('');
+}
+function extractPlainFromContent(contentJson) {
+    try {
+        const doc = JSON.parse(contentJson);
+        if (!doc || !Array.isArray(doc.content))
+            return '';
+        return doc.content.map(extractText).join('\n').trim();
+    }
+    catch {
+        return '';
+    }
 }
 function resolveListId(db, listRef) {
     // Try by ID first
@@ -319,6 +490,90 @@ function cmdCreate(db, args, flags, stdinContent) {
     db.prepare('INSERT INTO notes_fts (note_id, title, content_plain) VALUES (?, ?, ?)').run(id, title, contentPlain || '');
     const note = db.prepare('SELECT * FROM notes WHERE id = ?').get(id);
     console.log(JSON.stringify({ created: true, id: note.id, title: note.title, list_id: listId }, null, 2));
+}
+function cmdUpdate(db, args, flags, stdinContent) {
+    const id = args[0] || (typeof flags.id === 'string' ? flags.id : undefined);
+    if (!id) {
+        console.error('Usage: noted-cli update <note-id> [--title "..."] [--content "..."] [--type rich|plain] [--append]');
+        process.exit(1);
+    }
+    const existing = db.prepare('SELECT * FROM notes WHERE id = ?').get(id);
+    if (!existing) {
+        console.error(`Note not found: ${id}`);
+        process.exit(1);
+    }
+    // Note type (may be flipped via --type)
+    let noteType = existing.note_type;
+    if (flags.type === 'plain' || flags.type === 'rich')
+        noteType = flags.type;
+    // Content can come from --content or stdin. Only treat the body as changed
+    // when the user explicitly asked (--content or --append) — otherwise a stray
+    // pipe on stdin during a `update <id> --title X` would silently wipe the body.
+    const append = flags.append === true;
+    const contentFromFlag = typeof flags.content === 'string';
+    const contentInput = contentFromFlag ? flags.content : stdinContent;
+    const wantsContentChange = 'content' in flags || append;
+    // `contentFromFlag` keeps `--content ""` (clear body) as a real change.
+    const contentProvided = wantsContentChange && (contentFromFlag || contentInput.length > 0);
+    const typeChanged = noteType !== existing.note_type;
+    // Default: leave content untouched so a title-only edit keeps rich formatting.
+    let finalContent = existing.content;
+    let finalPlain = existing.content_plain;
+    if (contentProvided) {
+        if (append) {
+            // Derive the existing plain text from the rich doc when content_plain
+            // is missing, so the FTS index / word count keep the whole body — not
+            // just the appended part — in sync with the rich `content`.
+            const existingPlain = existing.content_plain
+                || (existing.note_type === 'rich' && existing.content
+                    ? extractPlainFromContent(existing.content)
+                    : '');
+            finalPlain = existingPlain ? `${existingPlain}\n${contentInput}` : contentInput;
+            if (noteType === 'rich') {
+                // Append new nodes onto the existing rich doc so prior formatting
+                // survives (re-parsing content_plain would flatten app-authored marks).
+                const newNodes = parseLinesToNodes(contentInput.split('\n'));
+                let doc = null;
+                if (existing.note_type === 'rich' && existing.content) {
+                    try {
+                        const parsed = JSON.parse(existing.content);
+                        if (parsed && Array.isArray(parsed.content))
+                            doc = parsed;
+                    }
+                    catch {
+                        // fall back to re-rendering below
+                    }
+                }
+                if (doc) {
+                    doc.content = [...(doc.content || []), ...newNodes];
+                    finalContent = JSON.stringify(doc);
+                }
+                else {
+                    finalContent = renderRichContent(finalPlain);
+                }
+            }
+            else {
+                finalContent = finalPlain;
+            }
+        }
+        else {
+            finalPlain = contentInput;
+            finalContent = noteType === 'rich' ? renderRichContent(contentInput) : contentInput;
+        }
+    }
+    else if (typeChanged) {
+        // Type flipped without new content — reproject the existing plain text.
+        finalPlain = existing.content_plain || '';
+        finalContent = noteType === 'rich' ? renderRichContent(finalPlain) : finalPlain;
+    }
+    const finalTitle = typeof flags.title === 'string' ? flags.title : existing.title;
+    db.prepare(`UPDATE notes SET title = ?, content = ?, content_plain = ?, note_type = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?`).run(finalTitle, finalContent, finalPlain, noteType, id);
+    // Refresh FTS — but don't resurrect a trashed note into search results.
+    db.prepare('DELETE FROM notes_fts WHERE note_id = ?').run(id);
+    if (!existing.is_trashed) {
+        db.prepare('INSERT INTO notes_fts (note_id, title, content_plain) VALUES (?, ?, ?)').run(id, finalTitle, finalPlain || '');
+    }
+    console.log(JSON.stringify({ updated: true, id, title: finalTitle, note_type: noteType }, null, 2));
 }
 function cmdCreateList(db, args, flags) {
     const name = flags.name || args[0];
@@ -360,10 +615,14 @@ function cmdMove(db, args, flags) {
     console.log(`Moved "${note.title}" to list`);
 }
 function cmdList(db, flags) {
-    const limit = parseInt(flags.limit) || 50;
+    const limit = parseLimit(flags.limit, 50);
     const notes = db
         .prepare('SELECT id, title, note_type, is_pinned, created_at, updated_at FROM notes WHERE is_trashed = 0 ORDER BY updated_at DESC LIMIT ?')
         .all(limit);
+    if (flags.json) {
+        console.log(JSON.stringify(notes, null, 2));
+        return;
+    }
     if (notes.length === 0) {
         console.log('No notes found.');
         return;
@@ -407,7 +666,7 @@ function cmdSearch(db, args, flags) {
         .split(/\s+/)
         .map((word) => `"${word}"*`)
         .join(' ');
-    const limit = parseInt(flags.limit) || 20;
+    const limit = parseLimit(flags.limit, 20);
     const results = db.prepare(`
 		SELECT n.id, n.title, snippet(notes_fts, 2, '>>>', '<<<', '...', 40) as snippet
 		FROM notes_fts
@@ -416,6 +675,10 @@ function cmdSearch(db, args, flags) {
 		ORDER BY rank
 		LIMIT ?
 	`).all(ftsQuery, limit);
+    if (flags.json) {
+        console.log(JSON.stringify(results, null, 2));
+        return;
+    }
     if (results.length === 0) {
         console.log('No results found.');
         return;
@@ -442,8 +705,12 @@ function cmdDelete(db, args) {
     db.prepare('DELETE FROM notes_fts WHERE note_id = ?').run(id);
     console.log(`Trashed: ${note.title}`);
 }
-function cmdLists(db) {
+function cmdLists(db, flags) {
     const lists = db.prepare('SELECT id, name, color FROM lists ORDER BY sort_order').all();
+    if (flags.json) {
+        console.log(JSON.stringify(lists, null, 2));
+        return;
+    }
     if (lists.length === 0) {
         console.log('No lists found.');
         return;
@@ -452,8 +719,12 @@ function cmdLists(db) {
         console.log(`  ${list.id}  ${list.name}`);
     }
 }
-function cmdTags(db) {
+function cmdTags(db, flags) {
     const tags = db.prepare('SELECT id, name, color FROM tags ORDER BY name').all();
+    if (flags.json) {
+        console.log(JSON.stringify(tags, null, 2));
+        return;
+    }
     if (tags.length === 0) {
         console.log('No tags found.');
         return;
@@ -471,22 +742,32 @@ USAGE
 
 COMMANDS
   create       Create a new note
+  update       Update an existing note (also: edit)
   create-list  Create a new list
   move         Move a note to a list
-  list         List all notes
+  list         List all notes (also: ls)
   get          Get a note by ID
-  search       Search notes
-  delete       Move a note to trash
+  search       Search notes (also: find)
+  delete       Move a note to trash (also: rm)
   lists        Show all lists
   tags         Show all tags
   help         Show this help message
 
 CREATE OPTIONS
   --title <text>       Note title (default: "Untitled")
-  --content <text>     Note content
+  --content <text>     Note content (single line; pipe stdin for multi-line)
   --type <rich|plain>  Note type (default: "rich")
   --list <name|id>     Add to a list (creates the list if it doesn't exist)
   (stdin)              Pipe content from stdin
+
+UPDATE OPTIONS
+  noted-cli update <note-id> [options]
+  --title <text>       Replace the title ("" clears it)
+  --content <text>     Replace the content (bare --content reads stdin; "" clears)
+  --append             Append --content/stdin instead of replacing
+  --type <rich|plain>  Change the note type
+  (The body is only touched with --content or --append, so a title-only update
+   is safe in a pipeline and preserves the note's existing rich formatting.)
 
 CREATE-LIST OPTIONS
   --name <text>        List name (required)
@@ -495,23 +776,32 @@ CREATE-LIST OPTIONS
 MOVE OPTIONS
   --list <name|id>     Target list (creates if needed). Omit to remove from list.
 
-LIST OPTIONS
-  --limit <n>          Max notes to show (default: 50)
+LIST / SEARCH OPTIONS
+  --limit <n>          Max items (list default: 50, search default: 20)
 
-GET OPTIONS
-  --json               Output full note as JSON
+OUTPUT (--json)
+  create / update      Always print JSON: { id, title, ... }
+  get --json           Full note as JSON
+  list / search /
+  lists / tags --json  Print results as a JSON array (best for scripts/agents)
 
-SEARCH OPTIONS
-  --limit <n>          Max results (default: 20)
+MARKDOWN (rich notes)
+  Content is parsed as markdown. Supported: # ## ### headings, **bold**,
+  *italic*, ~~strike~~, \`code\`, [links](url), "- " bullet and "1." ordered
+  lists, "- [ ]" / "- [x]" task lists, | pipe | tables |, > blockquotes,
+  fenced \`\`\` code blocks, and --- rules. Multi-line content must be piped
+  via stdin — a literal "\\n" inside --content is NOT turned into a newline.
 
 EXAMPLES
   noted-cli create --title "Meeting Notes" --content "# Agenda" --list "Work"
-  echo "Quick thought" | noted-cli create --title "Idea" --list "Personal"
+  printf '# Plan\\n\\n- [ ] ship\\n- [x] design' | noted-cli create --title "Plan"
   cat report.md | noted-cli create --title "Report" --list "Reports"
+  noted-cli update abc123 --title "Renamed"
+  echo "## Follow-up" | noted-cli update abc123 --append
   noted-cli create-list --name "Projects" --color "indigo"
   noted-cli move abc123 --list "Archive"
-  noted-cli list
-  noted-cli search "roadmap"
+  noted-cli list --json
+  noted-cli search "roadmap" --json
   noted-cli delete abc123
 
 DATABASE
@@ -531,6 +821,10 @@ async function main() {
         switch (command) {
             case 'create':
                 cmdCreate(db, args, flags, stdinContent);
+                break;
+            case 'update':
+            case 'edit':
+                cmdUpdate(db, args, flags, stdinContent);
                 break;
             case 'list':
             case 'ls':
@@ -554,10 +848,10 @@ async function main() {
                 cmdMove(db, args, flags);
                 break;
             case 'lists':
-                cmdLists(db);
+                cmdLists(db, flags);
                 break;
             case 'tags':
-                cmdTags(db);
+                cmdTags(db, flags);
                 break;
             default:
                 console.error(`Unknown command: ${command}`);

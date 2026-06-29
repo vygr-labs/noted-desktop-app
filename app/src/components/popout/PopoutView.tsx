@@ -347,6 +347,12 @@ export default function PopoutView() {
 			else if (isSingleNote) refetchNote()
 			else refetchNotes()
 		})
+		// noted-cli / external writes — keep popout windows live too.
+		window.electronAPI.onExternalDbChange(() => {
+			if (isTodos) refetchTodos()
+			else if (isSingleNote) refetchNote()
+			else refetchNotes()
+		})
 		window.electronAPI.popoutIsPinned().then(setIsPinned)
 	})
 

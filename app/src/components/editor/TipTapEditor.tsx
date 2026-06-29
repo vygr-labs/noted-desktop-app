@@ -569,6 +569,7 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					log('collab onUpdate', { ready: collabReady, isYjs, textLen: ed.getText().length, docChanged: transaction.docChanged })
 					if (!collabReady || isUpdatingContent) return
 					if (isYjs) return
+					editorStore.markDirty()
 					editorStore.setLivePreview(ed.getText().slice(0, 160))
 					debouncedSave()
 				},
@@ -667,6 +668,7 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 				},
 				onUpdate: ({ editor: ed }) => {
 					if (!editorReady || isUpdatingContent) return
+					editorStore.markDirty()
 					editorStore.setLivePreview(ed.getText().slice(0, 160))
 					debouncedSave()
 				},
@@ -787,6 +789,24 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					createEditorInstance(props.note)
 					previousSyncId = newSyncId || null
 				}
+			},
+			{ defer: true }
+		)
+	)
+
+	// When the open note is reloaded after an external (CLI) change, recreate the
+	// editor from the fresh content. Skipped for collab notes — their content is
+	// driven by Yjs/the sync server, not the local DB row. The store only bumps
+	// reloadNonce when the editor is idle (no unsaved edits), so this can't
+	// clobber in-progress typing.
+	createEffect(
+		on(
+			() => editorStore.reloadNonce(),
+			() => {
+				if (props.note.sync_id) return
+				debouncedSave.cancel()
+				createEditorInstance(props.note)
+				previousNoteId = props.note.id
 			},
 			{ defer: true }
 		)

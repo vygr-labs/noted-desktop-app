@@ -273,6 +273,9 @@ interface ElectronAPI {
 	// Notes refresh
 	onNotesRefresh: (callback: () => void) => void
 
+	// External DB change (noted-cli / another process committed a write)
+	onExternalDbChange: (callback: () => void) => void
+
 	// Window controls
 	windowMinimize: () => Promise<void>
 	windowMaximize: () => Promise<boolean>

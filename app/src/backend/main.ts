@@ -26,6 +26,7 @@ import { RESOURCES_PATH } from './constants.js'
 import { registerAllHandlers } from './ipc/register-all.js'
 import { createNote } from './database/note-operations.js'
 import { getSetting } from './database/settings-operations.js'
+import { startDbWatcher } from './database/db-watcher.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -339,6 +340,17 @@ app.on('ready', () => {
 	registerAppHandlers()
 	registerGlobalShortcuts()
 	spawnAppWindow()
+
+	// Detect writes from the noted-cli tool (a separate process/connection) and
+	// tell every open window to refresh so CLI edits appear live. Uses a distinct
+	// channel from quick-capture's `notes:refresh`: an external write may touch
+	// any table (notes, lists, tags, todos…), so listeners refetch broadly and
+	// reload the open note, whereas quick-capture only ever adds a note.
+	startDbWatcher(() => {
+		for (const win of BrowserWindow.getAllWindows()) {
+			if (!win.isDestroyed()) win.webContents.send('db:external-change')
+		}
+	})
 
 	// Handle deep links on macOS
 	app.on('open-url', (_event, url) => {
