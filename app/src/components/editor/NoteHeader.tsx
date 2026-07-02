@@ -57,6 +57,35 @@ const metaDivider = css({
 	flexShrink: 0,
 })
 
+const listChip = css({
+	display: 'inline-flex',
+	alignItems: 'center',
+	gap: '1.5',
+	maxWidth: '220px',
+	fontSize: '13px',
+	color: 'fg.subtle',
+	bg: 'transparent',
+	border: 'none',
+	padding: 0,
+	cursor: 'pointer',
+	letterSpacing: '-0.01em',
+	transition: 'color 0.15s',
+	_hover: { color: 'fg.default' },
+})
+
+const listChipName = css({
+	overflow: 'hidden',
+	textOverflow: 'ellipsis',
+	whiteSpace: 'nowrap',
+})
+
+const listDot = css({
+	width: '8px',
+	height: '8px',
+	borderRadius: 'full',
+	flexShrink: 0,
+})
+
 const actionsRow = css({
 	display: 'flex',
 	alignItems: 'center',
@@ -180,6 +209,19 @@ export function NoteHeader(props: { note: Note; readonly?: boolean }) {
 		return plain.trim().split(/\s+/).length
 	})
 
+	// The list this note belongs to, if any. Check hidden lists too so the chip
+	// still resolves for notes sitting in a hidden list.
+	const noteList = createMemo(() => {
+		const id = props.note.list_id
+		if (!id) return undefined
+		const all = [...(appStore.lists() ?? []), ...(appStore.hiddenLists() ?? [])]
+		return all.find((l) => l.id === id)
+	})
+
+	function handleOpenList(listId: string) {
+		appStore.setCurrentView({ type: 'list', listId })
+	}
+
 	function handleTitleChange(value: string) {
 		setLocalTitle(value)
 		editorStore.setLiveTitle(value || 'Untitled')
@@ -246,6 +288,24 @@ export function NoteHeader(props: { note: Note; readonly?: boolean }) {
 				/>
 			</Show>
 			<div class={metaRow}>
+				<Show when={noteList()}>
+					{(list) => (
+						<>
+							<button
+								class={listChip}
+								onClick={() => handleOpenList(list().id)}
+								title={`Open list: ${list().name}`}
+							>
+								<span
+									class={listDot}
+									style={{ background: `var(--colors-${list().color || 'gray'}-9)` }}
+								/>
+								<span class={listChipName}>{list().name}</span>
+							</button>
+							<div class={metaDivider} />
+						</>
+					)}
+				</Show>
 				<span class={metaText}>
 					{formatCreatedDate(props.note.created_at)}
 				</span>
