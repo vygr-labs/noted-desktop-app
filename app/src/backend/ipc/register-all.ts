@@ -10,6 +10,7 @@ import { registerExportHandlers } from './export-handlers.js'
 import { registerCliHandlers } from './cli-handlers.js'
 import { registerLockHandlers } from './lock-handlers.js'
 import { registerSyncHandlers } from './sync-handlers.js'
+import { registerFileHandlers } from './file-handlers.js'
 
 export function registerAllHandlers() {
 	registerNotesHandlers()
@@ -24,4 +25,5 @@ export function registerAllHandlers() {
 	registerCliHandlers()
 	registerLockHandlers()
 	registerSyncHandlers()
+	registerFileHandlers()
 }

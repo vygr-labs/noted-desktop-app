@@ -6,6 +6,7 @@ import {
 	onMount,
 	type ParentProps,
 } from 'solid-js'
+import { buildNoteFromFile } from '../lib/import-file'
 
 type SidebarView =
 	| 'all'
@@ -61,6 +62,12 @@ interface AppStore {
 	listNotesVersion: () => number
 	bumpListNotes: () => void
 	notesLoading: () => boolean
+
+	// Import external text/markdown files as notes. `importFromDialog` opens the
+	// native file picker; `importFiles` converts already-read files (also used
+	// by the OS "Open with noted" integration).
+	importFromDialog: () => Promise<void>
+	importFiles: (files: ImportedFile[]) => Promise<void>
 }
 
 const AppStoreContext = createContext<AppStore>()
@@ -143,6 +150,16 @@ export function AppStoreProvider(props: ParentProps) {
 			refetchSearch()
 		})
 
+		// A file opened via "Open with noted" (or a launch/second-instance arg)
+		// arrives here — turn it into a note and open it.
+		window.electronAPI.onImportFile((file: ImportedFile) => {
+			importFiles([file])
+		})
+
+		// Signal main that the import listener is live, so any file queued from a
+		// cold-start "Open with" gets delivered now.
+		window.electronAPI.notifyRendererReady()
+
 		// Handle noted://share/... deep links
 		window.electronAPI.onDeepLink(async (url: string) => {
 			const match = url.match(/^noted:\/\/share\/(.+)$/)
@@ -161,6 +178,33 @@ export function AppStoreProvider(props: ParentProps) {
 		if (ids.length === 0) return
 		const map = await window.electronAPI.fetchTagsForNotes(ids)
 		setNoteTagsMap((prev) => ({ ...prev, ...map }))
+	}
+
+	// Convert one or more already-read files into notes and open the last one.
+	// Imports into the current list when a list view is active (mirroring how a
+	// new note is created), otherwise lands in "All Notes".
+	async function importFiles(files: ImportedFile[]) {
+		if (!files || files.length === 0) return
+		const view = currentView()
+		const listId = typeof view === 'object' ? view.listId : null
+
+		let lastNote: Note | null = null
+		for (const file of files) {
+			lastNote = await window.electronAPI.createNote(buildNoteFromFile(file, listId))
+		}
+
+		refetchNotes()
+		if (listId) {
+			bumpListNotes()
+		} else {
+			setCurrentView('all')
+		}
+		if (lastNote) setSelectedNoteId(lastNote.id)
+	}
+
+	async function importFromDialog() {
+		const files = await window.electronAPI.openFileDialog()
+		await importFiles(files)
 	}
 
 	const [notes, { refetch: refetchNotes }] = createResource(
@@ -226,6 +270,8 @@ export function AppStoreProvider(props: ParentProps) {
 		listNotesVersion,
 		bumpListNotes,
 		notesLoading: () => notes.loading,
+		importFromDialog,
+		importFiles,
 	}
 
 	return (

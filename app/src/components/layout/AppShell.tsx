@@ -103,6 +103,11 @@ export function AppShell() {
 				e.preventDefault()
 				store.setNoteListCollapsed(!store.noteListCollapsed())
 			}
+			// Ctrl+O: open a text/markdown file as a note
+			if ((e.ctrlKey || e.metaKey) && !e.shiftKey && e.key === 'o') {
+				e.preventDefault()
+				store.importFromDialog()
+			}
 			// Ctrl+Tab / Ctrl+Shift+Tab: cycle through notes
 			if ((e.ctrlKey || e.metaKey) && e.key === 'Tab') {
 				e.preventDefault()

@@ -27,6 +27,11 @@ import { registerAllHandlers } from './ipc/register-all.js'
 import { createNote } from './database/note-operations.js'
 import { getSetting } from './database/settings-operations.js'
 import { startDbWatcher } from './database/db-watcher.js'
+import {
+	readImportableFile,
+	IMPORT_EXTENSIONS,
+	type ImportedFile,
+} from './ipc/file-handlers.js'
 
 const __filename = fileURLToPath(import.meta.url)
 const __dirname = dirname(__filename)
@@ -59,7 +64,65 @@ app.on('second-instance', (_event, commandLine) => {
 		appWindow.webContents.send('deep-link', deepLink)
 		if (appWindow.isMinimized()) appWindow.restore()
 		appWindow.focus()
+		return
 	}
+	// Windows/Linux: "Open with noted" on a file re-launches the app; the path
+	// arrives here as a command-line argument.
+	const fileArg = findFileArg(commandLine)
+	if (fileArg) dispatchOpenFile(fileArg)
+})
+
+/*
+ * ======================================================================================
+ *                          Open external files ("Open with noted")
+ * ======================================================================================
+ * A file may reach us three ways: as a launch argument (first instance), as a
+ * `second-instance` command line (already running, Windows/Linux), or via the
+ * macOS `open-file` event. All converge on dispatchOpenFile, which reads the
+ * file and hands it to the renderer to turn into a note. If the renderer isn't
+ * listening yet (cold start), the file is queued and flushed once it signals
+ * readiness via the `file:renderer-ready` IPC.
+ */
+
+const SUPPORTED_IMPORT_EXTS = new Set(IMPORT_EXTENSIONS)
+let rendererReady = false
+const pendingOpenFiles: ImportedFile[] = []
+
+// Is this argv token a path to a text file we can import? Skips flags, the
+// `noted://` deep-link, and anything that isn't a supported, existing file.
+function isSupportedFileArg(arg: string): boolean {
+	if (!arg || arg.startsWith('-')) return false
+	if (arg.startsWith('noted://')) return false
+	const ext = path.extname(arg).slice(1).toLowerCase()
+	if (!SUPPORTED_IMPORT_EXTS.has(ext)) return false
+	try {
+		return fs.statSync(arg).isFile()
+	} catch {
+		return false
+	}
+}
+
+function findFileArg(argv: string[]): string | undefined {
+	// Skip argv[0] (the executable, or electron in dev).
+	return argv.slice(1).find(isSupportedFileArg)
+}
+
+function dispatchOpenFile(filePath: string) {
+	const file = readImportableFile(filePath)
+	if (!file) return
+	if (rendererReady && appWindow && !appWindow.isDestroyed()) {
+		appWindow.webContents.send('file:import', file)
+		if (appWindow.isMinimized()) appWindow.restore()
+		appWindow.focus()
+	} else {
+		pendingOpenFiles.push(file)
+	}
+}
+
+// macOS delivers "Open with" via this event, which can fire before `ready`.
+app.on('open-file', (event, filePath) => {
+	event.preventDefault()
+	dispatchOpenFile(filePath)
 })
 
 class AppUpdater {
@@ -110,6 +173,9 @@ function registerZoomShortcuts(win: BrowserWindow) {
 }
 
 const spawnAppWindow = async () => {
+	// A fresh window hasn't registered its import listener yet — hold any queued
+	// "Open with" files until it signals readiness (file:renderer-ready).
+	rendererReady = false
 	// In dev, position left/right based on --user-data-dir flag (for two-window testing)
 	const isPeer = process.argv.some(a => a.startsWith('--user-data-dir'))
 	const display = screen.getPrimaryDisplay()
@@ -164,6 +230,7 @@ const spawnAppWindow = async () => {
 
 	appWindow.on('closed', () => {
 		appWindow = null
+		rendererReady = false
 	})
 
 	// Dev-only: when boot:both runs two instances side-by-side, focusing one
@@ -341,6 +408,12 @@ app.on('ready', () => {
 	registerGlobalShortcuts()
 	spawnAppWindow()
 
+	// First-instance launch via "Open with noted" (Windows/Linux): the file path
+	// is a launch argument. Queue it — dispatchOpenFile flushes once the renderer
+	// signals readiness.
+	const initialFile = findFileArg(process.argv)
+	if (initialFile) dispatchOpenFile(initialFile)
+
 	// Detect writes from the noted-cli tool (a separate process/connection) and
 	// tell every open window to refresh so CLI edits appear live. Uses a distinct
 	// channel from quick-capture's `notes:refresh`: an external write may touch
@@ -379,6 +452,20 @@ app.on('window-all-closed', () => {
  */
 
 function registerAppHandlers() {
+	// The main window's renderer has mounted and registered its import listener.
+	// Flush any files that arrived (via launch arg or macOS open-file) before it
+	// was ready.
+	ipcMain.on('file:renderer-ready', () => {
+		rendererReady = true
+		if (!pendingOpenFiles.length || !appWindow || appWindow.isDestroyed()) return
+		for (const file of pendingOpenFiles) {
+			appWindow.webContents.send('file:import', file)
+		}
+		pendingOpenFiles.length = 0
+		if (appWindow.isMinimized()) appWindow.restore()
+		appWindow.focus()
+	})
+
 	// Dark mode handlers
 	ipcMain.handle('app:open-external', (_, target: string) => {
 		if (typeof target !== 'string') return false

@@ -20,6 +20,8 @@ Full-featured TipTap editor with a configurable toolbar (top, right, bottom, or 
 
 **Markdown Paste:** Pasting markdown auto-converts headings, bold, italic, links, code, blockquotes, lists, tables, and horizontal rules into rich text.
 
+**Copy as… (right-click):** Select text in the editor and right-click to copy the selection as **Markdown** (formatting preserved as markdown syntax) or **Plain Text** (no syntax), alongside a standard **Copy**. Right-clicking with no selection leaves the native menu (spellcheck suggestions, etc.) intact.
+
 ## Note Types
 
 - **Rich text** — TipTap editor with full formatting toolbar
@@ -39,6 +41,15 @@ Plain text notes show a "Convert to rich text" button (Type icon) in the control
 - **In-note search** (`Ctrl+F`) — Find text within the current note with match highlighting and navigation.
 - **Find & Replace** (`Ctrl+H`) — Replace matches individually or all at once.
 - **Global search** (`Ctrl+Shift+F`) — Full-text search across all notes using SQLite FTS5.
+
+## Opening Files
+
+Open external text files as notes three ways:
+
+- **In-app** — the folder-open icon in the note list header, `Ctrl+O`, or the **Open file…** action in the command palette (`Ctrl+Shift+F`) open a file picker (multi-select supported).
+- **OS "Open with noted"** — double-click or right-click a `.md`/`.markdown`/`.txt`/`.text` file and choose noted. Works whether the app is closed or already running. *(File associations register when the app is installed from a packaged build.)*
+
+Markdown files (`.md`/`.markdown`) are parsed into rich notes — a leading `# Heading` becomes the note title. Every other text file imports as a plain-text note titled after the filename.
 
 ## Export
 

@@ -1,4 +1,4 @@
-import { onMount, onCleanup, createEffect, on, createSignal } from 'solid-js'
+import { onMount, onCleanup, createEffect, on, createSignal, Show } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { Editor, Extension } from '@tiptap/core'
 import StarterKit from '@tiptap/starter-kit'
@@ -20,6 +20,7 @@ import { ySyncPlugin, ySyncPluginKey, yCursorPlugin, yUndoPlugin } from 'y-prose
 import * as Y from 'yjs'
 import { debounce } from '../../lib/debounce'
 import { tiptapToPlaintext } from '../../lib/tiptap-to-plaintext'
+import { tiptapToMarkdown } from '../../lib/tiptap-to-markdown'
 import { hasListPatterns, hasTablePattern, hasMarkdownPatterns, parseLinesToNodes, parseMarkdownTable, cleanTipTapContent, alignLeftContent } from '../../lib/text-cleanup'
 import { CodeBlockWithCopy } from './codeblock-with-copy'
 import { DetailsBlock } from './details-block'
@@ -86,6 +87,37 @@ const editorWrap = css({
 	'&.mod-down .tiptap a': {
 		cursor: 'pointer',
 	},
+})
+
+const ctxMenuStyle = css({
+	position: 'fixed',
+	zIndex: 1000,
+	minWidth: '200px',
+	py: '1',
+	borderRadius: 'md',
+	bg: 'gray.2',
+	borderWidth: '1px',
+	borderStyle: 'solid',
+	borderColor: 'gray.a4',
+	boxShadow: '0 8px 24px -4px rgba(0, 0, 0, 0.25)',
+	animation: 'fade-in 0.1s ease',
+})
+
+const ctxItem = css({
+	display: 'flex',
+	alignItems: 'center',
+	gap: '2',
+	width: '100%',
+	px: '3',
+	py: '2',
+	fontSize: '13px',
+	textAlign: 'left',
+	cursor: 'pointer',
+	color: 'fg.muted',
+	bg: 'transparent',
+	border: 'none',
+	transition: 'all 0.1s',
+	_hover: { bg: 'gray.a3', color: 'fg.default' },
 })
 
 // Store editor instance globally so toolbar can access it
@@ -362,6 +394,88 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 	const settings = useSettingsStore()
 	let isUpdatingContent = false
 
+	// ─── Selection context menu ("Copy as…") ───────────────
+	const [ctxMenu, setCtxMenu] = createSignal<{ x: number; y: number } | null>(null)
+	let menuRef: HTMLDivElement | undefined
+
+	// Plain text of the current selection (block boundaries → newlines).
+	function selectionPlainText(): string {
+		if (!editor) return ''
+		const { from, to } = editor.state.selection
+		return editor.state.doc.textBetween(from, to, '\n', '\n')
+	}
+
+	// Markdown for the current selection: serialize the selected fragment through
+	// the same converter note export uses.
+	function selectionMarkdown(): string {
+		if (!editor) return ''
+		const frag = editor.state.selection.content().content.toJSON()
+		const nodes = Array.isArray(frag) ? frag : frag ? [frag] : []
+		return tiptapToMarkdown(JSON.stringify({ type: 'doc', content: nodes })).trim()
+	}
+
+	async function copyText(text: string) {
+		if (text) {
+			try {
+				await navigator.clipboard.writeText(text)
+			} catch {
+				/* clipboard denied — ignore */
+			}
+		}
+		setCtxMenu(null)
+	}
+
+	// Plain "Copy" keeps the browser's native rich copy (text + HTML) of the
+	// current DOM selection, matching Ctrl+C.
+	function nativeCopy() {
+		try {
+			document.execCommand('copy')
+		} catch {
+			/* ignore */
+		}
+		setCtxMenu(null)
+	}
+
+	function setupContextMenu() {
+		containerRef!.addEventListener('contextmenu', (e) => {
+			if (!editor) return
+			const { empty } = editor.state.selection
+			// No selection: let the native menu (spellcheck suggestions, etc.) show.
+			if (empty) {
+				setCtxMenu(null)
+				return
+			}
+			e.preventDefault()
+			const MENU_W = 210
+			const MENU_H = 132
+			const x = Math.min(e.clientX, window.innerWidth - MENU_W - 8)
+			const y = Math.min(e.clientY, window.innerHeight - MENU_H - 8)
+			setCtxMenu({ x: Math.max(8, x), y: Math.max(8, y) })
+		})
+	}
+
+	// While the menu is open, dismiss on outside click, Escape, scroll, or resize.
+	createEffect(() => {
+		if (!ctxMenu()) return
+		const close = () => setCtxMenu(null)
+		const onDown = (e: MouseEvent) => {
+			if (!menuRef || !menuRef.contains(e.target as Node)) close()
+		}
+		const onKey = (e: KeyboardEvent) => {
+			if (e.key === 'Escape') close()
+		}
+		document.addEventListener('mousedown', onDown, true)
+		document.addEventListener('keydown', onKey)
+		document.addEventListener('scroll', close, true)
+		window.addEventListener('resize', close)
+		onCleanup(() => {
+			document.removeEventListener('mousedown', onDown, true)
+			document.removeEventListener('keydown', onKey)
+			document.removeEventListener('scroll', close, true)
+			window.removeEventListener('resize', close)
+		})
+	})
+
 	const debouncedSave = debounce(() => {
 		if (!editor) return
 		// Use requestIdleCallback to avoid blocking the main thread
@@ -573,13 +687,11 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 					editorStore.setLivePreview(ed.getText().slice(0, 160))
 					debouncedSave()
 				},
-				onTransaction: ({ transaction }) => {
+				onTransaction: ({ editor: ed, transaction }) => {
 					const isYjs = !!transaction.getMeta(ySyncPluginKey)
 					if (transaction.docChanged) {
 						log('collab onTransaction docChanged', { isYjs })
 					}
-				},
-				onTransaction: ({ editor: ed }) => {
 					setInTable(ed.isActive('table'))
 				},
 			})
@@ -711,6 +823,7 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		if (!containerListenersAttached) {
 			setupCheckboxHandler()
 			setupLinkHandler()
+			setupContextMenu()
 			containerListenersAttached = true
 		}
 		log('editor setup complete, text length:', editor.getText().length)
@@ -853,7 +966,31 @@ export function TipTapEditor(props: { note: Note; readonly?: boolean }) {
 		destroyEditor()
 	})
 
-	return <div ref={containerRef} class={editorWrap} />
+	return (
+		<>
+			<div ref={containerRef} class={editorWrap} />
+			<Show when={ctxMenu()}>
+				{(pos) => (
+					<div
+						ref={(el) => (menuRef = el)}
+						class={ctxMenuStyle}
+						style={{ left: `${pos().x}px`, top: `${pos().y}px` }}
+						onMouseDown={(e) => e.preventDefault()}
+					>
+						<button type="button" class={ctxItem} onClick={nativeCopy}>
+							Copy
+						</button>
+						<button type="button" class={ctxItem} onClick={() => copyText(selectionMarkdown())}>
+							Copy as Markdown
+						</button>
+						<button type="button" class={ctxItem} onClick={() => copyText(selectionPlainText())}>
+							Copy as Plain Text
+						</button>
+					</div>
+				)}
+			</Show>
+		</>
+	)
 }
 
 function parseContent(content: string | null): Record<string, unknown> | string {

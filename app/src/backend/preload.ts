@@ -86,6 +86,15 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	exportNote: (noteId: string, format: string) => ipcRenderer.invoke('export:note', noteId, format),
 	exportAllNotes: (format: string) => ipcRenderer.invoke('export:all', format),
 
+	// Open external text/markdown files as notes
+	openFileDialog: () => ipcRenderer.invoke('file:open-dialog'),
+	onImportFile: (callback: (file: { name: string; ext: string; text: string }) => void) => {
+		ipcRenderer.on('file:import', (_: unknown, file: { name: string; ext: string; text: string }) => callback(file))
+	},
+	// Tell main the renderer is mounted and listening, so any file queued from a
+	// cold-start "Open with" can be delivered.
+	notifyRendererReady: () => ipcRenderer.send('file:renderer-ready'),
+
 	// Lock
 	hasLockPin: () => ipcRenderer.invoke('lock:has-pin'),
 	setLockPin: (pin: string) => ipcRenderer.invoke('lock:set-pin', pin),

@@ -3,6 +3,26 @@ productName: noted
 copyright: Copyright (c) 2026 Voyager Technologies Limited
 artifactName: ${productName}-${os}-${arch}.${ext}
 
+# Let the OS offer "Open with noted" for text/markdown files. The app reads the
+# file on launch and imports it as a note (see main.ts open-file handling).
+fileAssociations:
+  - ext: md
+    name: Markdown Document
+    description: Markdown Document
+    role: Editor
+  - ext: markdown
+    name: Markdown Document
+    description: Markdown Document
+    role: Editor
+  - ext: txt
+    name: Text Document
+    description: Text Document
+    role: Editor
+  - ext: text
+    name: Text Document
+    description: Text Document
+    role: Editor
+
 win:
   target: nsis
   icon: assets/icon.ico

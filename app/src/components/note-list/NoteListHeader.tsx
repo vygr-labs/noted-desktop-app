@@ -1,6 +1,6 @@
 import { Show, createSignal, onMount, onCleanup } from 'solid-js'
 import { css } from '../../../styled-system/css'
-import { PlusIcon, ArrowUpDownIcon, PanelLeftCloseIcon, EyeIcon } from 'lucide-solid'
+import { PlusIcon, ArrowUpDownIcon, PanelLeftCloseIcon, EyeIcon, FolderOpenIcon } from 'lucide-solid'
 import { useAppStore } from '../../stores/app-store'
 
 const headerStyle = css({
@@ -174,6 +174,13 @@ export function NoteListHeader(props: {
 					</Show>
 				</div>
 				<Show when={props.showCreate}>
+					<button
+						class={actionBtn}
+						onClick={() => store.importFromDialog()}
+						title="Open file… — import .md / .txt as a note (Ctrl+O)"
+					>
+						<FolderOpenIcon class={iconSize} />
+					</button>
 					<button class={actionBtn} onClick={props.onCreateNote} title="New note">
 						<PlusIcon class={iconSize} />
 					</button>

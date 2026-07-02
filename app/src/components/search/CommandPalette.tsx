@@ -1,7 +1,7 @@
 import { createSignal, For, Show, onMount, onCleanup } from 'solid-js'
 import { css } from '../../../styled-system/css'
 import { useAppStore } from '../../stores/app-store'
-import { SearchIcon, FileTextIcon, ClockIcon } from 'lucide-solid'
+import { SearchIcon, FileTextIcon, ClockIcon, FolderOpenIcon } from 'lucide-solid'
 import { parseDbDate } from '../../lib/date-utils'
 
 const overlay = css({
@@ -218,6 +218,31 @@ export function CommandPalette() {
 		}
 	}
 
+	// Static commands surfaced in the palette. Shown when the query is empty or
+	// matches an action's label/keywords.
+	const actions = [
+		{
+			id: 'open-file',
+			label: 'Open file…',
+			hint: 'Import a .md or .txt file as a note',
+			keywords: ['open', 'file', 'import', 'markdown', 'md', 'txt', 'text'],
+			run: () => {
+				store.setCommandPaletteOpen(false)
+				store.importFromDialog()
+			},
+		},
+	]
+
+	const visibleActions = () => {
+		const q = query().trim().toLowerCase()
+		if (!q) return actions
+		return actions.filter(
+			(a) =>
+				a.label.toLowerCase().includes(q) ||
+				a.keywords.some((k) => k.includes(q))
+		)
+	}
+
 	// Also browse all notes if query is empty
 	const recentNotes = () => {
 		if (query().trim()) return []
@@ -249,6 +274,22 @@ export function CommandPalette() {
 				</div>
 
 				<div class={resultsArea}>
+					{/* Actions */}
+					<Show when={visibleActions().length > 0}>
+						<div class={sectionLabel}>Actions</div>
+						<For each={visibleActions()}>
+							{(action) => (
+								<div class={resultItem} onClick={action.run}>
+									<FolderOpenIcon class={resultIcon} />
+									<div class={resultContent}>
+										<div class={resultTitle}>{action.label}</div>
+										<div class={resultSnippet}>{action.hint}</div>
+									</div>
+								</div>
+							)}
+						</For>
+					</Show>
+
 					{/* Search results */}
 					<Show when={query().trim() && results().length > 0}>
 						<div class={sectionLabel}>Results</div>
@@ -274,7 +315,7 @@ export function CommandPalette() {
 					</Show>
 
 					{/* No results */}
-					<Show when={query().trim() && results().length === 0}>
+					<Show when={query().trim() && results().length === 0 && visibleActions().length === 0}>
 						<div class={emptyResults}>
 							<SearchIcon class={css({ width: '8', height: '8', color: 'gray.a4' })} />
 							<span class={emptyText}>No notes found</span>

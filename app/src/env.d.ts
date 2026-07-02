@@ -88,6 +88,13 @@ interface SearchResult {
 	snippet: string
 }
 
+// A text file read from disk, handed to the renderer to import as a note.
+interface ImportedFile {
+	name: string
+	ext: string
+	text: string
+}
+
 // ==================== View Types ====================
 
 type SidebarView =
@@ -243,6 +250,11 @@ interface ElectronAPI {
 	// Export
 	exportNote: (noteId: string, format: string) => Promise<boolean>
 	exportAllNotes: (format: string) => Promise<boolean>
+
+	// Open external text/markdown files as notes
+	openFileDialog: () => Promise<ImportedFile[]>
+	onImportFile: (callback: (file: ImportedFile) => void) => void
+	notifyRendererReady: () => void
 
 	// CLI
 	installCli: () => Promise<{ success: boolean; path?: string; error?: string }>
