@@ -12,6 +12,8 @@ import { TipTapEditor, getEditorInstance, searchInNote, clearNoteSearch, scrollT
 
 import { PlainTextEditor } from '../editor/PlainTextEditor'
 
+import { plainTextToRichContent } from '../../lib/import-file'
+
 import { TagsBar } from '../editor/TagsBar'
 
 import { EditorToolbar, type ToolbarPosition } from '../editor/EditorToolbar'
@@ -729,7 +731,21 @@ export function EditorPane() {
 
 	async function convertToRich(noteId: string) {
 
-		await window.electronAPI.updateNote(noteId, { note_type: 'rich' })
+		// Parse the note's plain body into rich TipTap content so it gains real
+		// headings/lists/spacing — flipping note_type alone would leave the text
+		// as one unstructured paragraph (or empty, for an unedited import).
+		const note = editorStore.currentNote()
+		const raw =
+			note && note.id === noteId
+				? note.content_plain ?? note.content ?? ''
+				: ''
+		const { content, content_plain } = plainTextToRichContent(raw)
+
+		await window.electronAPI.updateNote(noteId, {
+			note_type: 'rich',
+			content,
+			content_plain,
+		})
 
 		await editorStore.refreshCurrentNote()
 
@@ -1081,11 +1097,19 @@ export function EditorPane() {
 			const editor = getEditorInstance()
 			editor?.commands.focus('end')
 		} else {
-			const textarea = scrollContainerRef?.querySelector('textarea')
-			if (textarea) {
-				textarea.focus()
-				const len = textarea.value.length
-				textarea.setSelectionRange(len, len)
+			// Plain notes now render in a (formatting-free) TipTap editor too, so
+			// focus the contenteditable and drop the caret at the very end.
+			const pm = scrollContainerRef?.querySelector('.tiptap') as HTMLElement | null
+			if (pm) {
+				pm.focus()
+				const sel = window.getSelection()
+				if (sel) {
+					const range = document.createRange()
+					range.selectNodeContents(pm)
+					range.collapse(false)
+					sel.removeAllRanges()
+					sel.addRange(range)
+				}
 			}
 		}
 	}
@@ -1647,7 +1671,7 @@ export function EditorPane() {
 								{(() => {
 									const isSyncing = () => note().is_shared && !note().content && !note().content_plain
 									return (
-								<div style={{ position: 'relative', flex: '1', 'min-height': '0' }}>
+								<div style={{ position: 'relative', flex: '1', 'min-height': '0', display: 'flex', 'flex-direction': 'column' }}>
 									<Show when={isSyncing()}>
 										<div class={syncOverlay}>
 											<div class={syncSkeleton}>
@@ -1670,7 +1694,14 @@ export function EditorPane() {
 									</Show>
 									<div style={{
 										visibility: isSyncing() ? 'hidden' : 'visible',
-										height: '100%',
+										// Unbroken flex chain (contentInner → this A → this B → editor)
+										// so both editors' `flex: 1` resolves without relying on
+										// percentage heights, filling the full height instead of
+										// collapsing to their min-height and leaving dead space below.
+										flex: '1',
+										'min-height': '0',
+										display: 'flex',
+										'flex-direction': 'column',
 									}}>
 										<Show
 											when={note().note_type === 'rich'}

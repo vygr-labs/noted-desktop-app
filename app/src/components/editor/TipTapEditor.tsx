@@ -126,6 +126,14 @@ export function getEditorInstance(): Editor | null {
 	return currentEditor
 }
 
+// Register/unregister the active editor. The plain-text editor uses this so the
+// shared in-note search (searchInNote etc., which operate on currentEditor) and
+// toolbar helpers target whichever editor is currently mounted. Guarded on the
+// caller side so a late unmount can't clobber a newer editor.
+export function setActiveEditor(editor: Editor | null) {
+	currentEditor = editor
+}
+
 // Reactive signal for whether cursor is inside a table
 const [inTable, setInTable] = createSignal(false)
 export function isInTable() { return inTable() }
@@ -135,7 +143,7 @@ export function isInTable() { return inTable() }
 const searchPluginKey = new PluginKey('noteSearch')
 let searchMatchPositions: { from: number; to: number }[] = []
 
-function createSearchPlugin() {
+export function createSearchPlugin() {
 	return new Plugin({
 		key: searchPluginKey,
 		state: {

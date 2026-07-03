@@ -2,7 +2,8 @@
 // Turns a text/markdown file (read by the backend) into the note payload
 // passed to createNote. Markdown files are parsed into rich TipTap content
 // with the same parser the editor uses for pasted markdown; every other text
-// file becomes a plain-text note.
+// file becomes a plain-text note (rendered faithfully as-is, and convertible to
+// rich on demand via plainTextToRichContent).
 
 import { parseLinesToNodes } from './text-cleanup'
 
@@ -14,8 +15,8 @@ interface TipTapNode {
 	marks?: Array<{ type: string; attrs?: Record<string, unknown> }>
 }
 
-// Extensions that get parsed as markdown into a rich note. Kept in sync with the
-// backend's IMPORT_EXTENSIONS — anything not listed here imports as plain text.
+// Extensions parsed as markdown into a rich note (a leading "# Heading" is
+// lifted out as the title). Every other imported file becomes a plain-text note.
 const MARKDOWN_EXTS = new Set(['md', 'markdown', 'mdown', 'mkd'])
 
 const MAX_TITLE_LEN = 200
@@ -50,6 +51,25 @@ function docPlainText(nodes: TipTapNode[]): string {
 		.trim()
 }
 
+// Parse raw text/markdown lines into the stored-content pair for a rich note:
+// `content` is the serialized TipTap doc (null when there's nothing to render)
+// and `content_plain` is its flattened text for search/preview.
+function buildRichFromLines(lines: string[]): { content: string | null; content_plain: string | null } {
+	const nodes = parseLinesToNodes(lines) as TipTapNode[]
+	const content = nodes.length > 0 ? JSON.stringify({ type: 'doc', content: nodes }) : null
+	const plain = docPlainText(nodes)
+	return { content, content_plain: plain || null }
+}
+
+/**
+ * Convert an existing plain-text note's body into rich TipTap content, using the
+ * same parser as markdown import. Used by "Convert to rich text" so a plain note
+ * gains real headings/lists/spacing instead of one unstructured paragraph.
+ */
+export function plainTextToRichContent(text: string): { content: string | null; content_plain: string | null } {
+	return buildRichFromLines(text.split(/\r?\n/))
+}
+
 /**
  * Build the createNote payload for an imported file.
  * - Markdown → rich note. A leading `# Heading` becomes the title (and is
@@ -59,41 +79,38 @@ function docPlainText(nodes: TipTapNode[]): string {
 export function buildNoteFromFile(file: ImportedFile, listId: string | null): NotePayload {
 	const fallbackTitle = (file.name && file.name.trim()) || 'Untitled'
 	const isMarkdown = MARKDOWN_EXTS.has(file.ext.toLowerCase())
-	const lines = file.text.split(/\r?\n/)
 
-	if (isMarkdown) {
-		let bodyLines = lines
-		let title = ''
-
-		// Use a leading level-1 heading as the title, stripping it from the body.
-		const firstIdx = bodyLines.findIndex((l) => l.trim() !== '')
-		if (firstIdx !== -1) {
-			const m = bodyLines[firstIdx].match(/^#\s+(.+)/)
-			if (m) {
-				title = m[1].trim()
-				bodyLines = bodyLines.slice(0, firstIdx).concat(bodyLines.slice(firstIdx + 1))
-			}
-		}
-		if (!title) title = fallbackTitle
-
-		const nodes = parseLinesToNodes(bodyLines) as TipTapNode[]
-		const content = nodes.length > 0 ? JSON.stringify({ type: 'doc', content: nodes }) : null
-		const plain = docPlainText(nodes)
-
+	if (!isMarkdown) {
 		return {
-			title: title.slice(0, MAX_TITLE_LEN),
-			content,
-			content_plain: plain || null,
-			note_type: 'rich',
+			title: fallbackTitle.slice(0, MAX_TITLE_LEN),
+			content: null,
+			content_plain: file.text,
+			note_type: 'plain',
 			list_id: listId,
 		}
 	}
 
+	let bodyLines = file.text.split(/\r?\n/)
+	let title = ''
+
+	// Use a leading level-1 heading as the title, stripping it from the body.
+	const firstIdx = bodyLines.findIndex((l) => l.trim() !== '')
+	if (firstIdx !== -1) {
+		const m = bodyLines[firstIdx].match(/^#\s+(.+)/)
+		if (m) {
+			title = m[1].trim()
+			bodyLines = bodyLines.slice(0, firstIdx).concat(bodyLines.slice(firstIdx + 1))
+		}
+	}
+	if (!title) title = fallbackTitle
+
+	const { content, content_plain } = buildRichFromLines(bodyLines)
+
 	return {
-		title: fallbackTitle.slice(0, MAX_TITLE_LEN),
-		content: null,
-		content_plain: file.text,
-		note_type: 'plain',
+		title: title.slice(0, MAX_TITLE_LEN),
+		content,
+		content_plain,
+		note_type: 'rich',
 		list_id: listId,
 	}
 }
