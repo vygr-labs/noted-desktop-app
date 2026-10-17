@@ -379,8 +379,9 @@ Flickable {
         Column {
             width: parent ? parent.width : 0
             topPadding: 28
+            Image { source: "qrc:/brand/icon.png"; width: 64; height: 64; sourceSize: Qt.size(128, 128); smooth: true; mipmap: true }
             Item { width: 1; height: 16 }
-            Text { textFormat: Text.PlainText; text: "noted"; color: Theme.c.ink; font.pixelSize: 22; font.weight: 650; font.letterSpacing: -0.22 }
+            Text { textFormat: Text.StyledText; text: "noted<font color=\"" + Theme.accent + "\">.</font>"; color: Theme.c.ink; font.pixelSize: 22; font.weight: 650; font.letterSpacing: -0.22 }
             Text { textFormat: Text.PlainText; topPadding: 4; text: "Version " + App.version; color: Theme.c.muted; font.pixelSize: 14; font.features: { "tnum": 1 } }
             Text {
                 textFormat: Text.PlainText

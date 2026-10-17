@@ -237,10 +237,10 @@ Rectangle {
             Layout.preferredHeight: 44
             DragArea { anchors.fill: parent }
             Text {
-                textFormat: Text.PlainText
                 x: 18
                 anchors.verticalCenter: parent.verticalCenter
-                text: "noted"
+                textFormat: Text.StyledText
+                text: "noted<font color=\"" + Theme.accent + "\">.</font>"
                 color: Theme.c.ink
                 font.pixelSize: 15
                 font.weight: 650
