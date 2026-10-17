@@ -159,6 +159,8 @@ int main(int argc, char* argv[])
     database->startWatching();
     // Syncs through a folder, when that's been set up (Settings, Sync).
     noted::SyncEngine sync(*database, store);
+    // Images deleted from notes a week ago or more.
+    if (!takeShot) QTimer::singleShot(60000, &store, [&store] { store.removeUnusedAttachments(7); });
 
     QQmlApplicationEngine engine;
     qml_register_types_Noted();

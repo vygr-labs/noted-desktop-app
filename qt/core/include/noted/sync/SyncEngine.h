@@ -80,6 +80,10 @@ public:
 
     // For tests: one full round, synchronously.
     void runOnce();
+    // How eagerly old change files are cleared: a snapshot after this many
+    // of our files, files kept at least this long. `always` skips the
+    // ten-minute spacing between cleanups (tests).
+    void setCleanup(int snapshotEvery, int minAgeSecs, bool always);
 
 signals:
     void changed();
@@ -95,6 +99,7 @@ private:
         QHash<QString, qint64> cursors;
         QHash<QString, QString> names;  // device -> computer name
         QHash<QString, QDateTime> seen;
+        QHash<QString, qint64> sawMe;   // device -> the last of our files it has read
         bool reachable = true;
     };
     static QList<Pulled> read(const QList<sync::Space>& spaces, const QString& me);
@@ -104,6 +109,7 @@ private:
     void finishPull(const QList<Pulled>& pulled);
     void publish();
     void writeMeta(const sync::Space& s);
+    void compact(sync::Space& s);
     void fetchAttachments(const QStringList& names);
     void ensureTriggers();
     void markSharedLists();
@@ -128,6 +134,13 @@ private:
     bool m_scanAttachments = true;  // look for every image notes use, not just changed ones
     qint64 m_metaAt = 0;
     QFutureWatcher<QList<Pulled>> m_reader;
+    QHash<QString, QHash<QString, qint64>> m_sawMe;     // space -> device -> our last file it has read
+    QHash<QString, QHash<QString, QDateTime>> m_seenAt; // space -> device -> when it last synced
+    QHash<QString, QHash<QString, qint64>> m_metaCursors;
+    QHash<QString, qint64> m_compactAt, m_attachScanAt;
+    int m_snapEvery = 200;
+    int m_minAge = 3600;
+    bool m_compactAlways = false;
 };
 
 }  // namespace noted

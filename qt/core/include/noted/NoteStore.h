@@ -142,6 +142,10 @@ public:
     // non-empty daily note.
     Q_INVOKABLE QStringList dailyDates(const QString& yearMonth);
 
+    // Deletes image files beside the database that no note (trashed ones
+    // included) has used for `minAgeDays`. Returns how many went.
+    int removeUnusedAttachments(int minAgeDays = 7);
+
     // Plain-text extraction used for content_plain on every rich save.
     Q_INVOKABLE static QString plainFromContent(const QString& tiptapJson);
 

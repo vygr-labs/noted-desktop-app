@@ -395,6 +395,39 @@ void SyncEngine::runOnce()
     finishPull(read(m_spaces, m_me));
 }
 
+namespace {
+
+struct Snapshot
+{
+    QString device;
+    qint64 upTo = 0;
+    QHash<QString, qint64> cursors;
+    QJsonArray records;
+};
+
+std::optional<Snapshot> readSnapshot(const Space& s, const QString& device)
+{
+    QFile f(s.root + QStringLiteral("/devices/") + device + QStringLiteral("/snapshot.nsnap"));
+    if (!f.open(QIODevice::ReadOnly)) return std::nullopt;
+    const auto plain = open(s.key, f.readAll(), (device + QStringLiteral("/snapshot")).toUtf8());
+    if (!plain) return std::nullopt;
+    const QJsonObject o = QJsonDocument::fromJson(qUncompress(*plain)).object();
+    Snapshot snap;
+    snap.device = device;
+    snap.upTo = qint64(o.value(QStringLiteral("upTo")).toDouble());
+    snap.records = o.value(QStringLiteral("recs")).toArray();
+    const QJsonObject cur = o.value(QStringLiteral("cursors")).toObject();
+    for (auto it = cur.begin(); it != cur.end(); ++it) snap.cursors.insert(it.key(), qint64(it.value().toDouble()));
+    return snap;
+}
+
+QDateTime snapshotTime(const Space& s, const QString& device)
+{
+    return QFileInfo(s.root + QStringLiteral("/devices/") + device + QStringLiteral("/snapshot.nsnap")).lastModified();
+}
+
+}  // namespace
+
 QList<SyncEngine::Pulled> SyncEngine::read(const QList<Space>& spaces, const QString& me)
 {
     static const QRegularExpression fileRe(QStringLiteral("^(\\d{8})\\.nchg$"));
@@ -409,25 +442,59 @@ QList<SyncEngine::Pulled> SyncEngine::read(const QList<Space>& spaces, const QSt
             out << p;
             continue;
         }
-        for (const QString& dev : devices.entryList(QDir::Dirs | QDir::NoDotAndDotDot)) {
-            if (dev == me) continue;
+        QStringList others = devices.entryList(QDir::Dirs | QDir::NoDotAndDotDot);
+        others.removeAll(me);
+        // A snapshot's records, and everything it had read.
+        auto take = [&](const Snapshot& snap) {
+            for (const QJsonValue& r : snap.records) p.records << Ledger::Incoming{snap.device, r.toObject()};
+            p.cursors.insert(snap.device, std::max(p.cursors.value(snap.device), snap.upTo));
+            for (auto it = snap.cursors.begin(); it != snap.cursors.end(); ++it)
+                if (it.key() != me) p.cursors.insert(it.key(), std::max(p.cursors.value(it.key()), it.value()));
+        };
+        // New to this folder: start from the newest snapshot rather than
+        // from every change ever made.
+        if (s.cursors.isEmpty()) {
+            QString newest;
+            for (const QString& dev : others)
+                if (QFileInfo::exists(devices.filePath(dev + QStringLiteral("/snapshot.nsnap")))
+                    && (newest.isEmpty() || snapshotTime(s, dev) > snapshotTime(s, newest)))
+                    newest = dev;
+            if (!newest.isEmpty())
+                if (const auto snap = readSnapshot(s, newest)) take(*snap);
+        }
+        for (const QString& dev : others) {
+            qint64 last = -1;  // that computer's newest file, by its own account
             QFile mf(devices.filePath(dev + QStringLiteral("/device.nmeta")));
             if (mf.open(QIODevice::ReadOnly)) {
                 if (const auto meta = open(s.key, mf.readAll(), (dev + QStringLiteral("/meta")).toUtf8())) {
                     const QJsonObject m = QJsonDocument::fromJson(*meta).object();
                     p.names.insert(dev, m.value(QStringLiteral("name")).toString());
                     p.seen.insert(dev, QDateTime::fromString(m.value(QStringLiteral("at")).toString(), Qt::ISODate));
+                    p.sawMe.insert(dev, qint64(m.value(QStringLiteral("seen")).toObject().value(me).toDouble()));
+                    last = qint64(m.value(QStringLiteral("last")).toDouble(-1));
                 }
             }
-            qint64 cursor = p.cursors.value(dev, 0);
-            int files = 0;
+            QList<qint64> seqs;
             for (const QString& name : QDir(devices.filePath(dev)).entryList({QStringLiteral("*.nchg")}, QDir::Files, QDir::Name)) {
                 const auto match = fileRe.match(name);
-                if (!match.hasMatch()) continue;
-                const qint64 seq = match.captured(1).toLongLong();
+                if (match.hasMatch()) seqs << match.captured(1).toLongLong();
+            }
+            qint64 cursor = p.cursors.value(dev, 0);
+            // The next file is gone and that computer's snapshot covers it:
+            // it cleared its old files while we were away.
+            const auto next = std::find_if(seqs.begin(), seqs.end(), [&](qint64 q) { return q > cursor; });
+            const qint64 ahead = next == seqs.end() ? 0 : *next;
+            if (ahead > cursor + 1 || (ahead == 0 && last > cursor)) {
+                if (const auto snap = readSnapshot(s, dev); snap && snap->upTo > cursor && (ahead == 0 || snap->upTo >= ahead - 1)) {
+                    take(*snap);
+                    cursor = p.cursors.value(dev);
+                }
+            }
+            int files = 0;
+            for (const qint64 seq : seqs) {
                 if (seq <= cursor) continue;
                 if (seq != cursor + 1 || ++files > 200) break;  // one still on its way: wait for it
-                QFile f(devices.filePath(dev + QLatin1Char('/') + name));
+                QFile f(devices.filePath(dev + QStringLiteral("/%1.nchg").arg(seq, 8, 10, QLatin1Char('0'))));
                 if (!f.open(QIODevice::ReadOnly)) break;
                 const auto plain = open(s.key, f.readAll(), QStringLiteral("%1/%2").arg(dev).arg(seq).toUtf8());
                 if (!plain) break;  // half-copied, or not ours: try again next time
@@ -465,6 +532,8 @@ void SyncEngine::finishPull(const QList<Pulled>& pulled)
         if (!p.records.isEmpty()) any = true;
         bool isLibrary = false;
         for (const Space& s : m_spaces) isLibrary |= s.id == p.space && s.kind == u"library";
+        m_sawMe[p.space] = p.sawMe;
+        m_seenAt[p.space] = p.seen;
         if (isLibrary)
             for (auto it = p.names.begin(); it != p.names.end(); ++it)
                 devices << QVariantMap{{"id", it.key()}, {"name", it.value()}, {"seen", p.seen.value(it.key())}, {"me", false}};
@@ -562,10 +631,17 @@ void SyncEngine::publish()
                 m_ledger->published(s, out);
             }
         }
+        // Tell the others how far we've read (they clear their old files by
+        // it), then clear ours.
         const qint64 now = QDateTime::currentSecsSinceEpoch();
-        if (now - m_metaAt > 60) {
+        const bool due = now - m_metaAt > 60;
+        for (Space& s : m_spaces) {
+            if (!QFileInfo::exists(s.root + QLatin1Char('/') + kMarker)) continue;
+            if (due || m_metaCursors.value(s.id) != s.cursors) writeMeta(s);
+            compact(s);
+        }
+        if (due) {
             m_metaAt = now;
-            for (const Space& s : m_spaces) writeMeta(s);
             m_ledger->prune();
         }
     } catch (const db::Error& e) {
@@ -589,9 +665,78 @@ void SyncEngine::writeMeta(const Space& s)
                            {"seen", seen}, {"last", double(s.fileSeq)}};
     const QString dir = s.root + QStringLiteral("/devices/") + m_me;
     QDir().mkpath(dir);
-    writeFile(dir + QStringLiteral("/device.nmeta"),
-              seal(s.key, QJsonDocument(meta).toJson(QJsonDocument::Compact), (m_me + QStringLiteral("/meta")).toUtf8()));
+    if (writeFile(dir + QStringLiteral("/device.nmeta"),
+                  seal(s.key, QJsonDocument(meta).toJson(QJsonDocument::Compact), (m_me + QStringLiteral("/meta")).toUtf8())))
+        m_metaCursors.insert(s.id, s.cursors);
 }
+
+void SyncEngine::setCleanup(int snapshotEvery, int minAgeSecs, bool always)
+{
+    m_snapEvery = snapshotEvery;
+    m_minAge = minAgeSecs;
+    m_compactAlways = always;
+}
+
+// Keeps the folder from growing forever. Every so often we write a snapshot
+// of everything this space holds; then those of our change files that the
+// snapshot covers and every computer still syncing has read can go. One not
+// seen for 60 days doesn't hold that up: it catches up from the snapshot
+// when it's back, as a new one does.
+void SyncEngine::compact(Space& s)
+{
+    const qint64 now = QDateTime::currentSecsSinceEpoch();
+    if (!m_compactAlways && now - m_compactAt.value(s.id) < 600) return;
+    m_compactAt.insert(s.id, now);
+    const QString dir = s.root + QStringLiteral("/devices/") + m_me;
+
+    const qint64 since = s.fileSeq - s.snapSeq;
+    if (since > 0 && (since >= m_snapEvery || now - s.snapAt > 3 * 86400)) {
+        QJsonObject cur;
+        for (auto it = s.cursors.begin(); it != s.cursors.end(); ++it) cur.insert(it.key(), double(it.value()));
+        const QJsonObject snap{{"v", 1}, {"dev", m_me}, {"upTo", double(s.fileSeq)}, {"cursors", cur},
+                               {"at", QDateTime::currentDateTimeUtc().toString(Qt::ISODate)}, {"recs", m_ledger->snapshot(s)}};
+        if (writeFile(dir + QStringLiteral("/snapshot.nsnap"),
+                      seal(s.key, qCompress(QJsonDocument(snap).toJson(QJsonDocument::Compact), 6),
+                           (m_me + QStringLiteral("/snapshot")).toUtf8()))) {
+            s.snapSeq = s.fileSeq;
+            s.snapAt = now;
+            m_ledger->saveSpace(s);
+        }
+    }
+
+    qint64 limit = s.snapSeq;
+    const QDateTime active = QDateTime::currentDateTime().addDays(-60);
+    const QHash<QString, QDateTime> seen = m_seenAt.value(s.id);
+    for (auto it = seen.begin(); it != seen.end(); ++it)
+        if (it.value().isValid() && it.value() > active) limit = std::min(limit, m_sawMe.value(s.id).value(it.key()));
+    if (limit > 0) {
+        static const QRegularExpression fileRe(QStringLiteral("^(\\d{8})\\.nchg$"));
+        const QDateTime old = QDateTime::currentDateTime().addSecs(-m_minAge);
+        for (const QFileInfo& f : QDir(dir).entryInfoList({QStringLiteral("*.nchg")}, QDir::Files)) {
+            const auto m = fileRe.match(f.fileName());
+            if (m.hasMatch() && m.captured(1).toLongLong() <= limit && f.lastModified() <= old) QFile::remove(f.filePath());
+        }
+    }
+
+    // Once a day: put back images the folder lost, and drop ones no note
+    // has used for a month.
+    if (!m_compactAlways && now - m_attachScanAt.value(s.id) < 86400) return;
+    m_attachScanAt.insert(s.id, now);
+    const QSet<QString> used = m_ledger->attachmentsUsed(s);
+    const QString folderDir = s.root + QStringLiteral("/attachments");
+    const QString localDir = doc::attachmentDir();
+    for (const QString& name : used) {
+        const QString dst = folderDir + QLatin1Char('/') + name;
+        QFile src(localDir + QLatin1Char('/') + name);
+        if (QFileInfo::exists(dst) || !src.open(QIODevice::ReadOnly)) continue;
+        QDir().mkpath(folderDir);
+        writeFile(dst, seal(s.key, src.readAll(), (QStringLiteral("att/") + name).toUtf8()));
+    }
+    const QDateTime month = QDateTime::currentDateTime().addDays(-30);
+    for (const QFileInfo& f : QDir(folderDir).entryInfoList(QDir::Files))
+        if (!used.contains(f.fileName()) && f.lastModified() < month) QFile::remove(f.filePath());
+}
+
 
 void SyncEngine::fetchAttachments(const QStringList& names)
 {

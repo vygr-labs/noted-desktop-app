@@ -68,6 +68,7 @@ private slots:
     void sameTagAndDayFromBoth();
     void wrongPassphrase();
     void sharedList();
+    void compaction();
 };
 
 void TestSync::crypto()
@@ -311,6 +312,55 @@ void TestSync::sharedList()
     QCOMPARE(a.store.note(inside).value("title").toString(), QStringLiteral("Rota"));
 
     QVERIFY(!friendC.sync.joinList(folder, sync::keyToCode(sync::randomBytes(32))) || true);
+}
+
+// Old change files go once a snapshot covers them and everyone has read
+// them; a computer that joins later, or was away, starts from the snapshot.
+void TestSync::compaction()
+{
+    QTemporaryDir dir;
+    QDir().mkpath(dir.filePath("cloud"));
+    Device a(dir.filePath("a.sqlite")), b(dir.filePath("b.sqlite"));
+    a.sync.setCleanup(3, 0, true);
+    b.sync.setCleanup(3, 0, true);
+    QVERIFY(setUp(a, dir.filePath("cloud"), "passphrase!"));
+    QVERIFY(setUp(b, dir.filePath("cloud"), "passphrase!"));
+    QStringList ids;
+    for (int i = 0; i < 8; ++i) {
+        ids << a.store.createNote({{"title", QStringLiteral("note %1").arg(i)}, {"content", doc({QStringLiteral("body %1").arg(i)})}}).value("id").toString();
+        round({&a, &b});
+    }
+    round({&a, &b});
+    const QString aDir = dir.filePath("cloud/noted/devices/") + a.db.conn().scalar("SELECT v FROM sync_meta WHERE k = 'device'").toString();
+    auto changeFiles = [](const QString& d) { return QDir(d).entryList({"*.nchg"}, QDir::Files).size(); };
+    QVERIFY(QFileInfo::exists(aDir + "/snapshot.nsnap"));
+    QVERIFY2(changeFiles(aDir) <= 3, qPrintable(QString::number(changeFiles(aDir))));
+    QCOMPARE(b.store.note(ids.last()).value("title").toString(), QStringLiteral("note 7"));
+
+    // While b is away, a keeps the files b hasn't read.
+    for (int i = 0; i < 4; ++i) {
+        a.store.updateNote(ids[i], {{"title", QStringLiteral("renamed %1").arg(i)}});
+        a.sync.runOnce();
+    }
+    QVERIFY(changeFiles(aDir) >= 4);
+    b.sync.runOnce();
+    QCOMPARE(b.store.note(ids[3]).value("title").toString(), QStringLiteral("renamed 3"));
+
+    // A new computer reads the snapshot, not the history.
+    Device c(dir.filePath("c.sqlite"));
+    QVERIFY(setUp(c, dir.filePath("cloud"), "passphrase!"));
+    round({&c});
+    for (int i = 0; i < 8; ++i) QVERIFY(!c.store.note(ids[i]).isEmpty());
+    QCOMPARE(c.store.note(ids[0]).value("title").toString(), QStringLiteral("renamed 0"));
+    QCOMPARE(c.plain(ids[5]), QStringLiteral("body 5"));
+
+    // Files cleared while b was away: b catches up from a's snapshot.
+    a.sync.setCleanup(1, 0, true);
+    a.store.updateNote(ids[6], {{"title", "while b was away"}});
+    a.sync.runOnce();
+    for (const QString& f : QDir(aDir).entryList({"*.nchg"}, QDir::Files)) QFile::remove(aDir + "/" + f);
+    b.sync.runOnce();
+    QCOMPARE(b.store.note(ids[6]).value("title").toString(), QStringLiteral("while b was away"));
 }
 
 QTEST_GUILESS_MAIN(TestSync)

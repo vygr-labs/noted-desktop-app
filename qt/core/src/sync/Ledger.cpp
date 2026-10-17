@@ -185,6 +185,10 @@ void Ledger::install()
         CREATE TABLE IF NOT EXISTS sync_unresolved (entity TEXT NOT NULL, id TEXT NOT NULL, field TEXT NOT NULL,
             value TEXT, PRIMARY KEY (entity, id, field)) WITHOUT ROWID;
     )"));
+    if (!c.hasColumn(QStringLiteral("sync_spaces"), QStringLiteral("snap_seq"))) {
+        c.exec(QStringLiteral("ALTER TABLE sync_spaces ADD COLUMN snap_seq INTEGER DEFAULT 0"));
+        c.exec(QStringLiteral("ALTER TABLE sync_spaces ADD COLUMN snap_at INTEGER DEFAULT 0"));
+    }
     // Remote changes are written with sync_meta.applying = '1' inside their
     // transaction (nobody else ever sees it), so they aren't sent back out.
     const QString quiet = QStringLiteral("NOT EXISTS (SELECT 1 FROM sync_meta WHERE k = 'applying' AND v = '1')");
@@ -255,6 +259,8 @@ QList<Space> Ledger::spaces()
         s.name = m.value("name").toString();
         s.published = m.value("published").toLongLong();
         s.fileSeq = m.value("file_seq").toLongLong();
+        s.snapSeq = m.value("snap_seq").toLongLong();
+        s.snapAt = m.value("snap_at").toLongLong();
         const QJsonObject cur = obj(m.value("cursors").toString());
         for (auto it = cur.begin(); it != cur.end(); ++it) s.cursors.insert(it.key(), qint64(it.value().toDouble()));
         out << s;
@@ -266,10 +272,10 @@ void Ledger::saveSpace(const Space& s)
 {
     QJsonObject cur;
     for (auto it = s.cursors.begin(); it != s.cursors.end(); ++it) cur.insert(it.key(), double(it.value()));
-    m_db.conn().run(QStringLiteral("INSERT OR REPLACE INTO sync_spaces (id, kind, root, key, list_id, name, published, file_seq, cursors) "
-                                   "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"),
+    m_db.conn().run(QStringLiteral("INSERT OR REPLACE INTO sync_spaces (id, kind, root, key, list_id, name, published, file_seq, cursors, snap_seq, snap_at) "
+                                   "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"),
                     {s.id, s.kind, s.root, s.key, s.listId.isEmpty() ? QVariant() : s.listId, s.name, s.published,
-                     s.fileSeq, j(cur)});
+                     s.fileSeq, j(cur), s.snapSeq, s.snapAt});
 }
 
 void Ledger::removeSpace(const QString& id)
@@ -527,7 +533,7 @@ bool Ledger::memberOf(const Space& s, const QString& e, const QString& id, const
 }
 
 QJsonObject Ledger::record(const Space& s, const QString& e, const QString& id, const State& st,
-                           const QSet<QString>& fields, Outgoing& out)
+                           const QSet<QString>& fields, Outgoing* out)
 {
     const Def* d = def(e);
     QJsonObject f;
@@ -542,7 +548,11 @@ QJsonObject Ledger::record(const Space& s, const QString& e, const QString& id, 
     if (fields.size() == d->fields.size()) rec.insert(QStringLiteral("full"), 1);
     if (e == u"note" && fields.contains(QStringLiteral("content"))) {
         const QString hash = st.data.value(QStringLiteral("content")).toString();
-        const QString body = contentOf(id, hash);
+        QString body = contentOf(id, hash);
+        if (body.isEmpty() && !hash.isEmpty()) {
+            const QString live = m_db.conn().scalar(QStringLiteral("SELECT content FROM notes WHERE id = ?"), {id}).toString();
+            if (contentHash(live) == hash) body = live;
+        }
         QJsonObject cobj{{"p", QJsonArray::fromStringList(parentsOf(id, hash))}};
         const bool plain = st.data.value(QStringLiteral("note_type")).toString() == u"plain";
         // Just the blocks that changed since the version already in the
@@ -550,7 +560,7 @@ QJsonObject Ledger::record(const Space& s, const QString& e, const QString& id, 
         const QString head = m_db.conn().scalar(QStringLiteral("SELECT hash FROM sync_heads WHERE space = ? AND note_id = ?"), {s.id, id}).toString();
         const QString headBody = head.isEmpty() || head == hash ? QString() : contentOf(id, head);
         bool asDelta = false;
-        if (!headBody.isEmpty() && body.size() > 2048) {
+        if (out && !headBody.isEmpty() && body.size() > 2048) {
             const Body from = splitBody(headBody, plain), to = splitBody(body, plain);
             if (from.exact && to.exact && from.head == to.head && from.tail == to.tail) {
                 const QJsonArray ops = delta(from.blocks, to.blocks);
@@ -563,8 +573,10 @@ QJsonObject Ledger::record(const Space& s, const QString& e, const QString& id, 
         }
         if (!asDelta) cobj.insert(QStringLiteral("b"), body);
         rec.insert(QStringLiteral("c"), cobj);
-        out.heads.insert(id, hash);
-        out.attachments << attachmentsIn(body);
+        if (out) {
+            out->heads.insert(id, hash);
+            out->attachments << attachmentsIn(body);
+        }
     }
     return rec;
 }
@@ -612,7 +624,7 @@ Ledger::Outgoing Ledger::outgoing(const Space& s, qint64 maxBytes)
         if (now) {
             QSet<QString> fs = fields.value(key);
             if (!before || fs.contains(QStringLiteral("*"))) fs = QSet<QString>(d->fields.begin(), d->fields.end());
-            out.records.append(record(s, e, id, st, fs, out));
+            out.records.append(record(s, e, id, st, fs, &out));
             if (!before) out.joined << key;
         } else if (before) {
             out.records.append(QJsonObject{{"e", e}, {"i", id}, {"h", m_clock.next()}, {"l", 1}});
@@ -1014,6 +1026,42 @@ Ledger::Applied Ledger::apply(const Space& s, QList<Incoming> records, const QSe
     c.exec(QStringLiteral("UPDATE sync_meta SET v = '0' WHERE k = 'applying'"));
     tx.commit();
     out.attachments.removeDuplicates();
+    return out;
+}
+
+// ── snapshots ─────────────────────────────────────────────────────────────
+
+QJsonArray Ledger::snapshot(const Space& s)
+{
+    auto& c = m_db.conn();
+    QJsonArray out;
+    const QVariantList rows = s.kind == u"library"
+        ? c.all(QStringLiteral("SELECT entity, id FROM sync_state"))
+        : c.all(QStringLiteral("SELECT entity, id FROM sync_members WHERE space = ?"), {s.id});
+    for (const QVariant& v : rows) {
+        const QString e = v.toMap().value("entity").toString(), id = v.toMap().value("id").toString();
+        const Def* d = def(e);
+        if (!d || (e == u"setting" && s.kind != u"library")) continue;
+        const State st = state(e, id);
+        if (!st.exists) continue;
+        if (st.deleted) {
+            if (s.kind == u"library") out.append(QJsonObject{{"e", e}, {"i", id}, {"h", st.delClock}, {"d", 1}});
+            continue;
+        }
+        if (!memberOf(s, e, id, st.data)) continue;
+        out.append(record(s, e, id, st, QSet<QString>(d->fields.begin(), d->fields.end()), nullptr));
+    }
+    return out;
+}
+
+QSet<QString> Ledger::attachmentsUsed(const Space& s)
+{
+    QSet<QString> out;
+    const QVariantList rows = s.kind == u"library"
+        ? m_db.conn().all(QStringLiteral("SELECT content FROM notes WHERE content LIKE '%attachment:%'"))
+        : m_db.conn().all(QStringLiteral("SELECT content FROM notes WHERE content LIKE '%attachment:%' AND list_id = ?"), {s.listId});
+    for (const QVariant& v : rows)
+        for (const QString& n : attachmentsIn(v.toMap().value("content").toString())) out.insert(n);
     return out;
 }
 

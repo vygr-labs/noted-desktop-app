@@ -1,6 +1,8 @@
 #include "noted/NoteStore.h"
 
 #include <QDate>
+#include <QDir>
+#include <QFileInfo>
 #include <functional>
 #include <QDebug>
 #include <QJsonArray>
@@ -1108,6 +1110,29 @@ QStringList NoteStore::dailyDates(const QString& yearMonth)
 QString NoteStore::plainFromContent(const QString& tiptapJson)
 {
     return doc::toPlainText(doc::parse(tiptapJson));
+}
+
+int NoteStore::removeUnusedAttachments(int minAgeDays)
+{
+    const QString dir = doc::attachmentDir();
+    if (dir.isEmpty() || !QFileInfo::exists(dir)) return 0;
+    static const QRegularExpression re(QStringLiteral("attachment:([A-Za-z0-9._-]+)"));
+    QSet<QString> used;
+    auto scan = [&](const QString& sql) {
+        for (const QVariant& v : m_db.conn().all(sql))
+            for (auto it = re.globalMatch(v.toMap().value(QStringLiteral("content")).toString()); it.hasNext();)
+                used.insert(it.next().captured(1));
+    };
+    scan(QStringLiteral("SELECT content FROM notes WHERE content LIKE '%attachment:%'"));
+    // Recent versions kept for sync merges can bring an image back.
+    if (m_db.conn().scalar(QStringLiteral("SELECT count(*) FROM sqlite_master WHERE name = 'sync_versions'")).toInt())
+        scan(QStringLiteral("SELECT content FROM sync_versions WHERE content LIKE '%attachment:%'"));
+    const QDateTime before = QDateTime::currentDateTime().addDays(-minAgeDays);
+    int removed = 0;
+    for (const QFileInfo& f : QDir(dir).entryInfoList(QDir::Files))
+        if (!used.contains(f.fileName()) && f.lastModified() < before && QFile::remove(f.filePath())) ++removed;
+    if (removed) qInfo() << "removed" << removed << "unused images";
+    return removed;
 }
 
 }  // namespace noted

@@ -43,6 +43,8 @@ struct Space
     qint64 published = 0;  // last journal seq written out
     qint64 fileSeq = 0;    // last file number written
     QHash<QString, qint64> cursors;  // device -> last file read
+    qint64 snapSeq = 0;    // our last snapshot covers our files up to here
+    qint64 snapAt = 0;     // when we wrote it (seconds)
 };
 
 class Clock
@@ -116,6 +118,12 @@ public:
     // isn't taken as one.
     Applied apply(const Space& s, QList<Incoming> records, const QSet<QString>& ownDevices);
 
+    // Everything the space holds as of now, as full records (and the
+    // library's deletions), for a computer starting from scratch.
+    QJsonArray snapshot(const Space& s);
+    // Image files the space's notes use.
+    QSet<QString> attachmentsUsed(const Space& s);
+
     void prune();
 
 private:
@@ -135,8 +143,9 @@ private:
     QString commonBase(const QString& noteId, const QString& a, const QStringList& bParents);
     bool isAncestor(const QString& noteId, const QString& older, const QString& newer);
     bool memberOf(const Space& s, const QString& e, const QString& id, const QJsonObject& data);
+    // `out` null: for a snapshot (whole bodies, nothing remembered).
     QJsonObject record(const Space& s, const QString& e, const QString& id, const State& st, const QSet<QString>& fields,
-                       Outgoing& out);
+                       Outgoing* out);
     void journal(const QString& e, const QString& id, const QStringList& fields, const QString& hlc, bool del,
                  const QString& origin, const QString& only = {});
     void markDirty(const QString& e, const QString& id);
