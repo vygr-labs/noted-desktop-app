@@ -91,10 +91,11 @@ QVariantMap NoteStore::createNote(const QVariantMap& data)
         plain = type == u"rich" ? plainFromContent(content.toString()) : content.toString();
 
     Transaction tx(c);
-    c.run(QStringLiteral("INSERT INTO notes (id, title, content, content_plain, note_type, list_id, is_daily, daily_date) "
-                         "VALUES (?, ?, ?, ?, ?, ?, ?, ?)"),
+    c.run(QStringLiteral("INSERT INTO notes (id, title, content, content_plain, note_type, list_id, is_daily, daily_date, spellcheck) "
+                         "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)"),
           {id, title, content, plain, type, nullIfEmpty(data.value(QStringLiteral("list_id"))),
-           data.value(QStringLiteral("is_daily")).toBool() ? 1 : 0, nullIfEmpty(data.value(QStringLiteral("daily_date")))});
+           data.value(QStringLiteral("is_daily")).toBool() ? 1 : 0, nullIfEmpty(data.value(QStringLiteral("daily_date"))),
+           data.value(QStringLiteral("spellcheck")).toBool() ? 1 : 0});
     ftsReplace(id, title, plain.toString());
     tx.commit();
     emit notesChanged();
@@ -202,6 +203,13 @@ QVariantMap NoteStore::duplicateNote(const QString& id)
         m_db.conn().run(QStringLiteral("INSERT OR IGNORE INTO note_tags (note_id, tag_id) VALUES (?, ?)"),
                         {created.value("id"), t.toMap().value("id")});
     return created;
+}
+
+void NoteStore::setSpellcheck(const QString& id, bool on)
+{
+    m_db.conn().run(QStringLiteral("UPDATE notes SET spellcheck = ? WHERE id = ?"), {on ? 1 : 0, id});
+    emit noteChanged(id);
+    emit notesChanged();
 }
 
 void NoteStore::setPinned(const QString& id, bool pinned)
@@ -1133,6 +1141,13 @@ int NoteStore::removeUnusedAttachments(int minAgeDays)
         if (!used.contains(f.fileName()) && f.lastModified() < before && QFile::remove(f.filePath())) ++removed;
     if (removed) qInfo() << "removed" << removed << "unused images";
     return removed;
+}
+
+void NoteStore::adoptSpellcheckOptIn()
+{
+    if (setting(QStringLiteral("qt.spellcheckOptIn")) == u"1") return;
+    m_db.conn().run(QStringLiteral("UPDATE notes SET spellcheck = 0 WHERE spellcheck <> 0"));
+    setSetting(QStringLiteral("qt.spellcheckOptIn"), QStringLiteral("1"));
 }
 
 }  // namespace noted

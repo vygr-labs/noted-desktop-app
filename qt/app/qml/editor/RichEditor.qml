@@ -13,6 +13,7 @@ Item {
     property alias controller: ctl
     property alias textEdit: edit
     property bool readOnly: false
+    property bool spellcheck: false   // this note has spelling turned on
     property real minHeight: 200
     property color pageColor: Theme.c.bg   // what's behind the editor (covers Qt's to-do bullets)
     property string placeholder: "Start writing, or type / for headings, lists and to-dos"
@@ -31,6 +32,7 @@ Item {
         store: Store
         files: Files
         palette: Theme.editorPalette
+        spellcheck: root.spellcheck
         cursorPosition: edit.cursorPosition
         selectionStart: edit.selectionStart
         selectionEnd: edit.selectionEnd
@@ -75,6 +77,34 @@ Item {
             width: edit.width - 1
             wrapMode: Text.Wrap
             font: edit.font
+        }
+
+        // Misspelled words: a red wave under each.
+        Repeater {
+            model: ctl.spellMarks
+            delegate: Canvas {
+                required property var modelData
+                readonly property rect a: { edit.width; edit.contentHeight; ctl.layoutTick; return edit.positionToRectangle(modelData.start) }
+                readonly property rect b: { edit.width; edit.contentHeight; ctl.layoutTick; return edit.positionToRectangle(modelData.start + modelData.length) }
+                x: Math.round(a.x)
+                y: Math.round(a.y + a.height - 3)
+                width: Math.max(4, Math.round((b.y === a.y ? b.x : edit.width) - a.x))
+                height: 4
+                onWidthChanged: requestPaint()
+                onPaint: {
+                    const g = getContext("2d")
+                    g.reset()
+                    g.strokeStyle = Theme.c.red
+                    g.lineWidth = 1.2
+                    g.beginPath()
+                    for (let i = 0, px = 0; px <= width; ++i, px += 2) {
+                        const py = i % 2 ? 3.2 : 0.8
+                        if (i === 0) g.moveTo(px, py)
+                        else g.lineTo(px, py)
+                    }
+                    g.stroke()
+                }
+            }
         }
 
         // Task checkboxes and blockquote bars (see EditorController::decorations).
@@ -401,6 +431,16 @@ Item {
         const hasSel = edit.selectionStart !== edit.selectionEnd
         const href = ctl.linkAt(pos) || ctl.linkAt(pos - 1)
         const items = []
+        // A misspelled word: what it might be, then teach or ignore it.
+        const miss = ctl.misspellingAt(pos)
+        if (miss.word) {
+            for (const s of miss.suggestions) items.push({ text: s, action: () => ctl.replaceRange(miss.start, miss.length, s) })
+            if (!miss.suggestions.length) items.push({ text: "No suggestions", disabled: true })
+            items.push({ separator: true })
+            items.push({ text: "Add to dictionary", action: () => Spell.addToDictionary(miss.word) })
+            items.push({ text: "Ignore", action: () => Spell.ignore(miss.word) })
+            items.push({ separator: true })
+        }
         if (href !== "") {
             items.push({ text: "Open link", icon: "external-link", action: () => App.openExternal(href) })
             items.push({ text: "Edit link…", icon: "link", action: () => linkDialog.openFor() })

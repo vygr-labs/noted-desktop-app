@@ -221,6 +221,14 @@ Flickable {
                 }
             }
             SettingRow {
+                label: "Check spelling"
+                description: Spell.available
+                    ? "Off unless you turn it on for a note, from its ⋯ menu. This starts new notes with it on. Uses Windows’ " + Spell.language + " dictionary."
+                    : "Windows doesn’t have a spelling dictionary for your language. Add one in Windows’ language settings."
+                Toggle { visible: Spell.available; checked: AppState.spellcheckNew; onToggled: (v) => { AppState.spellcheckNew = v; AppState.save("qt.spellcheckNew", v ? "1" : "0") } }
+                TextButton { visible: !Spell.available; text: "Language settings…"; onClicked: App.openExternal("ms-settings:regionlanguage") }
+            }
+            SettingRow {
                 label: "Note previews"
                 description: "Show the first lines of each note under its title in rows."
                 Toggle { checked: AppState.showPreview; onToggled: (v) => AppState.setShowPreview(v) }

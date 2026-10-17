@@ -6,8 +6,13 @@ qt_add_executable(test_editor
     ../src/EditorController.h
     ../src/OpenFiles.cpp
     ../src/OpenFiles.h
+    ../src/SpellChecker.cpp
+    ../src/SpellChecker.h
 )
 target_include_directories(test_editor PRIVATE ../src)
 target_link_libraries(test_editor PRIVATE Noted::Core Qt6::Quick Qt6::Test)
+if(WIN32)
+    target_link_libraries(test_editor PRIVATE ole32)
+endif()
 add_test(NAME test_editor COMMAND test_editor)
 set_tests_properties(test_editor PROPERTIES ENVIRONMENT "QT_QPA_PLATFORM=offscreen")

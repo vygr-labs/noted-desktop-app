@@ -273,6 +273,8 @@ Item {
             wide,
             { text: "Move to list…", action: () => header.openMove() },
             { text: "Copy as Markdown", disabled: locked, action: () => { if (App.copyAsMarkdown(n.id)) AppState.toast("Copied as Markdown") } },
+            ...(Spell.available && !isPlain ? [{ text: "Check spelling", checked: !!n.spellcheck, disabled: locked,
+                                                 action: () => Store.setSpellcheck(n.id, !n.spellcheck) }] : []),
             { text: "Export…", disabled: locked, children: [
                 { text: "Markdown", action: () => exportAs("md") },
                 { text: "PDF", action: () => exportAs("pdf") },
@@ -406,6 +408,7 @@ Item {
                 id: rich
                 visible: !pane.isPlain && !pane.locked
                 readOnly: pane.inTrash
+                spellcheck: Spell.available && !!pane.note.spellcheck && !pane.inTrash
                 width: parent.width
                 minHeight: 120
                 onCaretMoved: (r) => { if (textEdit.activeFocus) pane.ensureVisible(r, textEdit) }

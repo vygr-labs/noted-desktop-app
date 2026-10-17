@@ -27,6 +27,7 @@
 
 #include "noted/NoteStore.h"
 #include "noted/sync/Merge.h"
+#include "SpellChecker.h"
 #include "noted/doc/Export.h"
 #include "noted/doc/Schema.h"
 #include "noted/doc/TipTap.h"
@@ -90,6 +91,17 @@ EditorController::EditorController(QObject* parent)
         rebuildDecorations();
     });
 
+    m_spellTimer.setSingleShot(true);
+    m_spellTimer.setInterval(350);
+    connect(&m_spellTimer, &QTimer::timeout, this, [this] {
+        if (m_spellFrom < 0) return;
+        const int from = m_spellFrom, to = m_spellTo;
+        m_spellFrom = m_spellTo = -1;
+        checkSpelling(from, to);
+    });
+    if (SpellChecker* s = SpellChecker::instance())
+        connect(s, &SpellChecker::wordsChanged, this, [this] { if (m_spellcheck && doc()) checkSpelling(0, doc()->characterCount()); });
+
     m_saveTimer.setSingleShot(true);
     m_saveTimer.setInterval(600);
     connect(&m_saveTimer, &QTimer::timeout, this, &EditorController::save);
@@ -141,6 +153,12 @@ void EditorController::setFiles(OpenFiles* f)
 void EditorController::setCursorPosition(int p)
 {
     if (p == m_cursor) return;
+    // Left the paragraph where a word was being typed: mark it now.
+    if (m_spellHeldBlock >= 0 && doc() && doc()->findBlock(p).blockNumber() != m_spellHeldBlock) {
+        const QTextBlock held = doc()->findBlockByNumber(m_spellHeldBlock);
+        m_spellHeldBlock = -1;
+        if (held.isValid()) checkSpelling(held.position(), held.position() + held.length());
+    }
     if (m_pendingMarksAt >= 0 && p != m_pendingMarksAt) {
         m_pendingMarks.clear();
         m_pendingMarksAt = -1;
@@ -295,6 +313,12 @@ void EditorController::build(const QString& noteId, const QString& json)
     recomputeStats();
     if (!m_findQuery.isEmpty()) rebuildFind();
     rebuildDecorations();
+    m_spellHeldBlock = -1;
+    if (m_spellcheck) {
+        m_spellFrom = 0;
+        m_spellTo = d->characterCount();
+        m_spellTimer.start();
+    }
 }
 
 void EditorController::unload()
@@ -425,6 +449,16 @@ void EditorController::recomputeStats()
 
 void EditorController::onContentsChange(int pos, int removed, int added)
 {
+    if (m_spelling) return;
+    if (m_spellcheck && !m_loading && !m_spellMarks.isEmpty()) {
+        m_spellMarks.clear();
+        emit spellMarksChanged();
+    }
+    if (m_spellcheck && !m_loading) {
+        m_spellFrom = m_spellFrom < 0 ? pos : qMin(m_spellFrom, pos);
+        m_spellTo = qMax(m_spellTo, pos + qMax(added, 1));
+        m_spellTimer.start();
+    }
     if (m_loading || m_restyling) return;
     markDirty();
     const int end = pos + qMax(added, 1);
@@ -1856,3 +1890,113 @@ int EditorController::replaceAll(const QString& with)
     rebuildFind();
     return n;
 }
+
+// ── spelling ──────────────────────────────────────────────────────────────
+
+void EditorController::setSpellcheck(bool on)
+{
+    if (on == m_spellcheck) return;
+    m_spellcheck = on;
+    emit spellcheckChanged();
+    if (!doc()) return;
+    if (on) checkSpelling(0, doc()->characterCount());
+    else clearSpelling();
+}
+
+// Underlines live in each paragraph's layout (QTextLayout::setFormats), as a
+// syntax highlighter's do, so they're never part of the note. Telling the
+// layout to redraw raises contentsChange; m_spelling keeps that from counting
+// as an edit.
+void EditorController::checkSpelling(int from, int to)
+{
+    QTextDocument* d = doc();
+    SpellChecker* spell = SpellChecker::instance();
+    if (!d || !spell || !spell->available() || !m_spellcheck) return;
+    QTextCharFormat wavy;
+    wavy.setUnderlineStyle(QTextCharFormat::SpellCheckUnderline);
+    wavy.setUnderlineColor(QColor(m_paletteMap.value(QStringLiteral("spellColor"), QStringLiteral("#B4432F")).toString()));
+    QTextBlock b = d->findBlock(qMax(0, from));
+    const QTextBlock last = d->findBlock(qBound(0, to, d->characterCount() - 1));
+    const int caretBlock = d->findBlock(m_cursor).blockNumber();
+    int start = b.position(), end = start;
+    for (; b.isValid(); b = b.next()) {
+        QList<QTextLayout::FormatRange> ranges;
+        QTextFrame* frame = QTextCursor(b).currentFrame();
+        const bool code = frame && frame->frameFormat().intProperty(noted::doc::FrameKind) == noted::doc::CodeBlockFrame;
+        if (!code) {
+            const QString text = b.text();
+            for (const SpellChecker::Miss& m : spell->check(text)) {
+                const int at = b.position() + m.start;
+                // Not code, links, or the word still being typed.
+                QTextCursor fc(d);
+                fc.setPosition(at + 1);
+                const QTextCharFormat f = fc.charFormat();
+                if (f.boolProperty(noted::doc::MarkCode) || f.isAnchor()) continue;
+                if (b.blockNumber() == caretBlock && m_cursor == at + m.length) { m_spellHeldBlock = caretBlock; continue; }
+                ranges.append({m.start, m.length, wavy});
+            }
+        }
+        if (b.layout()->formats() != ranges) b.layout()->setFormats(ranges);
+        end = b.position() + b.length();
+        if (b == last) break;
+    }
+    m_spelling = true;
+    d->markContentsDirty(start, end - start);
+    m_spelling = false;
+    collectSpellMarks();
+}
+
+void EditorController::collectSpellMarks()
+{
+    QVariantList marks;
+    if (const QTextDocument* d = doc(); d && m_spellcheck)
+        for (QTextBlock b = d->begin(); b.isValid(); b = b.next())
+            for (const QTextLayout::FormatRange& r : b.layout()->formats())
+                if (r.format.underlineStyle() == QTextCharFormat::SpellCheckUnderline)
+                    marks << QVariantMap{{"start", b.position() + r.start}, {"length", r.length}};
+    if (marks == m_spellMarks) return;
+    m_spellMarks = marks;
+    emit spellMarksChanged();
+}
+
+void EditorController::clearSpelling()
+{
+    QTextDocument* d = doc();
+    if (!d) return;
+    for (QTextBlock b = d->begin(); b.isValid(); b = b.next())
+        if (!b.layout()->formats().isEmpty()) b.layout()->clearFormats();
+    m_spelling = true;
+    d->markContentsDirty(0, d->characterCount());
+    m_spelling = false;
+    collectSpellMarks();
+}
+
+QVariantMap EditorController::misspellingAt(int position) const
+{
+    const QTextDocument* d = doc();
+    SpellChecker* spell = SpellChecker::instance();
+    if (!d || !spell || !m_spellcheck) return {};
+    const QTextBlock b = d->findBlock(position);
+    if (!b.isValid()) return {};
+    const int off = position - b.position();
+    for (const QTextLayout::FormatRange& r : b.layout()->formats()) {
+        if (r.format.underlineStyle() != QTextCharFormat::SpellCheckUnderline) continue;
+        if (off < r.start || off > r.start + r.length) continue;
+        const QString word = b.text().mid(r.start, r.length);
+        return {{"start", b.position() + r.start}, {"length", r.length}, {"word", word},
+                {"suggestions", spell->suggest(word)}};
+    }
+    return {};
+}
+
+void EditorController::replaceRange(int start, int length, const QString& text)
+{
+    QTextDocument* d = doc();
+    if (!d) return;
+    QTextCursor c(d);
+    c.setPosition(start);
+    c.setPosition(start + length, QTextCursor::KeepAnchor);
+    c.insertText(text);
+    emit requestCursor(start + int(text.size()), start + int(text.size()));
+}
+

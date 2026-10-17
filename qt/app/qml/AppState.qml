@@ -46,6 +46,7 @@ QtObject {
     property string noteSort: "updated_at"
     property bool showPreview: true
     property string defaultNoteType: "rich"
+    property bool spellcheckNew: false   // new notes start with spelling on (qt.spellcheckNew)
     property bool popoutSkipTaskbar: false
     property bool spellcheckHint: true
     property string listLayout: "sheets"     // sheets | rows (list pages)
@@ -129,6 +130,7 @@ QtObject {
         noteSort = Store.setting("noteSort", "updated_at")
         showPreview = Store.setting("showNotePreview", "1") !== "0"
         defaultNoteType = Store.setting("defaultNoteType", "rich")
+        spellcheckNew = Store.setting("qt.spellcheckNew", "0") === "1"
         popoutSkipTaskbar = Store.setting("popoutSkipTaskbar", "false") === "true"
         fullWidth = Store.setting("qt.wideText", "false") === "true"
         sidebarCollapsed = Store.setting("qt.sidebarCollapsed", "false") === "true"
@@ -432,7 +434,8 @@ QtObject {
         const data = {
             title: (opts && opts.title) || "Untitled",
             note_type: (opts && opts.type) || defaultNoteType,
-            list_id: (opts && opts.listId !== undefined) ? opts.listId : (view === "list" ? viewId : (currentNote.list_id || ""))
+            list_id: (opts && opts.listId !== undefined) ? opts.listId : (view === "list" ? viewId : (currentNote.list_id || "")),
+            spellcheck: spellcheckNew
         }
         const n = Store.createNote(data)
         openNote(n.id)

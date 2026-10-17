@@ -23,6 +23,7 @@
 #include "AppController.h"
 #include "EditorController.h"
 #include "OpenFiles.h"
+#include "SpellChecker.h"
 #include "DevDriver.h"
 #include "WindowChrome.h"
 #include "noted/Database.h"
@@ -158,6 +159,9 @@ int main(int argc, char* argv[])
     }
     database->startWatching();
     // Syncs through a folder, when that's been set up (Settings, Sync).
+    // Spelling is something a note opts into (Electron's column said "on" for
+    // every note): turn the old default off once.
+    store.adoptSpellcheckOptIn();
     noted::SyncEngine sync(*database, store);
     // Images deleted from notes a week ago or more.
     if (!takeShot) QTimer::singleShot(60000, &store, [&store] { store.removeUnusedAttachments(7); });
@@ -170,6 +174,8 @@ int main(int argc, char* argv[])
     qmlRegisterSingletonInstance("Noted", 1, 0, "App", &controller);
     qmlRegisterSingletonInstance("Noted", 1, 0, "Files", &files);
     qmlRegisterSingletonInstance("Noted", 1, 0, "Sync", &sync);
+    SpellChecker spell;
+    qmlRegisterSingletonInstance("Noted", 1, 0, "Spell", &spell);
     engine.rootContext()->setContextProperty(QStringLiteral("startupState"), cli.value(stateOpt));
     engine.rootContext()->setContextProperty(QStringLiteral("startupFiles"), cli.positionalArguments());
     engine.rootContext()->setContextProperty(QStringLiteral("startupQuickCapture"), cli.isSet(quickOpt));

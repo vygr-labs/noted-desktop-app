@@ -300,6 +300,7 @@ Sections are on the left; the section name is the page title.
 | | Text size: Small / Default / Large / Larger, with a live sample | `qt.textScale` = 0.9375 / 1 / 1.094 / 1.1875 (15 / 16 / 17.5 / 19px body) |
 | | Text width: Normal / Wide | `qt.wideText` |
 | Editor | New notes start as: Rich text / Plain text | `defaultNoteType` |
+| | Check spelling in new notes (switch; per note in its ⋯ menu, off by default) | `qt.spellcheckNew`, `notes.spellcheck` |
 | | Note previews (switch) | `showNotePreview` |
 | | Markdown and text files: open in noted (switch) | file association, OS-level |
 | Sync | Sync: Off + Set up…, or the folder, when it last synced, Sync now / Turn off | `sync_spaces` (own tables) |

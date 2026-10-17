@@ -35,6 +35,7 @@ public:
     Q_INVOKABLE int emptyTrash();
     Q_INVOKABLE QVariantMap duplicateNote(const QString& id);
     Q_INVOKABLE void setPinned(const QString& id, bool pinned);
+    Q_INVOKABLE void setSpellcheck(const QString& id, bool on);  // not an edit: updated_at stays
     Q_INVOKABLE void moveToList(const QString& id, const QString& listId);  // "" = no list
     Q_INVOKABLE QVariantMap counts();  // all, synced, trash, todosOpen, todosToday
     Q_INVOKABLE QVariantList recentNotes(int limit = 8);
@@ -141,6 +142,10 @@ public:
     // ISO dates ("2026-09-04") in the given month ("2026-09") that have a
     // non-empty daily note.
     Q_INVOKABLE QStringList dailyDates(const QString& yearMonth);
+
+    // Spellcheck is opt-in per note. Electron stored 1 (on) for every note,
+    // so the first run of this build sets them all to off, once.
+    void adoptSpellcheckOptIn();
 
     // Deletes image files beside the database that no note (trashed ones
     // included) has used for `minAgeDays`. Returns how many went.

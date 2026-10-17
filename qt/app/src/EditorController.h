@@ -78,6 +78,13 @@ class EditorController : public QObject
     Q_PROPERTY(QVariantList findMatches READ findMatches NOTIFY findChanged)  // [{start, length}]
     Q_PROPERTY(int findIndex READ findIndex NOTIFY findChanged)
 
+    // Spelling (when the note has it on): misspelled words get a red wavy
+    // underline, drawn on the paragraphs' layouts, never saved.
+    Q_PROPERTY(bool spellcheck READ spellcheck WRITE setSpellcheck NOTIFY spellcheckChanged)
+    // [{start, length}] of every misspelled word, for the overlay that draws
+    // the squiggles (Qt Quick doesn't draw a layout's underline formats).
+    Q_PROPERTY(QVariantList spellMarks READ spellMarks NOTIFY spellMarksChanged)
+
 public:
     explicit EditorController(QObject* parent = nullptr);
     ~EditorController() override;
@@ -197,6 +204,13 @@ public:
 
     // ── find / replace ───────────────────────────────────────────────
     Q_INVOKABLE int findNext(bool backwards = false);  // returns match start or -1
+    bool spellcheck() const { return m_spellcheck; }
+    QVariantList spellMarks() const { return m_spellMarks; }
+    void setSpellcheck(bool on);
+    // The misspelled word at `position`: { start, length, word, suggestions },
+    // or empty.
+    Q_INVOKABLE QVariantMap misspellingAt(int position) const;
+    Q_INVOKABLE void replaceRange(int start, int length, const QString& text);
     Q_INVOKABLE void replaceCurrent(const QString& with);
     Q_INVOKABLE int replaceAll(const QString& with);
 
@@ -212,6 +226,8 @@ signals:
     void statsChanged();
     void dirtyChanged();
     void findChanged();
+    void spellcheckChanged();
+    void spellMarksChanged();
     void decorationsChanged();
     void layoutTickChanged();
     // Ask QML to move the caret / selection after a structural edit.
@@ -233,6 +249,9 @@ private:
     QTextDocument* doc() const;
     QTextCursor selectionCursor() const;
     void onContentsChange(int pos, int removed, int added);
+    void checkSpelling(int from, int to);  // document positions
+    void clearSpelling();
+    void collectSpellMarks();
     void restyle(int from, int to);
     void updateFormatState();
     void markDirty();
@@ -272,6 +291,12 @@ private:
     bool m_restyling = false;
     int m_pendingFrom = -1, m_pendingTo = -1;
     QTimer m_restyleTimer;
+    bool m_spellcheck = false;
+    bool m_spelling = false;          // setting underlines: not an edit
+    QTimer m_spellTimer;
+    QVariantList m_spellMarks;
+    int m_spellFrom = -1, m_spellTo = -1;
+    int m_spellHeldBlock = -1;        // the word being typed there wasn't marked yet
     QTimer m_saveTimer;
     QTimer m_statsTimer;
     // Marks toggled with an empty selection apply to the next typed text.

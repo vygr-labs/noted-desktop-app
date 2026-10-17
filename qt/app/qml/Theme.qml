@@ -166,6 +166,7 @@ QtObject {
         codeBlockBg: c.codeBg,
         codeBlockText: c.text,
         highlightBg: c.hl,
+        spellColor: c.red,
         quoteText: c.secondary,
         checkedText: c.muted,
         rule: c.line,

@@ -42,6 +42,8 @@ qt_add_qml_module(noted
         src/EditorController.h
         src/OpenFiles.cpp
         src/OpenFiles.h
+        src/SpellChecker.cpp
+        src/SpellChecker.h
     QML_FILES
         qml/Main.qml
         qml/Theme.qml
@@ -135,6 +137,9 @@ target_link_libraries(noted PRIVATE
     Qt6::Network
     Qt6::Svg
 )
+if(WIN32)
+    target_link_libraries(noted PRIVATE ole32)  # the system spell checker (COM)
+endif()
 
 set_target_properties(noted PROPERTIES
     OUTPUT_NAME noted
