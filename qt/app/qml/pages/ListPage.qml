@@ -17,16 +17,34 @@ PageColumns {
 
     property var notes: []
     property var previews: ({})
+    // Long lists render a page at a time: the first `shown` notes, and more as
+    // you scroll near the end. Previews are kept by note and edit time, so
+    // coming back to a list only renders what changed.
+    readonly property int pageSize: 30
+    property int shown: pageSize
+    property var previewCache: ({})
     function reload() {
         if (!listId) { notes = []; return }
         notes = Store.notesInList(listId, byTitle ? "title" : "updated_at")
-        if (sheets) {
-            const p = {}
-            for (const n of notes) p[n.id] = Store.previewBlocks(n.id, 9)
-            previews = p
-        }
+        fillPreviews()
     }
-    onListIdChanged: if (active) { reload(); contentY = 0 }
+    function fillPreviews() {
+        if (!sheets) return
+        const p = {}
+        for (const n of notes.slice(0, shown)) {
+            const key = n.id + "@" + n.updated_at + (AppState.isLocked(n) ? "#locked" : "")
+            if (!(key in previewCache)) previewCache[key] = Store.previewBlocks(n.id, 9)
+            p[n.id] = previewCache[key]
+        }
+        previews = p
+    }
+    function showMore() {
+        if (shown >= notes.length) return
+        shown += pageSize
+        fillPreviews()
+    }
+    onContentYChanged: if (active && contentY + height > contentHeight - 900) Qt.callLater(showMore)
+    onListIdChanged: if (active) { shown = pageSize; reload(); contentY = 0 }
     onActiveChanged: if (active) reload()
     onSheetsChanged: if (active) reload()
     onByTitleChanged: if (active) reload()
@@ -49,7 +67,7 @@ PageColumns {
         for (const n of notes) {
             const label = flat ? "" : (n.is_pinned ? "Pinned" : Fmt.timeGroup(n.updated_at))
             let g = out.length ? out[out.length - 1] : null
-            if (!g || g.label !== label) { g = { label, notes: [] }; out.push(g) }
+            if (!g || g.label !== label) { g = { label, notes: [], start: g ? g.start + g.notes.length : 0 }; out.push(g) }
             g.notes.push(n)
         }
         return out
@@ -174,6 +192,8 @@ PageColumns {
             id: group
             required property var modelData
             required property int index
+            readonly property var visibleNotes: modelData.notes.slice(0, Math.max(0, page.shown - modelData.start))
+            visible: visibleNotes.length > 0
             width: parent.width
 
             Item { width: 1; height: group.modelData.label ? (group.index ? 40 : 18) : 0 }
@@ -196,7 +216,7 @@ PageColumns {
                 columnSpacing: 20
                 rowSpacing: 28
                 Repeater {
-                    model: page.sheets ? group.modelData.notes : []
+                    model: page.sheets ? group.visibleNotes : []
                     delegate: Item {
                         id: sheet
                         required property var modelData
@@ -281,7 +301,8 @@ PageColumns {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: AppState.openNote(sheet.modelData.id)
+                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                            onClicked: (e) => AppState.openNoteFrom(e, sheet.modelData.id)
                         }
                     }
                 }
@@ -293,7 +314,7 @@ PageColumns {
                 width: parent.width
                 spacing: 2
                 Repeater {
-                    model: page.sheets ? [] : group.modelData.notes
+                    model: page.sheets ? [] : group.visibleNotes
                     delegate: Rectangle {
                         id: noteRow
                         required property var modelData
@@ -364,7 +385,8 @@ PageColumns {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            onClicked: AppState.openNote(noteRow.modelData.id)
+                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                            onClicked: (e) => AppState.openNoteFrom(e, noteRow.modelData.id)
                         }
                     }
                 }

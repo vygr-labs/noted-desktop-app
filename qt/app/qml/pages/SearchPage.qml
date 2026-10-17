@@ -47,7 +47,7 @@ PageColumns {
         recent = r
         AppState.save("qt.recentSearches", JSON.stringify(r))
     }
-    function open(id) { remember(query); AppState.openNote(id) }
+    function open(id, mouse) { remember(query); if (mouse) AppState.openNoteFrom(mouse, id); else AppState.openNote(id) }
 
     // ── results ──────────────────────────────────────────────────────
     readonly property string q: query.trim()
@@ -279,7 +279,8 @@ PageColumns {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: page.open(n.id)
+                acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                onClicked: (e) => page.open(n.id, e)
             }
         }
     }
@@ -376,7 +377,8 @@ PageColumns {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                onClicked: page.open(f.id)
+                acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                onClicked: (e) => page.open(f.id, e)
             }
         }
     }

@@ -10,6 +10,7 @@
 #include <QRegularExpression>
 #include <QTextBlock>
 #include <QTextCursor>
+#include <QAbstractTextDocumentLayout>
 #include <QTextDocument>
 #include <QTextDocumentFragment>
 #include <QTextFrame>
@@ -199,6 +200,11 @@ void EditorController::load(const QString& noteId, const QString& json)
     flush();
     QElapsedTimer t;
     t.start();
+    // Drop the old note's overlays first: they hold positions in its text.
+    if (!m_decorations.isEmpty()) {
+        m_decorations.clear();
+        emit decorationsChanged();
+    }
     m_loading = true;
     m_styler.applyDocumentDefaults(d);
     doc::load(d, doc::parse(json));
@@ -237,6 +243,10 @@ void EditorController::load(const QString& noteId, const QString& json)
 void EditorController::unload()
 {
     flush();
+    if (!m_decorations.isEmpty()) {
+        m_decorations.clear();
+        emit decorationsChanged();
+    }
     if (QTextDocument* d = doc()) {
         m_loading = true;
         d->clear();
@@ -1420,6 +1430,8 @@ void EditorController::rebuildDecorations()
             if (b.blockFormat().intProperty(BlockKind) == HorizontalRule)
                 out.append(QVariantMap{{"k", "hr"}, {"block", b.blockNumber()}});
             QTextFrame* f = QTextCursor(b).currentFrame();
+            if (f && f->frameFormat().intProperty(FrameKind) == CodeBlockFrame && b.position() == f->firstPosition())
+                out.append(QVariantMap{{"k", "code"}, {"block", b.blockNumber()}});
             const bool quoted = b.blockFormat().intProperty(QTextFormat::BlockQuoteLevel) > 0;
             if (quoted && quoteStart >= 0 && f == quoteFrame) {
                 quoteEnd = b.blockNumber();
@@ -1449,6 +1461,20 @@ QVariantMap EditorController::blockGeometry(int blockNumber, int tick) const
     const QTextBlock b = d->findBlockByNumber(blockNumber);
     if (!b.isValid()) return {};
     return {{"start", b.position()}, {"end", b.position() + qMax(0, b.length() - 1)}};
+}
+
+QRectF EditorController::codeRect(int blockNumber, int tick) const
+{
+    Q_UNUSED(tick)
+    QTextDocument* d = doc();
+    if (!d || !d->documentLayout()) return {};
+    const QTextBlock b = d->findBlockByNumber(blockNumber);
+    QTextFrame* f = b.isValid() ? QTextCursor(b).currentFrame() : nullptr;
+    if (!f || f->frameFormat().intProperty(FrameKind) != CodeBlockFrame) return {};
+    QRectF r = d->documentLayout()->frameBoundingRect(f);
+    const QTextFrameFormat ff = f->frameFormat();
+    r.adjust(ff.leftMargin(), ff.topMargin(), -ff.rightMargin(), -ff.bottomMargin());
+    return r;
 }
 
 bool EditorController::toggleTask(int blockNumber)

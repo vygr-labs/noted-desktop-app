@@ -68,6 +68,7 @@ qt_add_qml_module(noted
 
         qml/panels/MiniCalendar.qml
         qml/panels/Header.qml
+        qml/panels/TabStrip.qml
         qml/panels/SideTask.qml
         qml/panels/FolderCard.qml
         qml/panels/SheetPreview.qml

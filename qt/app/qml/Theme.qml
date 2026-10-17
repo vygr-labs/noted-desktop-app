@@ -136,7 +136,7 @@ QtObject {
         bodyFamily: fontFamily,
         monoFamily: monoFamily,
         basePx: 16 * textScale,
-        lineHeight: 170,
+        lineHeight: 150,
         text: c.text,
         muted: c.muted,
         subtle: c.faint,

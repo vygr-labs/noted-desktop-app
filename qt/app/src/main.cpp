@@ -11,6 +11,7 @@
 #include <QQmlContext>
 #include <QQuickStyle>
 #include <QQuickWindow>
+#include <QScreen>
 #include <QStandardPaths>
 #include <QTextStream>
 #include <QTimer>
@@ -158,6 +159,7 @@ int main(int argc, char* argv[])
     engine.rootContext()->setContextProperty(QStringLiteral("startupState"), cli.value(stateOpt));
     engine.rootContext()->setContextProperty(QStringLiteral("startupFiles"), cli.positionalArguments());
     engine.rootContext()->setContextProperty(QStringLiteral("startupQuickCapture"), cli.isSet(quickOpt));
+    engine.rootContext()->setContextProperty(QStringLiteral("screenshotMode"), takeShot);
 
     QObject::connect(&engine, &QQmlApplicationEngine::objectCreationFailed, &app, [] { QCoreApplication::exit(1); },
                      Qt::QueuedConnection);
@@ -169,6 +171,16 @@ int main(int argc, char* argv[])
     if (!takeShot) controller.registerQuickCaptureHotkey();
 
     if (takeShot && window) {
+        // Out of the way: on the smallest screen (a laptop's own panel, not the
+        // monitor someone is watching) and without taking focus.
+        QScreen* target = window->screen();
+        for (QScreen* s : QGuiApplication::screens()) {
+            const QSizeF a = s->physicalSize(), b = target->physicalSize();
+            if (a.width() * a.height() < b.width() * b.height()) target = s;
+        }
+        window->setScreen(target);
+        window->setPosition(target->availableGeometry().topLeft());
+        window->show();
         const QString out = cli.value(shotOpt);
         QTimer::singleShot(cli.value(delayOpt).toInt(), window, [window, out] {
             const QImage img = window->grabWindow();

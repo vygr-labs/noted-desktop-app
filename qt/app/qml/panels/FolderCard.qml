@@ -11,7 +11,7 @@ Item {
     property int count: 0
     property string latest: ""
     property string edited: ""
-    signal clicked()
+    signal clicked(var mouse)
 
     implicitHeight: 11 + 108
     readonly property color fill: area.containsMouse ? Theme.mix(Theme.c.folder, Theme.c.pressed, 0.45) : Theme.c.folder
@@ -89,6 +89,7 @@ Item {
         anchors.fill: parent
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
-        onClicked: card.clicked()
+        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+        onClicked: (e) => card.clicked(e)
     }
 }

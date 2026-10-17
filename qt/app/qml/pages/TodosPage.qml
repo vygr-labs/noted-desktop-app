@@ -118,35 +118,69 @@ Flickable {
             delegate: Column {
                 id: group
                 required property var modelData
+                readonly property string foldKey: page.tab + ":" + modelData.key
+                readonly property bool folded: !!AppState.foldedTodoGroups[foldKey]
+                // A long group shows a page of to-dos at a time.
+                property int limit: 40
                 width: col.width
                 topPadding: 30
-                Row {
-                    spacing: 8
-                    bottomPadding: 4
-                    Icon {
-                        visible: !!group.modelData.folder
-                        name: "folder"
-                        size: 14
-                        color: group.modelData.color ? Theme.swatch(group.modelData.color) : Theme.c.faint
-                        anchors.verticalCenter: parent.verticalCenter
+                // The group's heading folds it away (remembered). The chevron
+                // hangs in the margin so the name lines up with the boxes.
+                Item {
+                    x: -22
+                    width: groupHead.width
+                    height: groupHead.height
+                    Row {
+                        id: groupHead
+                        spacing: 8
+                        bottomPadding: 4
+                        Item {
+                            width: 14
+                            height: 18
+                            anchors.verticalCenter: parent.verticalCenter
+                            Icon {
+                                anchors.centerIn: parent
+                                name: "chevron-right"
+                                size: 12
+                                color: headArea.containsMouse ? Theme.c.ink : Theme.c.muted
+                                rotation: group.folded ? 0 : 90
+                                Behavior on rotation { NumberAnimation { duration: Theme.fast } }
+                            }
+                        }
+                        Icon {
+                            visible: !!group.modelData.folder
+                            name: "folder"
+                            size: 14
+                            color: group.modelData.color ? Theme.swatch(group.modelData.color) : Theme.c.faint
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Text {
+                            textFormat: Text.PlainText
+                            text: group.modelData.label
+                            color: group.modelData.key === "over" ? Theme.c.red : Theme.c.ink
+                            font.pixelSize: 13
+                            font.weight: Font.DemiBold
+                        }
+                        Text {
+                            textFormat: Text.PlainText
+                            text: group.modelData.items.filter(t => !page.isDone(t)).length
+                            color: Theme.c.muted
+                            font.pixelSize: 13
+                            font.features: { "tnum": 1 }
+                        }
                     }
-                    Text {
-                        textFormat: Text.PlainText
-                        text: group.modelData.label
-                        color: group.modelData.key === "over" ? Theme.c.red : Theme.c.ink
-                        font.pixelSize: 13
-                        font.weight: Font.DemiBold
-                    }
-                    Text {
-                        textFormat: Text.PlainText
-                        text: group.modelData.items.filter(t => !page.isDone(t)).length
-                        color: Theme.c.muted
-                        font.pixelSize: 13
-                        font.features: { "tnum": 1 }
+                    MouseArea {
+                        id: headArea
+                        anchors.fill: parent
+                        anchors.leftMargin: -6
+                        anchors.rightMargin: -6
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: AppState.setTodoGroupFolded(group.foldKey, !group.folded)
                     }
                 }
                 Repeater {
-                    model: group.modelData.items
+                    model: group.folded ? [] : group.modelData.items.slice(0, group.limit)
                     delegate: Item {
                         id: row
                         required property var modelData
@@ -219,6 +253,14 @@ Flickable {
                             font.features: { "tnum": 1 }
                         }
                     }
+                }
+                TextButton {
+                    readonly property int rest: group.modelData.items.length - group.limit
+                    visible: !group.folded && rest > 0
+                    x: 24
+                    variant: "link"
+                    text: "Show " + Math.min(rest, 100) + " more of " + rest
+                    onClicked: group.limit += 100
                 }
             }
         }

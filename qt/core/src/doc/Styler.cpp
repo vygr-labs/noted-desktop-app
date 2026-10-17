@@ -167,7 +167,9 @@ void Styler::styleFrame(QTextFrame* f) const
     if (f->frameFormat().intProperty(FrameKind) == CodeBlockFrame) {
         QTextFrameFormat ff = f->frameFormat();
         QTextFrameFormat want = ff;
-        want.setBackground(m_p.codeBlockBg);
+        // Qt paints a frame's background over its margin too, so the editor
+        // draws the code block's box itself (EditorController::codeRect).
+        want.clearBackground();
         want.setPadding(14);
         want.setLeftMargin(0);
         want.setTopMargin(frameGap(f));
@@ -251,7 +253,7 @@ void Styler::styleBlock(QTextDocument* doc, const QTextBlock& b) const
     want.setBottomMargin(0);
     // Exact pixel line boxes, like CSS line-height. Proportional heights in Qt
     // scale the font's own (tall, on Windows) line spacing, which compounds.
-    const qreal linePx = code ? m_p.basePx * 0.8125 * 1.6
+    const qreal linePx = code ? m_p.basePx * 0.8125 * 1.5
                        : headingLevel > 0 ? headingPx(headingLevel) * (headingLevel == 1 ? 1.15 : headingLevel == 2 ? 1.35 : 1.4)
                                           : m_p.basePx * m_p.lineHeight / 100.0;
     want.setLineHeight(qRound(linePx), QTextBlockFormat::FixedHeight);

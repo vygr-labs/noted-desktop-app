@@ -108,7 +108,7 @@ dark mode every list colour is mixed 20% towards white.
 | Page title (note, list, To-dos, Settings section) | 34 / 650 / 1.15, tracking −0.02em | |
 | Heading in a note | 21 / 600 / 1.35, −0.01em | |
 | Subheading | 17 / 600 / 1.4 | |
-| Body in a note | 16 / 400 / 1.7 | scales with Text size |
+| Body in a note | 16 / 400 / 1.5 | scales with Text size |
 | Body on the desk | 16 / 400 / 1.65 | |
 | Card title, search result title | 15 / 500 / 1.35–1.4 | two lines max on cards |
 | Sidebar row | 14 | nested note rows 13.5 |
@@ -125,6 +125,16 @@ dark mode every list colour is mixed 20% towards white.
 **Shell.** The sidebar is 248–272px with a 1px `line` right edge. The main area has a 44px header
 (sidebar toggle when hidden, breadcrumb, page actions, Windows caption buttons), the scrolling
 content, and on notes a 30px footer.
+
+**Tabs.** With two or more tabs, a 38px strip in `sidebar` sits above the header and takes the
+caption buttons. Tabs are 96–220px, radius 7 at the top; the active one is `bg` with a `line` edge
+and runs into the page, the rest are text on the strip with hairlines between. Notes show just their
+title (a lock or file icon when that applies), lists their folder in the list colour. Middle- or
+Ctrl-click anything to open it in a new tab; Ctrl+T, Ctrl+W, Ctrl+Tab; drag to reorder. Each tab
+keeps its own back/forward, and the set comes back next launch (`qt.tabs`).
+
+**Sidebar tree.** An open list shows its 8 latest notes, then "Show more" (20 at a time). While you
+scroll through an open list its row stays pinned at the top of the tree.
 
 **Note page.** A four-column grid gives equal gutters either side of the text, with the outline in
 a column of its own:
@@ -154,7 +164,7 @@ prototype). Use it in `doc/Styler` instead of per-block margins:
 | a file's `#` title → heading | 24, → anything else 14 |
 | everything else | 16 |
 
-**Desk, list, To-dos, search.** Content max 1140px, padding 32/48/72, a 56px gap to a 260–300px
+**Desk, list, To-dos, search.** Content max 1440px (main column up to 960px), padding 32/48/72, a 56px gap to a 260–320px
 right column that wraps under on narrow windows. To-dos and Settings use a single centred column
 the same width as a note's text.
 

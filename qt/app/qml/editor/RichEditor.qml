@@ -37,7 +37,8 @@ Item {
             if (pos === anchor) edit.cursorPosition = pos
             else edit.select(anchor, pos)
         }
-        onLivePreview: (id, preview) => Notes.patch(id, AppState.currentNote.title || "Untitled", preview)
+        // An empty title keeps the row's own; only the open note's title is known here.
+        onLivePreview: (id, preview) => Notes.patch(id, id === AppState.currentNote.id ? (AppState.currentNote.title || "") : "", preview)
     }
 
     TextEdit {
@@ -58,13 +59,16 @@ Item {
         onCursorRectangleChanged: root.caretMoved(cursorRectangle)
         onCursorPositionChanged: if (slash.opened) root.followSlash()
 
-        // Placeholder
+        // Placeholder, on the first line's glyphs: Qt puts a fixed-height
+        // line's extra space above its text, so line 0's caret sits lower than y 0.
         Text {
             textFormat: Text.PlainText
             visible: ctl.empty && !edit.activeFocus || (ctl.empty && edit.length <= 1)
             text: root.placeholder
             color: Theme.c.placeholder
-            width: edit.width
+            x: 1
+            y: { edit.contentHeight; edit.width; return Math.round(edit.positionToRectangle(0).y) }
+            width: edit.width - 1
             wrapMode: Text.Wrap
             font: edit.font
         }
@@ -83,6 +87,21 @@ Item {
                 readonly property rect last: { edit.width; edit.contentHeight; return edit.positionToRectangle(g2.end !== undefined ? g2.end : 0) }
                 readonly property bool isTask: modelData.k === "task"
                 readonly property string dueKey: isTask ? Fmt.dueGroup(modelData.due || "", AppState.todayIso) : ""
+                // A code block's box sits under the text (negative z draws
+                // below the TextEdit itself).
+                z: modelData.k === "code" ? -1 : 0
+
+                Rectangle {
+                    visible: deco.modelData.k === "code"
+                    readonly property rect box: { edit.width; edit.contentHeight; return deco.modelData.k === "code" ? ctl.codeRect(deco.modelData.block, ctl.layoutTick) : Qt.rect(0, 0, 0, 0) }
+                    x: box.x
+                    y: box.y
+                    width: box.width
+                    height: box.height
+                    radius: 8
+                    color: Theme.c.codeBg
+                    border.color: Theme.c.lineSoft
+                }
 
                 // Divider, in the line colour (Qt's own ruler is zero width).
                 Rectangle {

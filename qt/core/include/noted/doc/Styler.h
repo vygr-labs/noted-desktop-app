@@ -21,7 +21,7 @@ struct Palette {
     QString bodyFamily = QStringLiteral("IBM Plex Sans");
     QString monoFamily = QStringLiteral("IBM Plex Mono");
     qreal basePx = 15.0;
-    qreal lineHeight = 165;  // percent of basePx, as in CSS line-height
+    qreal lineHeight = 150;  // percent of basePx, as in CSS line-height
 
     QColor text = QColor("#1c2024");
     QColor muted = QColor("#60646c");

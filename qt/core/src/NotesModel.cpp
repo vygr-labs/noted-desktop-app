@@ -369,9 +369,10 @@ void NotesModel::patch(const QString& id, const QString& title, const QString& p
     const int i = indexOf(id);
     if (i < 0) return;
     Row& r = m_rows[i];
-    const QString p = snippet(preview, title);
-    if (r.title == title && r.preview == p) return;
-    r.title = title;
+    const QString t = title.isEmpty() ? r.title : title;
+    const QString p = snippet(preview, t);
+    if (r.title == t && r.preview == p) return;
+    r.title = t;
     r.preview = p;
     emit dataChanged(index(i), index(i), {TitleRole, PreviewRole});
 }

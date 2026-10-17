@@ -11,10 +11,10 @@ ApplicationWindow {
     height: 820
     minimumWidth: 720
     minimumHeight: 520
-    visible: true
+    visible: !screenshotMode           // main.cpp shows it, placed, for --screenshot
     title: (AppState.view === "note" && AppState.currentNote.title ? AppState.currentNote.title + " — " : "") + "noted"
     color: Theme.c.bg
-    flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowMinMaxButtonsHint
+    flags: Qt.Window | Qt.FramelessWindowHint | Qt.WindowMinMaxButtonsHint | (screenshotMode ? Qt.WindowDoesNotAcceptFocus : 0)
     font.family: Theme.fontFamily
 
     // Under ~720px the sidebar folds away to its toggle.
@@ -31,13 +31,15 @@ ApplicationWindow {
                 if (s.note) AppState.openNote(s.note)
                 if (s.unlock) Store.markUnlocked(s.unlock)
                 if (s.expand) for (const id of s.expand) AppState.setListExpanded(id, true)
+                if (s.tabs) for (const t of s.tabs) AppState.openInNewTab(t.view, t.viewId || "", t.note || "")
+                if (s.activeTab !== undefined) AppState.switchTab(s.activeTab)
                 if (s.palette) AppState.paletteOpen = true
                 if (s.sidebarCollapsed !== undefined) AppState.sidebarCollapsed = s.sidebarCollapsed
                 if (s.find) { AppState.findOpen = true; AppState.replaceOpen = !!s.replace }
                 if (s.scroll) Qt.callLater(() => notePage.scrollTo(s.scroll))
                 if (s.width) window.width = s.width
                 if (s.height) window.height = s.height
-                if (s.clean || s.resizeTo || s.more) { devActions.s = s; devActions.start() }
+                if (s.clean || s.resizeTo || s.more || s.sideScroll) { devActions.s = s; devActions.start() }
             } catch (e) { console.warn("bad --state:", e) }
         }
         if (startupFiles.length > 0) openPaths(startupFiles)
@@ -56,6 +58,7 @@ ApplicationWindow {
             if (s.resizeTo) window.width = s.resizeTo
             if (s.scroll) Qt.callLater(() => notePage.scrollTo(s.scroll))
             if (s.more) header.moreRequested(header.moreButton)
+            if (s.sideScroll) sidebar.scrollTree(s.sideScroll)
         }
     }
 
@@ -80,6 +83,7 @@ ApplicationWindow {
         spacing: 0
 
         Sidebar {
+            id: sidebar
             visible: window.showSidebar
             Layout.fillHeight: true
             Layout.preferredWidth: width
@@ -92,11 +96,19 @@ ApplicationWindow {
             Layout.fillHeight: true
             spacing: 0
 
+            TabStrip {
+                visible: AppState.tabs.length > 1
+                Layout.fillWidth: true
+                Layout.preferredHeight: visible ? implicitHeight : 0
+                window: window
+                liveTitle: notePage.liveTitle
+            }
             Header {
                 id: header
                 Layout.fillWidth: true
                 Layout.preferredHeight: 44
                 window: window
+                showCaption: AppState.tabs.length < 2
                 liveTitle: notePage.liveTitle
                 onMoreRequested: (button) => notePage.openMore(button)
             }
@@ -214,6 +226,10 @@ ApplicationWindow {
     Shortcut { sequences: ["Ctrl+K", "Ctrl+P"]; onActivated: AppState.paletteOpen = !AppState.paletteOpen }
     Shortcut { sequences: ["Ctrl+Shift+F"]; onActivated: { AppState.paletteOpen = false; AppState.openSearch("") } }
     Shortcut { sequences: ["Ctrl+N"]; onActivated: AppState.newNote() }
+    Shortcut { sequences: ["Ctrl+T"]; onActivated: AppState.newTab() }
+    Shortcut { sequences: ["Ctrl+W"]; enabled: AppState.tabs.length > 1; onActivated: AppState.closeTab(AppState.activeTab) }
+    Shortcut { sequences: ["Ctrl+Tab", "Ctrl+PgDown"]; onActivated: AppState.cycleTab(1) }
+    Shortcut { sequences: ["Ctrl+Shift+Tab", "Ctrl+PgUp"]; onActivated: AppState.cycleTab(-1) }
     Shortcut { sequences: ["Ctrl+Shift+N"]; onActivated: AppState.newNote({ type: "plain" }) }
     Shortcut { sequences: ["Ctrl+O"]; onActivated: importDialog.open() }
     Shortcut { sequences: ["Ctrl+,"]; onActivated: AppState.openSettings() }

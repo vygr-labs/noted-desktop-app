@@ -12,6 +12,7 @@ Item {
     property string liveTitle: ""
     signal moreRequested(Item button)
     property alias moreButton: moreButton
+    property bool showCaption: true   // false while the tab strip carries them
 
     readonly property var note: AppState.currentNote
     readonly property bool noteOpen: AppState.view === "note" && !!note.id
@@ -40,6 +41,7 @@ Item {
 
     WindowButtons {
         id: caption
+        visible: header.showCaption
         window: header.window
         anchors.right: parent.right
         height: parent.height
@@ -47,7 +49,7 @@ Item {
 
     RowLayout {
         anchors.left: parent.left
-        anchors.right: caption.left
+        anchors.right: header.showCaption ? caption.left : parent.right
         anchors.top: parent.top
         anchors.bottom: parent.bottom
         anchors.leftMargin: 16

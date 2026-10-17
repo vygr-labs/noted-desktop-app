@@ -125,6 +125,9 @@ public:
     // {start, end} character positions of a block, for TextEdit's
     // positionToRectangle(). `tick` only exists to make QML re-evaluate.
     Q_INVOKABLE QVariantMap blockGeometry(int blockNumber, int tick = 0) const;
+    // The box of the code block holding this block (padding included, margins
+    // not), in the TextEdit's coordinates.
+    Q_INVOKABLE QRectF codeRect(int blockNumber, int tick = 0) const;
     Q_INVOKABLE bool toggleTask(int blockNumber);
     // Sets ("2026-10-21") or clears ("") a to-do's due date.
     Q_INVOKABLE bool setTaskDue(int blockNumber, const QString& isoDate);

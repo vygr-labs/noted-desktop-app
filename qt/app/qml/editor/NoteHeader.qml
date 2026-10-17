@@ -44,12 +44,30 @@ ColumnLayout {
         font.letterSpacing: -0.68
 
         // Set imperatively, not bound: a binding would rewrite the text (and
-        // drop a trailing space) every time a debounced save lands.
-        property string noteId: header.note.id || ""
-        property string storedTitle: header.note.title || ""
-        function sync() { text = storedTitle === "Untitled" ? "" : storedTitle }
-        onNoteIdChanged: { saveTimer.stop(); sync() }
-        onStoredTitleChanged: if (!activeFocus) sync()
+        // drop a trailing space) every time a debounced save lands. Only typing
+        // saves: text set here never does, and an edit is saved to the note it
+        // was typed in, even when another note has opened since.
+        property string noteId: ""
+        property string editedId: ""     // the note the unsaved typing belongs to
+        property bool syncing: false
+        function sync() {
+            syncing = true
+            const t = header.note.title || ""
+            text = t === "Untitled" ? "" : t
+            syncing = false
+        }
+        Connections {
+            target: header
+            function onNoteChanged() {
+                const id = header.note.id || ""
+                if (id !== title.noteId) {
+                    if (saveTimer.running) { saveTimer.stop(); title.commit() }
+                    title.noteId = id
+                    title.sync()
+                } else if (!title.activeFocus && !saveTimer.running) title.sync()
+            }
+        }
+        Component.onCompleted: { noteId = header.note.id || ""; sync() }
 
         Text {
             textFormat: Text.PlainText
@@ -66,13 +84,15 @@ ColumnLayout {
                 header.enterPressed()
             }
         }
-        onTextChanged: if (activeFocus) saveTimer.restart()
+        onTextChanged: if (activeFocus && !syncing && noteId !== "") { editedId = noteId; saveTimer.restart() }
         onActiveFocusChanged: if (!activeFocus && saveTimer.running) { saveTimer.stop(); commit() }
         function commit() {
-            if (noteId === "") return
+            const id = editedId
+            editedId = ""
+            if (id === "") return
             const t = text.trim().replace(/\n/g, " ")
             const wanted = t === "" ? "Untitled" : t
-            if (wanted !== header.note.title) Store.updateNote(noteId, { title: wanted })
+            if (wanted !== Store.note(id).title) Store.updateNote(id, { title: wanted })
         }
         Timer {
             id: saveTimer

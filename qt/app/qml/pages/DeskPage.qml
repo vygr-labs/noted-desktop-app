@@ -19,7 +19,7 @@ PageColumns {
     property var ticked: ({})
 
     function reload() {
-        recent = Store.recentEdited(4, false)
+        recent = Store.recentEdited(6, false)
         listCards = AppState.lists.map(l => {
             const notes = Store.notesInList(l.id, "updated_at")
             const latest = notes.slice().sort((a, b) => (b.updated_at > a.updated_at) - (b.updated_at < a.updated_at))[0]
@@ -107,7 +107,8 @@ PageColumns {
             columnSpacing: 14
             rowSpacing: 14
             Repeater {
-                model: desk.recent
+                // Two full rows: four cards in two columns, six in three.
+                model: desk.recent.slice(0, recentGrid.cols * 2)
                 delegate: Rectangle {
                     id: card
                     required property var modelData
@@ -174,7 +175,8 @@ PageColumns {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        onClicked: AppState.openNote(card.modelData.id)
+                        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                        onClicked: (e) => AppState.openNoteFrom(e, card.modelData.id)
                     }
                 }
             }
@@ -205,7 +207,7 @@ PageColumns {
                     count: modelData.count
                     latest: modelData.latest
                     edited: modelData.edited
-                    onClicked: AppState.go("list", modelData.list.id)
+                    onClicked: (e) => AppState.goFrom(e, "list", modelData.list.id)
                 }
             }
         }

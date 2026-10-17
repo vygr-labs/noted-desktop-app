@@ -26,9 +26,19 @@ Rectangle {
 
     PopupMenu { id: menu }
 
-    // The notes shown under each open list, refreshed with the store.
+    // The notes shown under each open list, refreshed with the store. A long
+    // list shows its latest few, and more a page at a time.
     property var pinned: []
     property var listNotes: ({})
+    readonly property int treeLimit: 8
+    property var listLimits: ({})     // list id -> notes shown, while more than treeLimit
+    function limitFor(id) { return listLimits[id] || treeLimit }
+    function setLimit(id, n) {
+        const m = Object.assign({}, listLimits)
+        if (n <= treeLimit) delete m[id]
+        else m[id] = n
+        listLimits = m
+    }
     function reload() {
         pinned = Store.pinnedNotes()
         const m = {}
@@ -63,6 +73,8 @@ Rectangle {
         property bool nested: false
         property real leftPad: 10
         property string tooltip: ""
+        // [view, id, note]: middle- or Ctrl-click opens it in a new tab.
+        property var tabPlace: null
         readonly property bool ringed: menu.opened && menu.owner === row
         signal clicked()
         signal contextRequested(real x, real y)
@@ -115,11 +127,72 @@ Rectangle {
             id: area
             anchors.fill: parent
             hoverEnabled: true
-            acceptedButtons: Qt.LeftButton | Qt.RightButton
+            acceptedButtons: Qt.LeftButton | Qt.RightButton | Qt.MiddleButton
             cursorShape: Qt.PointingHandCursor
-            onClicked: (e) => e.button === Qt.RightButton ? row.contextRequested(e.x, e.y) : row.clicked()
+            onClicked: (e) => {
+                if (e.button === Qt.RightButton) row.contextRequested(e.x, e.y)
+                else if (row.tabPlace && (e.button === Qt.MiddleButton || (e.modifiers & Qt.ControlModifier)))
+                    AppState.openInNewTab(row.tabPlace[0], row.tabPlace[1], row.tabPlace[2])
+                else if (e.button === Qt.LeftButton) row.clicked()
+            }
         }
         Tip { visible: row.tooltip !== "" && area.containsMouse; text: row.tooltip }
+    }
+
+    // A list's row in the tree, with the chevron that opens it there.
+    component ListRow: Row_ {
+        id: lr
+        property var list: ({})
+        property bool expanded: false
+        leftPad: 28
+        icon: "folder"
+        iconColor: Theme.swatch(list.color)
+        label: list.name || ""
+        countText: String(list.note_count || 0)
+        active: AppState.view === "list" && AppState.viewId === list.id
+        tabPlace: ["list", list.id, ""]
+        onClicked: AppState.go("list", list.id)
+        onContextRequested: (x, y) => side.listMenu(this, x, y, list, expanded)
+        Item {
+            x: 2
+            width: 24
+            height: parent.height
+            Icon {
+                anchors.centerIn: parent
+                name: "chevron-right"
+                size: 13
+                color: Theme.c.muted
+                rotation: lr.expanded ? 90 : 0
+                Behavior on rotation { NumberAnimation { duration: Theme.fast } }
+            }
+            MouseArea {
+                anchors.fill: parent
+                cursorShape: Qt.PointingHandCursor
+                onClicked: side.toggleList(lr.list.id, !lr.expanded)
+            }
+        }
+    }
+    property Item stuck: null
+    property real stuckShift: 0
+    function updateStuck() {
+        const top = scroller.contentY - tree.y
+        for (let i = 0; i < listRepeater.count; ++i) {
+            const it = listRepeater.itemAt(i)
+            if (!it || !it.expanded || it.y >= top) continue
+            if (it.y + it.height > top + 32) {
+                stuck = it
+                stuckShift = Math.min(0, it.y + it.height - 4 - (top + 34))
+                return
+            }
+        }
+        stuck = null
+        stuckShift = 0
+    }
+    function scrollTree(y) { scroller.contentY = Math.max(0, Math.min(y, scroller.contentHeight - scroller.height)) }
+    function toggleList(id, open) {
+        // Closing a list from its pinned header: bring its row back into view.
+        if (!open && stuck && stuck.modelData.id === id) scroller.contentY = Math.max(0, tree.y + stuck.y - 2)
+        AppState.setListExpanded(id, open)
     }
 
     component GroupLabel: RowLayout {
@@ -225,6 +298,7 @@ Rectangle {
                 iconColor: active ? Theme.c.ink : Theme.c.secondary
                 label: "Today"
                 active: AppState.view === "desk"
+                tabPlace: ["desk", "", ""]
                 onClicked: AppState.go("desk")
             }
             Row_ {
@@ -233,6 +307,7 @@ Rectangle {
                 label: "To-dos"
                 countText: AppState.openTaskCount > 0 ? String(AppState.openTaskCount) : ""
                 active: AppState.view === "todos"
+                tabPlace: ["todos", "", ""]
                 onClicked: AppState.go("todos")
             }
         }
@@ -246,6 +321,28 @@ Rectangle {
             clip: true
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBarThin {}
+            onContentYChanged: side.updateStuck()
+            onContentHeightChanged: side.updateStuck()
+
+            // An open list's row stays at the top while you scroll through its
+            // notes, and is pushed off by the end of the list.
+            Rectangle {
+                visible: side.stuck !== null
+                z: 3
+                y: scroller.contentY + side.stuckShift
+                width: scroller.width
+                height: 34
+                color: Theme.c.sidebar
+                ListRow {
+                    x: 10
+                    y: 1
+                    width: parent.width - 20
+                    height: 32
+                    list: side.stuck ? side.stuck.modelData : ({})
+                    expanded: true
+                }
+                Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.c.lineFaint }
+            }
 
             ColumnLayout {
                 id: tree
@@ -273,6 +370,7 @@ Rectangle {
                         label: modelData.title || "Untitled"
                         locked: AppState.isLocked(modelData)
                         active: AppState.view === "note" && AppState.selectedNoteId === modelData.id
+                        tabPlace: ["note", "", modelData.id]
                         onClicked: AppState.openNote(modelData.id)
                         onContextRequested: (x, y) => side.noteMenu(this, x, y, modelData)
                     }
@@ -294,44 +392,20 @@ Rectangle {
                     font.pointSize: Theme.pt(13.5)
                 }
                 Repeater {
+                    id: listRepeater
                     model: AppState.lists
                     delegate: ColumnLayout {
                         id: listItem
                         required property var modelData
                         readonly property bool expanded: !!AppState.expandedLists[modelData.id]
+                        readonly property var notes: expanded ? (side.listNotes[modelData.id] || []) : []
+                        readonly property int limit: side.limitFor(modelData.id)
                         Layout.fillWidth: true
                         spacing: 1
 
-                        Row_ {
-                            id: listRow
-                            leftPad: 28
-                            icon: "folder"
-                            iconColor: Theme.swatch(listItem.modelData.color)
-                            label: listItem.modelData.name
-                            countText: String(listItem.modelData.note_count || 0)
-                            active: AppState.view === "list" && AppState.viewId === listItem.modelData.id
-                            onClicked: AppState.go("list", listItem.modelData.id)
-                            onContextRequested: (x, y) => side.listMenu(this, x, y, listItem.modelData, listItem.expanded)
-
-                            // Chevron: open/close the list in the tree.
-                            Item {
-                                x: 2
-                                width: 24
-                                height: parent.height
-                                Icon {
-                                    anchors.centerIn: parent
-                                    name: "chevron-right"
-                                    size: 13
-                                    color: Theme.c.muted
-                                    rotation: listItem.expanded ? 90 : 0
-                                    Behavior on rotation { NumberAnimation { duration: Theme.fast } }
-                                }
-                                MouseArea {
-                                    anchors.fill: parent
-                                    cursorShape: Qt.PointingHandCursor
-                                    onClicked: AppState.setListExpanded(listItem.modelData.id, !listItem.expanded)
-                                }
-                            }
+                        ListRow {
+                            list: listItem.modelData
+                            expanded: listItem.expanded
                         }
                         ColumnLayout {
                             visible: listItem.expanded
@@ -340,7 +414,7 @@ Rectangle {
                             Layout.bottomMargin: 4
                             spacing: 1
                             Repeater {
-                                model: listItem.expanded ? (side.listNotes[listItem.modelData.id] || []) : []
+                                model: listItem.notes.slice(0, listItem.limit)
                                 delegate: Row_ {
                                     required property var modelData
                                     nested: true
@@ -348,8 +422,25 @@ Rectangle {
                                     label: modelData.title || "Untitled"
                                     locked: AppState.isLocked(modelData)
                                     active: AppState.view === "note" && AppState.selectedNoteId === modelData.id
+                                    tabPlace: ["note", "", modelData.id]
                                     onClicked: AppState.openNote(modelData.id)
                                     onContextRequested: (x, y) => side.noteMenu(this, x, y, modelData)
+                                }
+                            }
+                            // More (or fewer) of a long list.
+                            Row_ {
+                                readonly property int rest: listItem.notes.length - listItem.limit
+                                visible: listItem.notes.length > side.treeLimit
+                                nested: true
+                                leftPad: 50
+                                label: rest > 0 ? "Show more" : "Show fewer"
+                                countText: rest > 0 ? String(rest) : ""
+                                onClicked: {
+                                    if (rest > 0) side.setLimit(listItem.modelData.id, listItem.limit + 20)
+                                    else {
+                                        side.setLimit(listItem.modelData.id, side.treeLimit)
+                                        if (scroller.contentY > tree.y + listItem.y) scroller.contentY = Math.max(0, tree.y + listItem.y - 2)
+                                    }
                                 }
                             }
                         }
@@ -378,6 +469,7 @@ Rectangle {
                             label: modelData.name
                             countText: String(modelData.note_count || 0)
                             active: AppState.view === "list" && AppState.viewId === modelData.id
+                            tabPlace: ["list", modelData.id, ""]
                             onClicked: AppState.go("list", modelData.id)
                             onContextRequested: (x, y) => side.listMenu(this, x, y, modelData, false, true)
                         }
@@ -407,9 +499,11 @@ Rectangle {
                         }
                         tooltip: modelData.path
                         active: AppState.view === "note" && AppState.selectedNoteId === modelData.id
+                        tabPlace: ["note", "", modelData.id]
                         onClicked: AppState.openNote(modelData.id)
                         onContextRequested: (x, y) => menu.openAt(this, x, y, [
                             { text: "Open", action: () => AppState.openNote(modelData.id) },
+                            { text: "Open in new tab", action: () => AppState.openNoteInNewTab(modelData.id) },
                             { text: "Show in folder", action: () => App.revealFile(modelData.path) },
                             { text: "Copy into notes", action: () => AppState.copyFileToNotes(modelData.id) },
                             { separator: true },
@@ -483,6 +577,7 @@ Rectangle {
         const locked = AppState.isLocked(note)
         menu.openAt(item, x, y, [
             { text: "Open", action: () => AppState.openNote(note.id) },
+            { text: "Open in new tab", action: () => AppState.openNoteInNewTab(note.id) },
             { text: "Open in new window", action: () => side.popoutRequested(note.id) },
             { text: note.is_pinned ? "Unpin" : "Pin", action: () => Store.setPinned(note.id, !note.is_pinned) },
             { text: "Move to", children: moveTargets(note) },
@@ -497,6 +592,7 @@ Rectangle {
             Theme.pickerSwatches.some(s => s.name === list.color) ? [] : [{ name: list.color, label: list.color.charAt(0).toUpperCase() + list.color.slice(1) }])
         menu.openAt(item, x, y, [
             { text: "New note in " + list.name, action: () => AppState.newNote({ listId: list.id }) },
+            { text: "Open in new tab", action: () => AppState.openInNewTab("list", list.id) },
             hidden ? { text: "Show in sidebar", action: () => Store.setListHidden(list.id, false) }
                    : { text: expanded ? "Collapse" : "Expand", action: () => AppState.setListExpanded(list.id, !expanded) },
             { text: "Rename…", action: () => renameDialog.openFor(list) },

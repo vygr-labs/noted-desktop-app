@@ -29,6 +29,14 @@ QtObject {
     property int historyIndex: -1
     property bool _navigating: false
 
+    // Tabs: each is a place {view, viewId, note} with its own back/forward
+    // history. The page on screen is the active tab's, and going somewhere
+    // changes that tab. The strip shows once there are two.
+    property var tabs: [{ view: "desk", viewId: "", note: "", history: [], historyIndex: -1 }]
+    property int activeTab: 0
+    // Bumps when note titles or lists may have changed, for tab labels.
+    property int tabsTick: 0
+
     // ── layout ───────────────────────────────────────────────────────
     property bool sidebarCollapsed: false
     property bool focusMode: false
@@ -42,6 +50,7 @@ QtObject {
     property bool spellcheckHint: true
     property string listLayout: "sheets"     // sheets | rows (list pages)
     property var expandedLists: ({})         // list id -> true while open in the sidebar tree
+    property var foldedTodoGroups: ({})      // "tab:group" -> true while folded on the To-dos page
 
     // ── overlays ─────────────────────────────────────────────────────
     property bool paletteOpen: false
@@ -103,10 +112,11 @@ QtObject {
         sidebarCollapsed = Store.setting("qt.sidebarCollapsed", "false") === "true"
         listLayout = Store.setting("qt.listLayout", "sheets")
         try { expandedLists = JSON.parse(Store.setting("qt.expandedLists", "{}")) } catch (e) { expandedLists = ({}) }
+        try { foldedTodoGroups = JSON.parse(Store.setting("qt.foldedTodoGroups", "{}")) } catch (e) { foldedTodoGroups = ({}) }
         Theme.textScale = parseFloat(Store.setting("qt.textScale", "1")) || 1
         Notes.sort = noteSort
         refreshAll()
-        go("desk")
+        restoreTabs()
     }
 
     function save(key, value) { Store.setSetting(key, String(value)) }
@@ -129,6 +139,14 @@ QtObject {
         else delete e[id]
         expandedLists = e
         save("qt.expandedLists", JSON.stringify(e))
+    }
+
+    function setTodoGroupFolded(key, folded) {
+        const f = Object.assign({}, foldedTodoGroups)
+        if (folded) f[key] = true
+        else delete f[key]
+        foldedTodoGroups = f
+        save("qt.foldedTodoGroups", JSON.stringify(f))
     }
 
     function refreshAll() {
@@ -232,6 +250,114 @@ QtObject {
                 historyIndex = history.length - 1
             }
         }
+        _storeTab()
+    }
+
+    // ── tabs ─────────────────────────────────────────────────────────
+    function _storeTab() {
+        const t = tabs.slice()
+        t[activeTab] = { view: view, viewId: viewId, note: selectedNoteId, history: history, historyIndex: historyIndex }
+        tabs = t
+        _saveTabs.restart()
+    }
+    // Opens a place in a new tab after the current one and shows it.
+    function openInNewTab(v, id, noteId) {
+        if (v === "note" && !noteData(noteId || id).id) return
+        const t = tabs.slice()
+        t.splice(activeTab + 1, 0, { view: "desk", viewId: "", note: "", history: [], historyIndex: -1 })
+        tabs = t
+        activeTab = activeTab + 1
+        history = []
+        historyIndex = -1
+        if (v === "note") openNote(noteId || id)
+        else go(v || "desk", id)
+    }
+    function openNoteInNewTab(id) { openInNewTab("note", "", id) }
+    // A click on a note or list: middle- or Ctrl-click opens it in a new tab.
+    function wantsNewTab(mouse) { return mouse.button === Qt.MiddleButton || !!(mouse.modifiers & Qt.ControlModifier) }
+    function openNoteFrom(mouse, id) { if (wantsNewTab(mouse)) openNoteInNewTab(id); else openNote(id) }
+    function goFrom(mouse, v, id) { if (wantsNewTab(mouse)) openInNewTab(v, id); else go(v, id) }
+    function newTab() { openInNewTab("desk") }
+    function switchTab(i) {
+        if (i < 0 || i >= tabs.length || i === activeTab) return
+        activeTab = i
+        _showTab()
+    }
+    function _showTab() {
+        const t = tabs[activeTab]
+        history = t.history || []
+        historyIndex = t.historyIndex !== undefined ? t.historyIndex : -1
+        const n = t.note ? noteData(t.note) : null
+        // A tab with no history yet (restored) starts one with this place.
+        _navigating = history.length > 0
+        if (t.note && !(n && n.id)) go("desk")       // its note (or file) is gone
+        else go(t.view, t.viewId, t.note)
+        _navigating = false
+    }
+    function closeTab(i) {
+        if (tabs.length < 2 || i < 0 || i >= tabs.length) return
+        const t = tabs.slice()
+        t.splice(i, 1)
+        const wasActive = i === activeTab
+        tabs = t
+        if (wasActive) {
+            activeTab = Math.min(i, t.length - 1)
+            _showTab()
+        } else if (i < activeTab) activeTab = activeTab - 1
+        _saveTabs.restart()
+    }
+    function closeOtherTabs(i) {
+        tabs = [tabs[i]]
+        activeTab = 0
+        _showTab()
+        _saveTabs.restart()
+    }
+    function cycleTab(delta) {
+        if (tabs.length > 1) switchTab((activeTab + delta + tabs.length) % tabs.length)
+    }
+    function moveTab(from, to) {
+        if (from === to || from < 0 || to < 0 || from >= tabs.length || to >= tabs.length) return
+        const t = tabs.slice()
+        const [moved] = t.splice(from, 1)
+        t.splice(to, 0, moved)
+        const active = tabs[activeTab]
+        tabs = t
+        activeTab = t.indexOf(active)
+        _saveTabs.restart()
+    }
+    // The tab's label and icon, from the place it shows.
+    function tabInfo(t) {
+        tabsTick
+        switch (t.view) {
+        case "note": {
+            const n = t.note === selectedNoteId ? currentNote : noteData(t.note)
+            if (n.is_file) return { title: n.title || "File", icon: "file", color: "" }
+            return { title: n.title || "Untitled", icon: n.is_locked ? "lock" : "", color: "" }
+        }
+        case "list": { const l = listById(t.viewId); return { title: l ? l.name : "List", icon: "folder", color: l ? l.color : "" } }
+        case "todos": return { title: "To-dos", icon: "circle-check", color: "" }
+        case "search": return { title: t.viewId ? "Search: " + t.viewId : "Search", icon: "search", color: "" }
+        case "settings": return { title: "Settings", icon: "sliders-horizontal", color: "" }
+        case "trash": return { title: "Trash", icon: "trash-2", color: "" }
+        default: return { title: "Today", icon: "calendar", color: "" }
+        }
+    }
+    // Tabs come back next time (just the places; history starts fresh).
+    property Timer _saveTabs: Timer {
+        interval: 800
+        onTriggered: state.save("qt.tabs", JSON.stringify({
+            active: state.activeTab,
+            tabs: state.tabs.map(t => ({ view: t.view, viewId: t.viewId, note: t.note }))
+        }))
+    }
+    function restoreTabs() {
+        let saved = null
+        try { saved = JSON.parse(Store.setting("qt.tabs", "")) } catch (e) { saved = null }
+        const list = saved && Array.isArray(saved.tabs) ? saved.tabs.filter(t => t && t.view) : []
+        if (list.length < 2) { go("desk"); return }
+        tabs = list.map(t => ({ view: t.view, viewId: t.viewId || "", note: t.note || "", history: [], historyIndex: -1 }))
+        activeTab = Math.max(0, Math.min(list.length - 1, saved.active || 0))
+        _showTab()
     }
     // Older callers.
     function setView(v, id) { if (v === "tag") openTag(id); else go(v, id) }
@@ -335,10 +461,10 @@ QtObject {
 
     property Connections _store: Connections {
         target: Store
-        function onNotesChanged() { state.refreshCounts(); state.refreshLists(); state.refreshTags(); state._tasksLater.restart() }
+        function onNotesChanged() { state.refreshCounts(); state.refreshLists(); state.refreshTags(); state._tasksLater.restart(); state.tabsTick++ }
         function onLockStateChanged() { state.lockTick++; state.refreshTasks() }
         function onNoteChanged(id) { if (id === state.selectedNoteId) { state.currentNote = Store.note(id); state.currentTags = Store.tagsForNote(id) } }
-        function onListsChanged() { state.refreshLists() }
+        function onListsChanged() { state.refreshLists(); state.tabsTick++ }
         function onTagsChanged() { state.refreshTags() }
         function onTodosChanged() { state.refreshCounts(); state.refreshTodoLists(); state._tasksLater.restart() }
     }

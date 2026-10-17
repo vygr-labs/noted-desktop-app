@@ -25,13 +25,14 @@ Item {
     // The note opens with an H1 that repeats its title: show it once (the
     // heading), and keep the title following that heading while it's edited.
     property bool titleMerged: false
+    property string mergedHeading: ""   // the heading as loaded: opening a note never retitles it
     Connections {
         target: rich.controller
         function onStatsChanged() {
             if (!pane.titleMerged) return
             const h = rich.controller.leadingHeading
             if (h === "") { pane.titleMerged = false; return }
-            if (h !== pane.note.title) titleSync.restart()
+            if (h !== pane.mergedHeading && h !== pane.note.title) titleSync.restart()
         }
     }
     Timer {
@@ -89,6 +90,7 @@ Item {
         titleSync.stop()
         titleMerged = !n.is_file && n.note_type !== "plain" && (n.title || "") !== ""
                       && rich.controller.leadingHeading.toLowerCase() === n.title.replace(/\s+/g, " ").trim().toLowerCase()
+        mergedHeading = titleMerged ? rich.controller.leadingHeading : ""
         const reloaded = loadedId === n.id
         loadedId = n.id
         if (!reloaded) scroller.contentY = 0

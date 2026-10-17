@@ -53,7 +53,7 @@ Item {
             if (root.loading) return
             root.dirty = true
             saveTimer.restart()
-            Notes.patch(root.noteId, AppState.currentNote.title || "Untitled", text.substring(0, 240))
+            Notes.patch(root.noteId, root.noteId === AppState.currentNote.id ? (AppState.currentNote.title || "") : "", text.substring(0, 240))
         }
         Text {
             textFormat: Text.PlainText
