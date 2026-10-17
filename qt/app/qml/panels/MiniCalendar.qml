@@ -10,6 +10,7 @@ Column {
     id: cal
 
     property date month: new Date()       // any day in the shown month
+    property string selectedIso: ""       // the day open beside it, ringed
     signal dayPicked(string iso)
 
     spacing: 0
@@ -77,6 +78,7 @@ Column {
                 required property int modelData
                 readonly property string iso: modelData > 0 ? Qt.formatDate(new Date(cal.month.getFullYear(), cal.month.getMonth(), modelData), "yyyy-MM-dd") : ""
                 readonly property bool isToday: iso === AppState.todayIso
+                readonly property bool isSelected: iso !== "" && iso === cal.selectedIso && !isToday
                 readonly property bool has: !!cal.marked[iso]
                 width: cal.width / 7
                 height: 34
@@ -86,20 +88,22 @@ Column {
                     width: 28
                     height: 28
                     radius: 14
-                    color: day.isToday ? Theme.c.accent : (dayArea.containsMouse ? Qt.alpha(Theme.c.pressed, 0.8) : "transparent")
+                    color: day.isToday ? Theme.c.accent : day.isSelected ? Theme.c.pressed : (dayArea.containsMouse ? Qt.alpha(Theme.c.pressed, 0.8) : "transparent")
+                    border.width: day.isSelected ? 1.5 : 0
+                    border.color: Theme.c.ink
                     Text {
                         textFormat: Text.PlainText
                         anchors.centerIn: parent
                         text: day.modelData
                         color: day.isToday ? Theme.c.onAccent : (day.has ? Theme.c.ink : Theme.c.muted)
                         font.pixelSize: 13
-                        font.weight: day.isToday ? Font.DemiBold : (day.has ? Font.Medium : Font.Normal)
+                        font.weight: day.isToday || day.isSelected ? Font.DemiBold : (day.has ? Font.Medium : Font.Normal)
                         font.features: { "tnum": 1 }
                     }
                 }
                 // A day you wrote in: a dot under the number.
                 Rectangle {
-                    visible: day.has && !day.isToday
+                    visible: day.has && !day.isToday && !day.isSelected
                     anchors.horizontalCenter: parent.horizontalCenter
                     y: 26
                     width: 4

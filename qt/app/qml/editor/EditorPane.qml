@@ -49,11 +49,13 @@ Item {
     readonly property int taskDone: taskDecos.filter(d => d.checked).length
     readonly property var outline: isPlain || locked ? [] : rich.controller.outline
     readonly property bool showOutline: outline.length >= 2 && scroller.width >= 900
+    // A daily note keeps the month beside it, to step between days.
+    readonly property bool showCalendar: hasNote && !!note.is_daily && !isFile && !inTrash && scroller.width >= 900
 
     // ── grid ─────────────────────────────────────────────────────────
     // normal: minmax(48px,1fr) | clamp(680px, 62%, 960px) − 96px | minmax(48px,1fr) | outline
     // wide:   64px | 1fr | 64px | outline
-    readonly property real outlineW: showOutline ? 200 : 0
+    readonly property real outlineW: showCalendar ? 300 : showOutline ? 200 : 0
     readonly property real columnWidth: AppState.fullWidth
         ? scroller.width - outlineW - 128
         : Math.min(scroller.width - outlineW - 96, Math.max(680, Math.min(960, scroller.width * 0.62)) - 96)
@@ -360,13 +362,38 @@ Item {
             onClicked: pane.isPlain ? plain.focusEnd() : rich.focusEnd()
         }
 
-        // On this page: sticky in its own column.
+        // The month (daily notes) and On this page: sticky in their own column.
         Column {
-            visible: pane.showOutline
+            visible: pane.showOutline || pane.showCalendar
             x: scroller.width - pane.outlineW
             y: Math.max(46, scroller.contentY + 24)
-            width: pane.outlineW - 24
+            width: pane.outlineW - (pane.showCalendar ? 40 : 24)
+            MiniCalendar {
+                id: dayCalendar
+                visible: pane.showCalendar
+                width: parent.width
+                selectedIso: pane.note.daily_date || ""
+                onDayPicked: (iso) => {
+                    if (iso === AppState.todayIso) AppState.go("desk")
+                    else if (iso !== pane.note.daily_date) AppState.openNote(Store.dailyNote(iso).id)
+                }
+                Connections {
+                    target: pane
+                    // Follow the open day's month (the arrows can still look around).
+                    function onNoteChanged() { if (pane.note.is_daily && pane.note.daily_date) dayCalendar.month = Fmt.fromIso(pane.note.daily_date) }
+                }
+                Component.onCompleted: if (pane.note.is_daily && pane.note.daily_date) month = Fmt.fromIso(pane.note.daily_date)
+            }
+            Item { visible: pane.showCalendar; width: 1; height: 10 }
+            TextButton {
+                visible: pane.showCalendar
+                variant: "link"
+                text: "Back to today"
+                onClicked: AppState.go("desk")
+            }
+            Item { visible: pane.showCalendar && pane.showOutline; width: 1; height: 32 }
             Text {
+                visible: pane.showOutline
                 textFormat: Text.PlainText
                 bottomPadding: 8
                 text: "On this page"
@@ -375,7 +402,7 @@ Item {
                 font.weight: Font.Medium
             }
             Repeater {
-                model: pane.outline
+                model: pane.showOutline ? pane.outline : []
                 delegate: Text {
                     required property var modelData
                     width: parent.width
