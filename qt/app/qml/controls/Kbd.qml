@@ -23,6 +23,7 @@ Item {
         color: Theme.c.field
     }
     Text {
+        textFormat: Text.PlainText
         id: label
         anchors.centerIn: parent
         anchors.verticalCenterOffset: -0.5

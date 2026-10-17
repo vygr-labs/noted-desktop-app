@@ -29,6 +29,7 @@ Item {
         anchors.verticalCenter: parent.verticalCenter
         spacing: 2
         Text {
+            textFormat: Text.PlainText
             Layout.fillWidth: true
             text: row.label
             color: Theme.c.ink
@@ -37,6 +38,7 @@ Item {
             wrapMode: Text.Wrap
         }
         Text {
+            textFormat: Text.PlainText
             visible: row.description !== ""
             Layout.fillWidth: true
             text: row.description

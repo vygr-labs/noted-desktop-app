@@ -42,6 +42,7 @@ Column {
         height: 28
         spacing: 4
         Text {
+            textFormat: Text.PlainText
             Layout.fillWidth: true
             text: Fmt.monthTitle(cal.month)
             color: Theme.c.ink
@@ -87,6 +88,7 @@ Column {
                     radius: 14
                     color: day.isToday ? Theme.c.accent : (dayArea.containsMouse ? Qt.alpha(Theme.c.pressed, 0.8) : "transparent")
                     Text {
+                        textFormat: Text.PlainText
                         anchors.centerIn: parent
                         text: day.modelData
                         color: day.isToday ? Theme.c.onAccent : (day.has ? Theme.c.ink : Theme.c.muted)

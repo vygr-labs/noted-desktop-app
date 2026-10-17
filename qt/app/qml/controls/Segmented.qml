@@ -43,6 +43,7 @@ Rectangle {
                     color: Theme.c.segOn
                 }
                 Text {
+                    textFormat: Text.PlainText
                     id: label
                     anchors.centerIn: parent
                     text: seg.modelData.label

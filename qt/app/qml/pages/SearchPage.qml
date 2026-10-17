@@ -113,6 +113,7 @@ PageColumns {
 
     // ── field ────────────────────────────────────────────────────────
     Text {
+        textFormat: Text.PlainText
         text: page.q === "" ? "Search" : "Search · " + Fmt.plural(page.total, "result")
         color: Theme.c.muted
         font.pixelSize: 13
@@ -183,7 +184,7 @@ PageColumns {
                 spacing: 8
                 bottomPadding: 4
                 SectionLabel { text: sec.modelData.heading }
-                Text { text: sec.modelData.all.length; color: Theme.c.muted; font.pixelSize: 13; font.features: { "tnum": 1 } }
+                Text { textFormat: Text.PlainText; text: sec.modelData.all.length; color: Theme.c.muted; font.pixelSize: 13; font.features: { "tnum": 1 } }
             }
 
             Repeater {
@@ -235,7 +236,7 @@ PageColumns {
                         font.weight: Font.Medium
                         elide: Text.ElideRight
                     }
-                    Text { text: Fmt.edited(n.updated_at); color: Theme.c.muted; font.pointSize: Theme.pt(12.5); font.features: { "tnum": 1 } }
+                    Text { textFormat: Text.PlainText; text: Fmt.edited(n.updated_at); color: Theme.c.muted; font.pointSize: Theme.pt(12.5); font.features: { "tnum": 1 } }
                 }
                 RowLayout {
                     Layout.fillWidth: true
@@ -266,6 +267,7 @@ PageColumns {
                         color: list ? Theme.swatch(list.color) : Theme.c.faint
                     }
                     Text {
+                        textFormat: Text.PlainText
                         text: (list ? list.name : (n.is_daily ? "Daily notes" : "Notes")) + (extra ? "  ·  " + extra : "")
                         color: Theme.c.muted
                         font.pointSize: Theme.pt(12.5)
@@ -312,6 +314,7 @@ PageColumns {
                     wrapMode: Text.Wrap
                 }
                 Text {
+                    textFormat: Text.PlainText
                     text: (todo.t.isDaily && todo.t.dailyDate === AppState.todayIso ? "Today’s note" : (todo.t.title || "Untitled"))
                           + (todo.done ? "  ·  Done" : (todo.t.due ? "  ·  " + Fmt.dueLabel(todo.t.due, AppState.todayIso) : ""))
                     color: todo.dueKey === "over" && !todo.done ? Theme.c.red : Theme.c.muted
@@ -345,7 +348,7 @@ PageColumns {
                     Layout.fillWidth: true
                     spacing: 12
                     Text { Layout.fillWidth: true; text: page.hl(f.name); textFormat: Text.RichText; color: Theme.c.ink; font.pixelSize: 15; font.weight: Font.Medium; elide: Text.ElideRight }
-                    Text { text: Fmt.edited(f.updated_at); color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
+                    Text { textFormat: Text.PlainText; text: Fmt.edited(f.updated_at); color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
                 }
                 Text {
                     Layout.fillWidth: true
@@ -365,7 +368,7 @@ PageColumns {
                     Layout.fillWidth: true
                     spacing: 7
                     Icon { name: "file"; size: 13; color: Theme.c.muted; anchors.verticalCenter: parent.verticalCenter }
-                    Text { width: fileCol.width - 20; text: f.path; color: Theme.c.muted; font.pointSize: Theme.pt(12.5); elide: Text.ElideMiddle }
+                    Text { textFormat: Text.PlainText; width: fileCol.width - 20; text: f.path; color: Theme.c.muted; font.pointSize: Theme.pt(12.5); elide: Text.ElideMiddle }
                 }
             }
             MouseArea {
@@ -384,6 +387,7 @@ PageColumns {
         width: parent.width
         topPadding: 32
         Text {
+            textFormat: Text.PlainText
             width: parent.width
             text: "Nothing matches “" + page.q + "”" + (page.anyList || page.anyTag ? " with these filters." : ".")
             color: Theme.c.text
@@ -391,6 +395,7 @@ PageColumns {
             wrapMode: Text.Wrap
         }
         Text {
+            textFormat: Text.PlainText
             width: Math.min(parent.width, 460)
             topPadding: 4
             text: page.anyList || page.anyTag ? "Try clearing the filters on the right." : "Check the spelling, or try a shorter word. Locked notes are matched by title only."
@@ -424,7 +429,7 @@ PageColumns {
                     anchors.verticalCenter: parent.verticalCenter
                     spacing: 12
                     Icon { name: "history"; size: 15; color: Theme.c.muted; anchors.verticalCenter: parent.verticalCenter }
-                    Text { text: modelData; color: Theme.c.ink2; font.pointSize: Theme.pt(14.5); anchors.verticalCenter: parent.verticalCenter }
+                    Text { textFormat: Text.PlainText; text: modelData; color: Theme.c.ink2; font.pointSize: Theme.pt(14.5); anchors.verticalCenter: parent.verticalCenter }
                 }
                 MouseArea {
                     id: recentArea
@@ -436,6 +441,7 @@ PageColumns {
             }
         }
         Text {
+            textFormat: Text.PlainText
             width: Math.min(parent.width, 480)
             topPadding: 22
             text: "Searches titles, text and to-dos in every list, plus the files you have open. Locked notes are matched by title only."
@@ -518,9 +524,10 @@ PageColumns {
             spacing: 10
             Checkbox { small: true; checked: fr.checked; anchors.verticalCenter: parent.verticalCenter; onToggled: fr.toggled() }
             Icon { visible: fr.folderColor.a > 0; name: "folder"; size: 15; color: fr.folderColor; anchors.verticalCenter: parent.verticalCenter }
-            Text { text: fr.label; color: Theme.c.ink2; font.pixelSize: 14; anchors.verticalCenter: parent.verticalCenter }
+            Text { textFormat: Text.PlainText; text: fr.label; color: Theme.c.ink2; font.pixelSize: 14; anchors.verticalCenter: parent.verticalCenter }
         }
         Text {
+            textFormat: Text.PlainText
             anchors.right: parent.right
             anchors.verticalCenter: parent.verticalCenter
             text: fr.count

@@ -81,6 +81,7 @@ Item {
                 color: Theme.c.muted
             }
             Text {
+                textFormat: Text.PlainText
                 text: header.crumb
                 color: crumbArea.containsMouse && crumbArea.enabled ? Theme.c.ink : Theme.c.muted
                 font.pointSize: Theme.pt(13.5)
@@ -100,12 +101,14 @@ Item {
                 }
             }
             Text {
+                textFormat: Text.PlainText
                 visible: header.noteOpen
                 text: "/"
                 color: Theme.c.faintest
                 font.pointSize: Theme.pt(13.5)
             }
             Text {
+                textFormat: Text.PlainText
                 visible: header.noteOpen
                 Layout.fillWidth: true
                 Layout.minimumWidth: 0

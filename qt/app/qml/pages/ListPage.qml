@@ -57,12 +57,14 @@ PageColumns {
 
     // ── heading ──────────────────────────────────────────────────────
     Text {
+        textFormat: Text.PlainText
         text: "List · " + Fmt.plural(page.notes.length, "note")
         color: Theme.c.muted
         font.pixelSize: 13
     }
     Item { width: 1; height: 6 }
     Text {
+        textFormat: Text.PlainText
         width: parent.width
         text: page.list.name || ""
         color: Theme.c.ink
@@ -96,7 +98,7 @@ PageColumns {
                 id: sortRow
                 anchors.centerIn: parent
                 spacing: 6
-                Text { text: page.byTitle ? "Title A–Z" : "Last edited"; color: Theme.c.secondary; font.pixelSize: 13; anchors.verticalCenter: parent.verticalCenter }
+                Text { textFormat: Text.PlainText; text: page.byTitle ? "Title A–Z" : "Last edited"; color: Theme.c.secondary; font.pixelSize: 13; anchors.verticalCenter: parent.verticalCenter }
                 Icon { name: "chevron-down"; size: 11; color: Theme.c.secondary; anchors.verticalCenter: parent.verticalCenter }
             }
             MouseArea {
@@ -115,9 +117,10 @@ PageColumns {
         visible: page.notes.length === 0
         width: parent.width
         Item { width: 1; height: 16 }
-        Text { text: "Nothing in " + (page.list.name || "this list") + " yet."; color: Theme.c.text; font.pixelSize: 15 }
+        Text { textFormat: Text.PlainText; text: "Nothing in " + (page.list.name || "this list") + " yet."; color: Theme.c.text; font.pixelSize: 15 }
         Item { width: 1; height: 4 }
         Text {
+            textFormat: Text.PlainText
             width: Math.min(parent.width, 460)
             text: "Notes you start here land in this list. To bring one in, click the list name under its title, or right-click it in the sidebar."
             color: Theme.c.muted
@@ -152,7 +155,7 @@ PageColumns {
                 anchors.centerIn: parent
                 spacing: 8
                 Icon { anchors.horizontalCenter: parent.horizontalCenter; name: "plus"; size: 18; color: Theme.c.secondary }
-                Text { text: "New note"; color: Theme.c.secondary; font.pointSize: Theme.pt(13.5) }
+                Text { textFormat: Text.PlainText; text: "New note"; color: Theme.c.secondary; font.pointSize: Theme.pt(13.5) }
             }
             MouseArea {
                 id: emptyArea
@@ -178,7 +181,7 @@ PageColumns {
                 visible: group.modelData.label !== ""
                 spacing: 8
                 SectionLabel { text: group.modelData.label }
-                Text { text: group.modelData.notes.length; color: Theme.c.muted; font.pixelSize: 13; font.features: { "tnum": 1 } }
+                Text { textFormat: Text.PlainText; text: group.modelData.notes.length; color: Theme.c.muted; font.pixelSize: 13; font.features: { "tnum": 1 } }
             }
             Item { width: 1; height: group.modelData.label ? 14 : 10 }
 
@@ -231,7 +234,7 @@ PageColumns {
                                 anchors.centerIn: parent
                                 spacing: 8
                                 Icon { anchors.horizontalCenter: parent.horizontalCenter; name: "lock"; size: 18; color: Theme.c.muted }
-                                Text { text: "Locked"; color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
+                                Text { textFormat: Text.PlainText; text: "Locked"; color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
                             }
                             // Fade out the bottom of the page.
                             Rectangle {
@@ -247,6 +250,7 @@ PageColumns {
                             }
                         }
                         Text {
+                            textFormat: Text.PlainText
                             id: titleText
                             y: 190
                             width: parent.width
@@ -265,6 +269,7 @@ PageColumns {
                             spacing: 6
                             Icon { visible: !!sheet.modelData.is_pinned; name: "pin"; size: 12; color: Theme.c.muted; anchors.verticalCenter: parent.verticalCenter }
                             Text {
+                                textFormat: Text.PlainText
                                 text: Fmt.edited(sheet.modelData.updated_at) + (sheet.openHere && !sheet.locked ? "  ·  " + sheet.openHere + " open" : "")
                                 color: Theme.c.muted
                                 font.pointSize: Theme.pt(12.5)
@@ -311,6 +316,7 @@ PageColumns {
                                 Layout.fillWidth: true
                                 spacing: 16
                                 Text {
+                                    textFormat: Text.PlainText
                                     Layout.fillWidth: true
                                     text: noteRow.modelData.title || "Untitled"
                                     color: Theme.c.ink
@@ -327,10 +333,11 @@ PageColumns {
                                     Layout.topMargin: 2
                                     spacing: 6
                                     Icon { visible: !!noteRow.modelData.is_pinned; name: "pin"; size: 13; color: Theme.c.muted }
-                                    Text { text: Fmt.edited(noteRow.modelData.updated_at); color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
+                                    Text { textFormat: Text.PlainText; text: Fmt.edited(noteRow.modelData.updated_at); color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
                                 }
                             }
                             Text {
+                                textFormat: Text.PlainText
                                 visible: AppState.showPreview
                                 Layout.fillWidth: true
                                 Layout.topMargin: 4
@@ -344,6 +351,7 @@ PageColumns {
                                 elide: Text.ElideRight
                             }
                             Text {
+                                textFormat: Text.PlainText
                                 visible: noteRow.meta !== ""
                                 Layout.topMargin: 6
                                 text: noteRow.meta
@@ -386,6 +394,7 @@ PageColumns {
                 }
             }
             Text {
+                textFormat: Text.PlainText
                 visible: openCol.open.length === 0
                 topPadding: 6
                 text: "Nothing open in this list."

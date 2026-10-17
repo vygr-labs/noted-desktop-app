@@ -55,7 +55,7 @@ Window {
                 anchors.rightMargin: 4
                 spacing: 4
                 Icon { name: "file-text"; size: 13; color: Theme.c.muted }
-                Text { text: win.title; color: Theme.c.text; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
+                Text { textFormat: Text.PlainText; text: win.title; color: Theme.c.text; font.pixelSize: Theme.fontSm; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
                 IconButton { icon: win.pinned ? "pin-off" : "pin"; size: 26; iconSize: 13; checked: win.pinned; tooltip: win.pinned ? "Unpin" : "Keep on top"; onClicked: win.pinned = !win.pinned }
                 IconButton { icon: "x"; size: 26; iconSize: 14; tooltip: "Close"; onClicked: win.close() }
             }
@@ -77,6 +77,7 @@ Window {
                 width: parent.width - 36
                 spacing: 10
                 Text {
+                    textFormat: Text.PlainText
                     Layout.fillWidth: true
                     text: win.note.title || "Untitled"
                     color: Theme.c.text
@@ -85,6 +86,7 @@ Window {
                     wrapMode: Text.Wrap
                 }
                 Text {
+                    textFormat: Text.PlainText
                     visible: AppState.isLocked(win.note)
                     text: "This note is locked. Unlock it in the main window."
                     color: Theme.c.muted

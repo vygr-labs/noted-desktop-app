@@ -152,7 +152,7 @@ ApplicationWindow {
     ResizeFrame { window: window }
 
     // ── overlays ────────────────────────────────────────────────────
-    CommandPalette {
+    QuickFind {
         id: commandPalette
         onImportRequested: importDialog.open()
         onExportCurrentRequested: (fmt) => notePage.exportAs(fmt)
@@ -200,6 +200,7 @@ ApplicationWindow {
         visible: opacity > 0
         Behavior on opacity { NumberAnimation { duration: 180 } }
         Text {
+            textFormat: Text.PlainText
             id: toastText
             anchors.centerIn: parent
             text: toast.message

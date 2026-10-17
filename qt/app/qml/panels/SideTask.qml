@@ -31,6 +31,7 @@ Item {
         width: row.width - x
         spacing: 2
         Text {
+            textFormat: Text.PlainText
             Layout.fillWidth: true
             text: row.task.text || ""
             color: row.ticked ? Theme.c.muted : Theme.c.ink2
@@ -44,6 +45,7 @@ Item {
             Layout.fillWidth: true
             spacing: 5
             Text {
+                textFormat: Text.PlainText
                 Layout.maximumWidth: body.width - (whenText.visible ? whenText.implicitWidth + 5 : 0)
                 text: row.source
                 color: srcArea.containsMouse ? Theme.c.ink : Theme.c.muted
@@ -58,6 +60,7 @@ Item {
                 }
             }
             Text {
+                textFormat: Text.PlainText
                 id: whenText
                 visible: row.when !== ""
                 text: "· " + row.when

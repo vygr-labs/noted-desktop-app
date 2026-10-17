@@ -29,6 +29,7 @@ ColumnLayout {
 
     TextEdit {
         id: title
+        textFormat: TextEdit.PlainText
         visible: header.showTitle
         Layout.fillWidth: true
         readOnly: header.readOnly
@@ -51,6 +52,7 @@ ColumnLayout {
         onStoredTitleChanged: if (!activeFocus) sync()
 
         Text {
+            textFormat: Text.PlainText
             visible: title.length === 0
             text: "Untitled"
             color: Theme.c.faintest
@@ -86,6 +88,7 @@ ColumnLayout {
         spacing: 16
 
         component Meta: Text {
+            textFormat: Text.PlainText
             height: 26
             verticalAlignment: Text.AlignVCenter
             color: Theme.c.muted
@@ -108,6 +111,7 @@ ColumnLayout {
                 spacing: 6
                 Icon { name: "folder"; size: 14; color: header.noteList ? Theme.swatch(header.noteList.color) : Theme.c.muted; anchors.verticalCenter: parent.verticalCenter }
                 Text {
+                    textFormat: Text.PlainText
                     text: header.noteList ? header.noteList.name : (header.note.is_daily ? "Daily notes" : "No list")
                     color: Theme.c.text
                     font.pixelSize: 13

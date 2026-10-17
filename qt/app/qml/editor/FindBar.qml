@@ -47,6 +47,7 @@ Rectangle {
                 Keys.onEscapePressed: bar.closed()
             }
             Text {
+                textFormat: Text.PlainText
                 text: bar.editor.findQuery === "" ? "" : bar.editor.findMatches.length === 0 ? "No results"
                       : (bar.editor.findIndex + 1) + " of " + bar.editor.findMatches.length
                 color: bar.editor.findMatches.length === 0 && bar.editor.findQuery !== "" ? Theme.c.dangerText : Theme.c.subtle

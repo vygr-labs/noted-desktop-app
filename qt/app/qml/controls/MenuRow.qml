@@ -32,6 +32,7 @@ Rectangle {
             color: row.data_.color ? Theme.swatch(row.data_.color) : "transparent"
         }
         Text {
+            textFormat: Text.PlainText
             Layout.fillWidth: true
             text: row.data_.text || ""
             color: row.data_.danger ? Theme.c.red : Theme.c.ink2
@@ -39,6 +40,7 @@ Rectangle {
             elide: Text.ElideRight
         }
         Text {
+            textFormat: Text.PlainText
             visible: !!row.data_.shortcut
             text: (row.data_.shortcut || "").replace(/\+/g, " ")
             color: Theme.c.muted

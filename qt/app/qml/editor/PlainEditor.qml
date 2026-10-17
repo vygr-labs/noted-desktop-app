@@ -56,6 +56,7 @@ Item {
             Notes.patch(root.noteId, AppState.currentNote.title || "Untitled", text.substring(0, 240))
         }
         Text {
+            textFormat: Text.PlainText
             visible: edit.length === 0
             text: "Start writing…"
             color: Theme.c.faint

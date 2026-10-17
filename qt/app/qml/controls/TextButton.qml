@@ -47,6 +47,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
         }
         Text {
+            textFormat: Text.PlainText
             id: label
             text: root.text
             color: root.kind === "primary" ? Theme.c.bg : root.kind === "destructive" ? Theme.c.red

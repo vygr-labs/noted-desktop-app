@@ -86,6 +86,7 @@ Rectangle {
                 color: row.iconColor
             }
             Text {
+                textFormat: Text.PlainText
                 Layout.fillWidth: !row.locked
                 Layout.maximumWidth: row.locked ? row.width - row.leftPad - 40 : -1
                 text: row.label
@@ -102,6 +103,7 @@ Rectangle {
             }
             Item { visible: row.locked; Layout.fillWidth: true }
             Text {
+                textFormat: Text.PlainText
                 visible: row.countText !== ""
                 text: row.countText
                 color: Theme.c.muted
@@ -133,6 +135,7 @@ Rectangle {
         Layout.preferredHeight: 24
         spacing: 0
         Text {
+            textFormat: Text.PlainText
             Layout.fillWidth: true
             text: gl.label
             color: Theme.c.tertiary
@@ -161,6 +164,7 @@ Rectangle {
             Layout.preferredHeight: 44
             DragArea { anchors.fill: parent }
             Text {
+                textFormat: Text.PlainText
                 x: 18
                 anchors.verticalCenter: parent.verticalCenter
                 text: "noted"
@@ -199,8 +203,8 @@ Rectangle {
                 anchors.rightMargin: 10
                 spacing: 8
                 Icon { name: "search"; size: 15; color: Theme.c.muted }
-                Text { Layout.fillWidth: true; text: "Find a note"; color: Theme.c.muted; font.pointSize: Theme.pt(13.5) }
-                Text { text: "Ctrl K"; color: Theme.c.muted; font.pixelSize: 12 }
+                Text { textFormat: Text.PlainText; Layout.fillWidth: true; text: "Find a note"; color: Theme.c.muted; font.pointSize: Theme.pt(13.5) }
+                Text { textFormat: Text.PlainText; text: "Ctrl K"; color: Theme.c.muted; font.pixelSize: 12 }
             }
             MouseArea {
                 id: findArea
@@ -251,6 +255,7 @@ Rectangle {
                 spacing: 1
 
                 Text {
+                    textFormat: Text.PlainText
                     visible: side.pinned.length > 0
                     Layout.leftMargin: 10
                     Layout.bottomMargin: 6
@@ -280,6 +285,7 @@ Rectangle {
                     onAddClicked: newListDialog.openFor()
                 }
                 Text {
+                    textFormat: Text.PlainText
                     visible: AppState.lists.length === 0
                     Layout.leftMargin: 10
                     Layout.topMargin: 2
@@ -416,6 +422,7 @@ Rectangle {
 
         // ── dev-data note ────────────────────────────────────────────────
         Text {
+            textFormat: Text.PlainText
             visible: App.devData
             Layout.leftMargin: 20
             Layout.bottomMargin: 6
@@ -442,7 +449,7 @@ Rectangle {
                     anchors.leftMargin: 10
                     spacing: 10
                     Icon { name: "plus"; size: 16; color: Theme.c.text }
-                    Text { Layout.fillWidth: true; text: "New note"; color: Theme.c.text; font.pixelSize: 14 }
+                    Text { textFormat: Text.PlainText; Layout.fillWidth: true; text: "New note"; color: Theme.c.text; font.pixelSize: 14 }
                 }
                 MouseArea {
                     id: newArea

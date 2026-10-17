@@ -65,12 +65,14 @@ PageColumns {
 
     // ── today's note ─────────────────────────────────────────────────
     Text {
+        textFormat: Text.PlainText
         text: desk.daily.content_plain ? "Daily note · edited " + Fmt.edited(desk.daily.updated_at) : "Daily note"
         color: Theme.c.muted
         font.pixelSize: 13
     }
     Item { width: 1; height: 6 }
     Text {
+        textFormat: Text.PlainText
         width: parent.width
         text: Fmt.longDay(AppState.todayIso)
         color: Theme.c.ink
@@ -126,6 +128,7 @@ PageColumns {
                             Layout.fillWidth: true
                             spacing: 12
                             Text {
+                                textFormat: Text.PlainText
                                 Layout.fillWidth: true
                                 text: card.modelData.title || "Untitled"
                                 color: Theme.c.ink
@@ -138,6 +141,7 @@ PageColumns {
                                 elide: Text.ElideRight
                             }
                             Text {
+                                textFormat: Text.PlainText
                                 Layout.alignment: Qt.AlignTop
                                 Layout.topMargin: 2
                                 text: Fmt.edited(card.modelData.updated_at)
@@ -146,6 +150,7 @@ PageColumns {
                             }
                         }
                         Text {
+                            textFormat: Text.PlainText
                             Layout.fillWidth: true
                             Layout.topMargin: 8
                             text: AppState.isLocked(card.modelData) ? "Locked" : (card.modelData.preview || "").replace(/\s+/g, " ")
@@ -161,7 +166,7 @@ PageColumns {
                         RowLayout {
                             spacing: 7
                             Rectangle { width: 7; height: 7; radius: 3.5; color: card.list ? Theme.swatch(card.list.color) : Theme.c.faint }
-                            Text { text: card.list ? card.list.name : "Notes"; color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
+                            Text { textFormat: Text.PlainText; text: card.list ? card.list.name : "Notes"; color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
                         }
                     }
                     MouseArea {
@@ -262,6 +267,7 @@ PageColumns {
                     width: parent.width
                     topPadding: 12
                     Text {
+                        textFormat: Text.PlainText
                         text: group.modelData.label
                         color: group.modelData.key === "over" ? Theme.c.red : Theme.c.ink
                         font.pixelSize: 12
@@ -292,6 +298,7 @@ PageColumns {
                 }
             }
             Text {
+                textFormat: Text.PlainText
                 visible: desk.todoGroups.length === 0
                 width: parent.width
                 topPadding: 10

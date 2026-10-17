@@ -24,15 +24,16 @@ Flickable {
         width: Math.min(page.width - 96, Math.max(680, Math.min(960, page.width * 0.62)) - 96)
         x: (page.width - width) / 2
 
-        Text { text: "Trash · " + Fmt.plural(Notes.count, "note"); color: Theme.c.muted; font.pixelSize: 13 }
+        Text { textFormat: Text.PlainText; text: "Trash · " + Fmt.plural(Notes.count, "note"); color: Theme.c.muted; font.pixelSize: 13 }
         Item { width: 1; height: 6 }
         RowLayout {
             width: parent.width
-            Text { Layout.fillWidth: true; text: "Trash"; color: Theme.c.ink; font.pixelSize: 34; font.weight: 650; font.letterSpacing: -0.68 }
+            Text { textFormat: Text.PlainText; Layout.fillWidth: true; text: "Trash"; color: Theme.c.ink; font.pixelSize: 34; font.weight: 650; font.letterSpacing: -0.68 }
             TextButton { visible: Notes.count > 0; text: "Empty trash"; variant: "destructive"; onClicked: emptyDialog.open() }
         }
         Item { width: 1; height: 22 }
         Text {
+            textFormat: Text.PlainText
             visible: Notes.count === 0
             text: "Nothing in the trash."
             color: Theme.c.muted
@@ -68,11 +69,12 @@ Flickable {
                     RowLayout {
                         Layout.fillWidth: true
                         spacing: 16
-                        Text { Layout.fillWidth: true; text: row.title || "Untitled"; color: Theme.c.ink; font.pixelSize: 15; font.weight: Font.Medium; elide: Text.ElideRight }
+                        Text { textFormat: Text.PlainText; Layout.fillWidth: true; text: row.title || "Untitled"; color: Theme.c.ink; font.pixelSize: 15; font.weight: Font.Medium; elide: Text.ElideRight }
                         TextButton { variant: "link"; fontSize: 13; text: "Restore"; onClicked: AppState.restoreNote(row.noteId) }
                         TextButton { variant: "link"; fontSize: 13; text: "Delete forever"; onClicked: Store.deleteNotePermanently(row.noteId) }
                     }
                     Text {
+                        textFormat: Text.PlainText
                         visible: AppState.showPreview
                         Layout.fillWidth: true
                         text: row.locked ? "Locked" : row.preview.replace(/\s+/g, " ")
@@ -80,7 +82,7 @@ Flickable {
                         font.pointSize: Theme.pt(13.5)
                         elide: Text.ElideRight
                     }
-                    Text { text: Fmt.editedPhrase(row.updatedAt).replace(/^Edited/, "Moved to the trash"); color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
+                    Text { textFormat: Text.PlainText; text: Fmt.editedPhrase(row.updatedAt).replace(/^Edited/, "Moved to the trash"); color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
                 }
             }
         }

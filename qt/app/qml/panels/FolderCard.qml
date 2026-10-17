@@ -51,6 +51,7 @@ Item {
             spacing: 8
             Rectangle { width: 8; height: 8; radius: 4; color: Theme.swatch(card.list.color) }
             Text {
+                textFormat: Text.PlainText
                 Layout.fillWidth: true
                 text: card.list.name || ""
                 color: Theme.c.ink
@@ -59,6 +60,7 @@ Item {
                 elide: Text.ElideRight
             }
             Text {
+                textFormat: Text.PlainText
                 text: card.count
                 color: Theme.c.muted
                 font.pointSize: Theme.pt(12.5)
@@ -66,6 +68,7 @@ Item {
             }
         }
         Text {
+            textFormat: Text.PlainText
             Layout.fillWidth: true
             Layout.topMargin: 18
             text: card.latest
@@ -74,6 +77,7 @@ Item {
             elide: Text.ElideRight
         }
         Text {
+            textFormat: Text.PlainText
             Layout.topMargin: 2
             text: card.edited
             color: Theme.c.muted

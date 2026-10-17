@@ -104,6 +104,7 @@ Popup {
                         elide: Text.ElideRight
                     }
                     Text {
+                        textFormat: Text.PlainText
                         visible: r.modelData.count !== undefined
                         text: r.modelData.count !== undefined ? r.modelData.count : ""
                         color: Theme.c.muted
@@ -127,6 +128,7 @@ Popup {
             }
         }
         Text {
+            textFormat: Text.PlainText
             visible: picker.rows.length === 0 && picker.emptyText !== ""
             Layout.fillWidth: true
             leftPadding: 10

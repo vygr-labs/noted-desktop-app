@@ -44,12 +44,14 @@ Popup {
             spacing: 4
             visible: dlg.title !== ""
             Text {
+                textFormat: Text.PlainText
                 text: dlg.title
                 color: Theme.c.text
                 font.pixelSize: Theme.fontXl
                 font.weight: Font.DemiBold
             }
             Text {
+                textFormat: Text.PlainText
                 visible: dlg.description !== ""
                 text: dlg.description
                 color: Theme.c.muted

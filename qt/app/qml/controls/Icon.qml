@@ -3,6 +3,7 @@ import Noted
 
 // A Lucide glyph. Icon { name: "search"; size: 16; color: Theme.c.muted }
 Text {
+    textFormat: Text.PlainText
     property string name: ""
     property real size: 16
 

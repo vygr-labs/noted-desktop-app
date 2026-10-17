@@ -5,6 +5,7 @@
 #include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QJsonDocument>
+#include <QJsonObject>
 #include <QMimeData>
 #include <QRegularExpression>
 #include <QTextBlock>
@@ -1411,8 +1412,13 @@ void EditorController::rebuildDecorations()
             quoteStart = quoteEnd = -1;
         };
         for (QTextBlock b = d->begin(); b.isValid(); b = b.next()) {
-            if (listKindOf(b.textList()) == TaskList)
-                out.append(QVariantMap{{"k", "task"}, {"block", b.blockNumber()}, {"checked", taskChecked(b.blockFormat())}});
+            if (listKindOf(b.textList()) == TaskList) {
+                const QJsonObject attrs = QJsonDocument::fromJson(b.blockFormat().property(BlockItemAttrs).toString().toUtf8()).object();
+                out.append(QVariantMap{{"k", "task"}, {"block", b.blockNumber()}, {"checked", taskChecked(b.blockFormat())},
+                                       {"due", attrs.value(QLatin1String("due")).toString()}});
+            }
+            if (b.blockFormat().intProperty(BlockKind) == HorizontalRule)
+                out.append(QVariantMap{{"k", "hr"}, {"block", b.blockNumber()}});
             QTextFrame* f = QTextCursor(b).currentFrame();
             const bool quoted = b.blockFormat().intProperty(QTextFormat::BlockQuoteLevel) > 0;
             if (quoted && quoteStart >= 0 && f == quoteFrame) {
@@ -1455,6 +1461,26 @@ bool EditorController::toggleTask(int blockNumber)
     QTextBlockFormat bf = c.blockFormat();
     setTaskChecked(bf, !taskChecked(bf));
     c.setBlockFormat(bf);
+    return true;
+}
+
+bool EditorController::setTaskDue(int blockNumber, const QString& isoDate)
+{
+    QTextDocument* d = doc();
+    if (!d) return false;
+    const QTextBlock b = d->findBlockByNumber(blockNumber);
+    if (!b.isValid() || listKindOf(b.textList()) != TaskList) return false;
+    QTextCursor c(b);
+    QTextBlockFormat bf = c.blockFormat();
+    // The item's attrs are kept verbatim for the save; only "due" changes.
+    QJsonObject attrs = QJsonDocument::fromJson(bf.property(BlockItemAttrs).toString().toUtf8()).object();
+    if (isoDate.isEmpty()) attrs.remove(QStringLiteral("due"));
+    else attrs.insert(QStringLiteral("due"), isoDate);
+    if (attrs.isEmpty()) bf.clearProperty(BlockItemAttrs);
+    else bf.setProperty(BlockItemAttrs, QString::fromUtf8(QJsonDocument(attrs).toJson(QJsonDocument::Compact)));
+    c.setBlockFormat(bf);
+    markDirty();
+    rebuildDecorations();
     return true;
 }
 

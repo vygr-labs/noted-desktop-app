@@ -65,6 +65,7 @@ ModalDialog {
         onAccepted: dlg.submit()
     }
     Text {
+        textFormat: Text.PlainText
         id: error
         visible: text !== ""
         color: Theme.c.dangerText

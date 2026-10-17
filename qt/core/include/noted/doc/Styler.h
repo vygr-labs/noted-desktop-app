@@ -63,9 +63,14 @@ public:
 
     qreal headingPx(int level) const;
 
+    // Space above a block of kind `cur` after one of kind `prev`, in px at a
+    // 16px body (kinds: p h1 h2 h3 li ol task quote code table hr; "" = none).
+    static qreal gapFor(const QString& prev, const QString& cur);
+
 private:
     void styleBlock(QTextDocument* doc, const QTextBlock& b) const;
     void styleFrame(QTextFrame* f) const;
+    qreal frameGap(QTextFrame* f) const;
 
     Palette m_p;
 };

@@ -53,6 +53,7 @@ Flickable {
                     radius: 6
                     color: on ? Theme.c.selected : (navArea.containsMouse ? Qt.alpha(Theme.c.pressed, 0.6) : "transparent")
                     Text {
+                        textFormat: Text.PlainText
                         x: 10
                         anchors.verticalCenter: parent.verticalCenter
                         text: parent.modelData[1]
@@ -78,9 +79,9 @@ Flickable {
             y: page.wrapped ? nav.height + 40 : 0
             width: page.wrapped ? frame.width : Math.min(620, frame.width - 196 - 56)
 
-            Text { text: "Settings"; color: Theme.c.muted; font.pixelSize: 13 }
+            Text { textFormat: Text.PlainText; text: "Settings"; color: Theme.c.muted; font.pixelSize: 13 }
             Item { width: 1; height: 6 }
-            Text { text: page.title; color: Theme.c.ink; font.pixelSize: 34; font.weight: 650; font.letterSpacing: -0.68 }
+            Text { textFormat: Text.PlainText; text: page.title; color: Theme.c.ink; font.pixelSize: 34; font.weight: 650; font.letterSpacing: -0.68 }
 
             Loader {
                 width: parent.width
@@ -91,6 +92,7 @@ Flickable {
     }
 
     component Intro: Text {
+        textFormat: Text.PlainText
         width: parent ? parent.width : 0
         topPadding: 14
         bottomPadding: 4
@@ -107,7 +109,7 @@ Flickable {
         Column {
             width: parent ? parent.width : 0
             Item { width: 1; height: 28 }
-            Text { text: "Theme"; color: Theme.c.ink; font.pointSize: Theme.pt(14.5); font.weight: Font.Medium }
+            Text { textFormat: Text.PlainText; text: "Theme"; color: Theme.c.ink; font.pointSize: Theme.pt(14.5); font.weight: Font.Medium }
             Item { width: 1; height: 12 }
             Flow {
                 width: parent.width
@@ -176,6 +178,7 @@ Flickable {
                 radius: 8
                 color: Theme.c.codeBg
                 Text {
+                    textFormat: Text.PlainText
                     id: sample
                     x: 16
                     y: 14
@@ -248,8 +251,8 @@ Flickable {
                 topPadding: 16
                 bottomPadding: 16
                 Rectangle { width: parent.width; height: 1; color: Theme.c.lineFaint; y: 0 }
-                Text { text: "Server"; color: Theme.c.ink; font.pointSize: Theme.pt(14.5); font.weight: Font.Medium; topPadding: 16 }
-                Text { text: "Leave this alone to use the noted server."; color: Theme.c.muted; font.pointSize: Theme.pt(13.5); topPadding: 2 }
+                Text { textFormat: Text.PlainText; text: "Server"; color: Theme.c.ink; font.pointSize: Theme.pt(14.5); font.weight: Font.Medium; topPadding: 16 }
+                Text { textFormat: Text.PlainText; text: "Leave this alone to use the noted server."; color: Theme.c.muted; font.pointSize: Theme.pt(13.5); topPadding: 2 }
                 Item { width: 1; height: 10 }
                 Field {
                     width: parent.width
@@ -267,8 +270,8 @@ Flickable {
                 bottomPadding: 16
                 property bool show: false
                 Rectangle { width: parent.width; height: 1; color: Theme.c.lineFaint }
-                Text { text: "Access token"; color: Theme.c.ink; font.pointSize: Theme.pt(14.5); font.weight: Font.Medium; topPadding: 16 }
-                Text { width: parent.width; text: "Only needed for your own server. It has to match the server’s secret."; color: Theme.c.muted; font.pointSize: Theme.pt(13.5); topPadding: 2; wrapMode: Text.Wrap }
+                Text { textFormat: Text.PlainText; text: "Access token"; color: Theme.c.ink; font.pointSize: Theme.pt(14.5); font.weight: Font.Medium; topPadding: 16 }
+                Text { textFormat: Text.PlainText; width: parent.width; text: "Only needed for your own server. It has to match the server’s secret."; color: Theme.c.muted; font.pointSize: Theme.pt(13.5); topPadding: 2; wrapMode: Text.Wrap }
                 Item { width: 1; height: 10 }
                 RowLayout {
                     width: parent.width
@@ -377,9 +380,10 @@ Flickable {
             width: parent ? parent.width : 0
             topPadding: 28
             Item { width: 1; height: 16 }
-            Text { text: "noted"; color: Theme.c.ink; font.pixelSize: 22; font.weight: 650; font.letterSpacing: -0.22 }
-            Text { topPadding: 4; text: "Version " + App.version; color: Theme.c.muted; font.pixelSize: 14; font.features: { "tnum": 1 } }
+            Text { textFormat: Text.PlainText; text: "noted"; color: Theme.c.ink; font.pixelSize: 22; font.weight: 650; font.letterSpacing: -0.22 }
+            Text { textFormat: Text.PlainText; topPadding: 4; text: "Version " + App.version; color: Theme.c.muted; font.pixelSize: 14; font.features: { "tnum": 1 } }
             Text {
+                textFormat: Text.PlainText
                 topPadding: 18
                 width: Math.min(parent.width, 460)
                 text: "Notes, lists and to-dos that live on your computer. Made with care by Eyetu Kingsley at Voyager Technologies."
@@ -468,6 +472,7 @@ Flickable {
             }
         }
         Text {
+            textFormat: Text.PlainText
             text: card.label
             color: card.selected ? Theme.c.ink : Theme.c.secondary
             font.pointSize: Theme.pt(13.5)

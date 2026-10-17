@@ -142,6 +142,7 @@ Popup {
                     color: Theme.c.menuLine
                 }
                 Text {
+                    textFormat: Text.PlainText
                     visible: !!entry.modelData.header
                     text: entry.modelData.header || ""
                     color: Theme.c.tertiary

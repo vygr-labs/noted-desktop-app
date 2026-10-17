@@ -58,7 +58,7 @@ Window {
                         spacing: 8
                         anchors.verticalCenter: parent.verticalCenter
                         Icon { name: "zap"; size: 15; color: Theme.c.accent; anchors.verticalCenter: parent.verticalCenter }
-                        Text { text: "Quick capture"; color: Theme.c.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold; anchors.verticalCenter: parent.verticalCenter }
+                        Text { textFormat: Text.PlainText; text: "Quick capture"; color: Theme.c.text; font.pixelSize: Theme.fontMd; font.weight: Font.DemiBold; anchors.verticalCenter: parent.verticalCenter }
                     }
                 }
                 Kbd { text: "Ctrl Enter to save" }
@@ -81,7 +81,7 @@ Window {
                         color: Theme.c.text
                         font.pixelSize: Theme.fontLg
                         selectByMouse: true
-                        Text { visible: input.length === 0; text: "Jot something down…"; color: Theme.c.faint; font: input.font }
+                        Text { textFormat: Text.PlainText; visible: input.length === 0; text: "Jot something down…"; color: Theme.c.faint; font: input.font }
                         Keys.onPressed: (e) => {
                             if ((e.key === Qt.Key_Return || e.key === Qt.Key_Enter) && (e.modifiers & Qt.ControlModifier)) { win.save(); e.accepted = true }
                             else if (e.key === Qt.Key_Escape) { win.hide(); e.accepted = true }
@@ -91,7 +91,7 @@ Window {
             }
             RowLayout {
                 Layout.fillWidth: true
-                Text { text: "Saved as a plain note. Esc to dismiss."; color: Theme.c.subtle; font.pixelSize: Theme.fontSm; Layout.fillWidth: true }
+                Text { textFormat: Text.PlainText; text: "Saved as a plain note. Esc to dismiss."; color: Theme.c.subtle; font.pixelSize: Theme.fontSm; Layout.fillWidth: true }
                 TextButton { text: "Save note"; variant: "primary"; compact: true; onClicked: win.save() }
             }
         }

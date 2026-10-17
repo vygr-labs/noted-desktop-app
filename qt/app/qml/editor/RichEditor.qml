@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import Noted
+import "../Fmt.js" as Fmt
 
 // The rich-text editing surface: a TextEdit whose document is driven by an
 // EditorController (see app/src/EditorController.h).
@@ -12,6 +13,7 @@ Item {
     property alias textEdit: edit
     property bool readOnly: false
     property real minHeight: 200
+    property color pageColor: Theme.c.bg   // what's behind the editor (covers Qt's to-do bullets)
     property string placeholder: "Start writing, or type / for headings, lists and to-dos"
     signal caretMoved(rect r)
 
@@ -54,9 +56,11 @@ Item {
         textMargin: 0
         focus: true
         onCursorRectangleChanged: root.caretMoved(cursorRectangle)
+        onCursorPositionChanged: if (slash.opened) root.followSlash()
 
         // Placeholder
         Text {
+            textFormat: Text.PlainText
             visible: ctl.empty && !edit.activeFocus || (ctl.empty && edit.length <= 1)
             text: root.placeholder
             color: Theme.c.placeholder
@@ -77,34 +81,91 @@ Item {
                 readonly property rect first: { edit.width; edit.contentHeight; return edit.positionToRectangle(g.start !== undefined ? g.start : 0) }
                 readonly property var g2: modelData.k === "quote" ? ctl.blockGeometry(modelData.endBlock, ctl.layoutTick) : g
                 readonly property rect last: { edit.width; edit.contentHeight; return edit.positionToRectangle(g2.end !== undefined ? g2.end : 0) }
+                readonly property bool isTask: modelData.k === "task"
+                readonly property string dueKey: isTask ? Fmt.dueGroup(modelData.due || "", AppState.todayIso) : ""
+
+                // Divider, in the line colour (Qt's own ruler is zero width).
+                Rectangle {
+                    visible: deco.modelData.k === "hr"
+                    x: 0
+                    y: Math.round(deco.first.y + deco.first.height / 2)
+                    width: edit.width
+                    height: 1
+                    color: Theme.c.line
+                }
+
+                // Qt draws a bullet in front of a to-do's text; cover it.
+                Rectangle {
+                    visible: deco.isTask
+                    x: deco.first.x - Math.round(12 * Theme.textScale)
+                    y: deco.first.y
+                    width: Math.round(11 * Theme.textScale)
+                    height: deco.first.height
+                    color: root.pageColor
+                }
+
+                // The whole line, to show "Add date" on hover. Takes no clicks.
+                MouseArea {
+                    id: lineHover
+                    visible: deco.isTask && !root.readOnly
+                    x: 0
+                    y: deco.first.y
+                    width: edit.width
+                    height: deco.last.y + deco.last.height - deco.first.y
+                    hoverEnabled: true
+                    acceptedButtons: Qt.NoButton
+                    cursorShape: Qt.IBeamCursor
+                }
+                Text {
+                    textFormat: Text.PlainText
+                    id: dueLabel
+                    readonly property bool hasDue: !!deco.modelData.due
+                    visible: deco.isTask && (hasDue || ((lineHover.containsMouse || dueArea.containsMouse) && !deco.modelData.checked && !root.readOnly))
+                    x: Math.min(deco.last.x + 10, edit.width - implicitWidth)
+                    y: deco.last.y + Math.round((deco.last.height - height) / 2)
+                    text: hasDue ? Fmt.dueLabel(deco.modelData.due, AppState.todayIso) : "Add date"
+                    color: !hasDue ? Theme.c.faint : (deco.dueKey === "over" && !deco.modelData.checked ? Theme.c.red : Theme.c.muted)
+                    font.pixelSize: Math.round(13 * Theme.textScale)
+                    font.family: Theme.fontFamily
+                    font.features: { "tnum": 1 }
+                    MouseArea {
+                        id: dueArea
+                        anchors.fill: parent
+                        anchors.margins: -3
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        enabled: !root.readOnly
+                        onClicked: { duePicker.block = deco.modelData.block; duePicker.openUnder(dueLabel, -8, deco.modelData.due || "") }
+                    }
+                }
 
                 Rectangle {
                     visible: deco.modelData.k === "quote"
                     x: deco.first.x - 16
-                    y: deco.first.y - 2
+                    y: deco.first.y
                     width: 3
-                    height: deco.last.y + deco.last.height - deco.first.y + 4
-                    radius: 2
-                    color: Theme.c.accentLine
+                    height: deco.last.y + deco.last.height - deco.first.y
+                    radius: 1.5
+                    color: Theme.c.quote
                 }
 
                 Rectangle {
                     visible: deco.modelData.k === "task"
-                    readonly property real s: Math.round(15 * Theme.textScale)
-                    x: deco.first.x - s - 3
-                    y: deco.first.y + (deco.first.height - s) / 2
+                    readonly property real s: Math.round(18 * Theme.textScale)
+                    // The text starts 30px in: an 18px box, then a 12px gap.
+                    x: deco.first.x - Math.round(30 * Theme.textScale)
+                    y: deco.first.y + Math.round((deco.first.height - s) / 2)
                     width: s
                     height: s
-                    radius: 4
-                    color: !!deco.modelData.checked ? Theme.c.accent : (boxArea.containsMouse ? Theme.c.accentSubtle : Theme.c.window)
+                    radius: 5
+                    color: !!deco.modelData.checked ? Theme.c.accent : (boxArea.containsMouse ? Qt.alpha(Theme.c.accent, 0.08) : "transparent")
                     border.width: !!deco.modelData.checked ? 0 : 1.5
                     border.color: boxArea.containsMouse ? Theme.c.accent : Theme.c.faint
-                    Behavior on color { ColorAnimation { duration: 120 } }
                     Icon {
                         anchors.centerIn: parent
                         name: "check"
-                        size: parent.s - 3
-                        color: "white"
+                        size: parent.s - 5
+                        color: Theme.c.onAccent
                         visible: !!deco.modelData.checked
                     }
                     MouseArea {
@@ -139,9 +200,11 @@ Item {
         }
 
         Keys.onPressed: (e) => {
+            if (slash.opened && slash.key(e)) { e.accepted = true; return }
             const ctrl = e.modifiers & Qt.ControlModifier
             const shift = e.modifiers & Qt.ShiftModifier
             const alt = e.modifiers & Qt.AltModifier
+            if (e.text === "/" && !ctrl && !alt && !root.readOnly) Qt.callLater(root.maybeOpenSlash)
             let handled = true
             if (e.key === Qt.Key_Return || e.key === Qt.Key_Enter) {
                 if (ctrl && ctl.listKind === 2) { ctl.clickAt(edit.cursorPosition, -1000, 0); handled = true }
@@ -201,6 +264,66 @@ Item {
     }
 
     PopupMenu { id: menu; minWidth: 210 }
+    // ── the "/" menu ─────────────────────────────────────────────────
+    property int slashPos: -1
+    SlashMenu {
+        id: slash
+        onPicked: (kind) => root.insertBlock(kind)
+        onClosed: root.slashPos = -1
+    }
+    // A "/" at the start of a line or after a space opens the menu.
+    function maybeOpenSlash() {
+        const pos = edit.cursorPosition - 1
+        if (pos < 0 || edit.getText(pos, pos + 1) !== "/" || ctl.inCodeBlock) return
+        const before = pos > ctl.blockStart(pos) ? edit.getText(pos - 1, pos) : ""
+        if (before !== "" && !/\s/.test(before)) return
+        slashPos = pos
+        slash.query = ""
+        const win = edit.Window.contentItem
+        slash.parent = win
+        const r = edit.positionToRectangle(pos)
+        const below = edit.mapToItem(win, r.x - 8, r.y + r.height + 6)
+        slash.x = Math.max(8, Math.min(below.x, win.width - slash.width - 8))
+        slash.open()
+        slash.y = win.height - below.y < 440 ? edit.mapToItem(win, 0, r.y).y - slash.implicitHeight - 6 : below.y
+    }
+    function followSlash() {
+        const end = edit.cursorPosition
+        if (slashPos < 0 || end <= slashPos || edit.getText(slashPos, slashPos + 1) !== "/") { slash.close(); return }
+        const q = edit.getText(slashPos + 1, end)
+        if (/\s/.test(q) || q.length > 24) { slash.close(); return }
+        slash.query = q
+    }
+    // Removes "/query", then turns the line into the block (or inserts one).
+    function insertBlock(kind) {
+        const from = slashPos
+        slash.close()
+        if (from >= 0) edit.remove(from, edit.cursorPosition)
+        const plain = () => {
+            if (ctl.headingLevel > 0) ctl.setHeading(0)
+            if (ctl.listKind >= 0) ctl.toggleList(ctl.listKind)
+            if (ctl.inQuote) ctl.toggleQuote()
+        }
+        switch (kind) {
+        case "p": plain(); break
+        case "h2": plain(); ctl.setHeading(2); break
+        case "h3": plain(); ctl.setHeading(3); break
+        case "task": if (ctl.listKind !== 2) { plain(); ctl.toggleList(2) } break
+        case "li": if (ctl.listKind !== 0) { plain(); ctl.toggleList(0) } break
+        case "ol": if (ctl.listKind !== 1) { plain(); ctl.toggleList(1) } break
+        case "quote": if (!ctl.inQuote) { plain(); ctl.toggleQuote() } break
+        case "code": if (!ctl.inCodeBlock) ctl.toggleCodeBlock(); break
+        case "table": ctl.insertTable(3, 3); break
+        case "hr": ctl.insertHorizontalRule(); break
+        }
+        edit.forceActiveFocus()
+    }
+
+    DuePicker {
+        id: duePicker
+        property int block: -1
+        onPicked: (iso) => ctl.setTaskDue(block, iso)
+    }
 
     function openContextMenu(x, y) {
         const pos = edit.positionAt(x, y)

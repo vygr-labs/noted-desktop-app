@@ -84,6 +84,8 @@ qt_add_qml_module(noted
         qml/editor/SelectionToolbar.qml
         qml/editor/MovePicker.qml
         qml/editor/TagPicker.qml
+        qml/editor/DuePicker.qml
+        qml/editor/SlashMenu.qml
 
         qml/pages/DeskPage.qml
         qml/pages/ListPage.qml
@@ -92,7 +94,7 @@ qt_add_qml_module(noted
         qml/pages/SettingsPage.qml
         qml/pages/TrashPage.qml
 
-        qml/dialogs/CommandPalette.qml
+        qml/dialogs/QuickFind.qml
         qml/dialogs/PinDialog.qml
         qml/dialogs/QuickCapture.qml
 )

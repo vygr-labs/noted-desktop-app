@@ -73,7 +73,7 @@ Rectangle {
                 id: turnRow
                 anchors.centerIn: parent
                 spacing: 6
-                Text { text: bar.blockLabel; color: Theme.c.text2; font.pointSize: Theme.pt(13.5); anchors.verticalCenter: parent.verticalCenter }
+                Text { textFormat: Text.PlainText; text: bar.blockLabel; color: Theme.c.text2; font.pointSize: Theme.pt(13.5); anchors.verticalCenter: parent.verticalCenter }
                 Icon { name: "chevron-down"; size: 11; color: Theme.c.muted; anchors.verticalCenter: parent.verticalCenter }
             }
             MouseArea {

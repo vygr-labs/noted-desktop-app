@@ -62,12 +62,13 @@ Flickable {
         x: (page.width - width) / 2
 
         Text {
+            textFormat: Text.PlainText
             text: page.open.length + " open across " + Fmt.plural(page.openNotes, "note")
             color: Theme.c.muted
             font.pixelSize: 13
         }
         Item { width: 1; height: 6 }
-        Text { text: "To-dos"; color: Theme.c.ink; font.pixelSize: 34; font.weight: 650; font.letterSpacing: -0.68 }
+        Text { textFormat: Text.PlainText; text: "To-dos"; color: Theme.c.ink; font.pixelSize: 34; font.weight: 650; font.letterSpacing: -0.68 }
         Item { width: 1; height: 24 }
         Tabs {
             width: parent.width
@@ -108,7 +109,7 @@ Flickable {
                         if (Store.appendTask(daily.id, t) >= 0) text = ""
                     }
                 }
-                Text { visible: draft.text !== ""; text: "Enter to add"; color: Theme.c.muted; font.pixelSize: 12 }
+                Text { textFormat: Text.PlainText; visible: draft.text !== ""; text: "Enter to add"; color: Theme.c.muted; font.pixelSize: 12 }
             }
         }
 
@@ -130,12 +131,14 @@ Flickable {
                         anchors.verticalCenter: parent.verticalCenter
                     }
                     Text {
+                        textFormat: Text.PlainText
                         text: group.modelData.label
                         color: group.modelData.key === "over" ? Theme.c.red : Theme.c.ink
                         font.pixelSize: 13
                         font.weight: Font.DemiBold
                     }
                     Text {
+                        textFormat: Text.PlainText
                         text: group.modelData.items.filter(t => !page.isDone(t)).length
                         color: Theme.c.muted
                         font.pixelSize: 13
@@ -159,6 +162,7 @@ Flickable {
                             onToggled: page.flip(row.modelData)
                         }
                         Text {
+                            textFormat: Text.PlainText
                             id: taskText
                             x: 30
                             y: 8
@@ -184,6 +188,7 @@ Flickable {
                                 color: row.list ? Theme.swatch(row.list.color) : Theme.c.faint
                             }
                             Text {
+                                textFormat: Text.PlainText
                                 width: Math.min(implicitWidth, row.width * 0.42 - 14)
                                 text: row.todays ? "Today’s note" : (row.modelData.title || "Untitled")
                                 color: srcArea.containsMouse ? Theme.c.ink : Theme.c.muted
@@ -202,6 +207,7 @@ Flickable {
                             onClicked: AppState.openTask(row.modelData)
                         }
                         Text {
+                            textFormat: Text.PlainText
                             x: row.width - 52
                             y: 10
                             width: 52
@@ -218,6 +224,7 @@ Flickable {
         }
 
         Text {
+            textFormat: Text.PlainText
             visible: page.groups.length === 0
             topPadding: 40
             width: parent.width

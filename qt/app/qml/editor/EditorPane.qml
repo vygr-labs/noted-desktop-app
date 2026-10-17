@@ -251,6 +251,7 @@ Item {
                     spacing: 6
                     Icon { name: "file"; size: 14; color: Theme.c.muted; anchors.verticalCenter: parent.verticalCenter }
                     Text {
+                        textFormat: Text.PlainText
                         text: (/\.(md|markdown)$/i.test(pane.note.file_path || "") ? "Markdown" : "Plain text") + " file"
                         color: Theme.c.text
                         font.pixelSize: 13
@@ -258,6 +259,7 @@ Item {
                     }
                 }
                 Text {
+                    textFormat: Text.PlainText
                     width: Math.min(implicitWidth, 340)
                     height: 20
                     verticalAlignment: Text.AlignVCenter
@@ -269,6 +271,7 @@ Item {
                     Tip { visible: pathArea.containsMouse; text: pane.note.file_path || "" }
                 }
                 Text {
+                    textFormat: Text.PlainText
                     height: 20
                     verticalAlignment: Text.AlignVCenter
                     text: "Saved " + Fmt.edited(pane.note.updated_at).toLowerCase().replace(/^yesterday$/, "yesterday")
@@ -307,7 +310,7 @@ Item {
                     anchors.rightMargin: 12
                     spacing: 12
                     Icon { name: "trash-2"; size: 16; color: Theme.c.muted }
-                    Text { Layout.fillWidth: true; text: "This note is in the trash."; color: Theme.c.ink; font.pixelSize: 14 }
+                    Text { textFormat: Text.PlainText; Layout.fillWidth: true; text: "This note is in the trash."; color: Theme.c.ink; font.pixelSize: 14 }
                     TextButton { text: "Restore"; onClicked: AppState.restoreNote(pane.note.id) }
                 }
             }
@@ -360,6 +363,7 @@ Item {
             y: Math.max(46, scroller.contentY + 24)
             width: pane.outlineW - 24
             Text {
+                textFormat: Text.PlainText
                 bottomPadding: 8
                 text: "On this page"
                 color: Theme.c.tertiary
@@ -434,6 +438,7 @@ Item {
             anchors.verticalCenter: parent.verticalCenter
             spacing: 18
             Text {
+                textFormat: Text.PlainText
                 visible: !pane.locked
                 readonly property int words: pane.isPlain ? plain.wordCount : rich.controller.wordCount
                 text: words.toLocaleString(Qt.locale("en_US"), "f", 0) + (words === 1 ? " word" : " words")
@@ -442,6 +447,7 @@ Item {
                 font.features: { "tnum": 1 }
             }
             Text {
+                textFormat: Text.PlainText
                 text: {
                     if (pane.inTrash) return "In the trash"
                     if (rich.controller.dirty || plain.dirty) return "Saving…"

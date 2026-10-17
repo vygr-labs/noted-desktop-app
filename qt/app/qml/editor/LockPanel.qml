@@ -32,6 +32,7 @@ Column {
     Icon { anchors.horizontalCenter: parent.horizontalCenter; name: "lock"; size: 28; color: Theme.c.muted }
     Item { width: 1; height: 12 }
     Text {
+        textFormat: Text.PlainText
         anchors.horizontalCenter: parent.horizontalCenter
         text: "This note is locked"
         color: Theme.c.ink
@@ -40,6 +41,7 @@ Column {
     }
     Item { width: 1; height: 6 }
     Text {
+        textFormat: Text.PlainText
         width: parent.width
         horizontalAlignment: Text.AlignHCenter
         text: "Enter your PIN to open it. It stays open until you quit noted."
@@ -70,6 +72,7 @@ Column {
         TextButton { variant: "primary"; text: "Unlock"; fontSize: 14; onClicked: panel.tryUnlock() }
     }
     Text {
+        textFormat: Text.PlainText
         visible: panel.failed
         topPadding: 10
         width: parent.width

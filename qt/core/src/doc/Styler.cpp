@@ -48,15 +48,53 @@ bool inCodeFrame(const QTextBlock& b)
     return f && f->frameFormat().intProperty(FrameKind) == CodeBlockFrame;
 }
 
+// What a block is, for the spacing rule: p h1 h2 h3 li ol task quote code
+// table hr. A block inside a code block or table reports that frame.
+QString rhythmKind(const QTextBlock& b)
+{
+    if (!b.isValid()) return {};
+    if (inCodeFrame(b)) return QStringLiteral("code");
+    if (QTextCursor(b).currentTable()) return QStringLiteral("table");
+    const QTextBlockFormat f = b.blockFormat();
+    const int kind = f.intProperty(BlockKind);
+    if (kind == HorizontalRule || f.hasProperty(QTextFormat::BlockTrailingHorizontalRulerWidth)) return QStringLiteral("hr");
+    if (kind == Heading || f.headingLevel() > 0) {
+        const int level = qMax(1, f.headingLevel());
+        return level == 1 ? QStringLiteral("h1") : level == 2 ? QStringLiteral("h2") : QStringLiteral("h3");
+    }
+    if (f.intProperty(QTextFormat::BlockQuoteLevel) > 0) return QStringLiteral("quote");
+    if (const QTextList* l = b.textList()) {
+        const int lk = l->format().intProperty(ListKind);
+        return lk == TaskList ? QStringLiteral("task") : lk == OrderedList ? QStringLiteral("ol") : QStringLiteral("li");
+    }
+    return QStringLiteral("p");
+}
+
 }  // namespace
+
+// The space above a block, given the block before it. Mirrors `gapFor` in
+// the prototype and the table in qt/DESIGN.md (px at a 16px body).
+qreal Styler::gapFor(const QString& prev, const QString& cur)
+{
+    if (prev.isEmpty()) return 0;
+    if (cur == u"h1") return 40;
+    if (prev == u"h1") return cur == u"h2" ? 24 : 14;
+    if (prev == u"hr" || cur == u"hr") return 28;
+    if (cur == u"h2") return 40;
+    if (cur == u"h3") return prev == u"h2" ? 14 : 30;
+    if (prev == u"h2" || prev == u"h3") return 10;
+    if ((cur == u"task" || cur == u"li" || cur == u"ol") && prev == cur) return 4;
+    const auto boxed = [](const QString& k) { return k == u"code" || k == u"table" || k == u"quote"; };
+    if (boxed(cur) || boxed(prev)) return 22;
+    return 16;
+}
 
 qreal Styler::headingPx(int level) const
 {
     switch (level) {
-    case 1:  return m_p.basePx * 1.75;
-    case 2:  return m_p.basePx * 1.4;
-    case 3:  return m_p.basePx * 1.15;
-    default: return m_p.basePx * 1.05;
+    case 1:  return m_p.basePx * 2.125;   // 34: a markdown file's # title
+    case 2:  return m_p.basePx * 1.3125;  // 21: heading
+    default: return m_p.basePx * 1.0625;  // 17: subheading
     }
 }
 
@@ -66,7 +104,7 @@ void Styler::applyDocumentDefaults(QTextDocument* doc) const
     f.setPixelSize(qRound(m_p.basePx));
     f.setHintingPreference(QFont::PreferNoHinting);
     doc->setDefaultFont(f);
-    doc->setIndentWidth(m_p.basePx * 1.6);
+    doc->setIndentWidth(m_p.basePx * 1.875);  // 30px: an 18px checkbox and a 12px gap
     doc->setDocumentMargin(2);
 }
 
@@ -87,6 +125,16 @@ void Styler::apply(QTextDocument* doc, int from, int to) const
     }
 }
 
+// The space above a code block or table: the rule for whatever comes before it.
+qreal Styler::frameGap(QTextFrame* f) const
+{
+    const int at = f->firstPosition() - 1;
+    if (at <= 0) return 0;
+    const QTextBlock before = f->document()->findBlock(at - 1);
+    const QString kind = qobject_cast<QTextTable*>(f) ? QStringLiteral("table") : QStringLiteral("code");
+    return gapFor(rhythmKind(before), kind) * m_p.basePx / 16.0;
+}
+
 void Styler::styleFrame(QTextFrame* f) const
 {
     if (!f) return;
@@ -99,8 +147,8 @@ void Styler::styleFrame(QTextFrame* f) const
         want.setBorderCollapse(true);
         want.setCellPadding(8);
         want.setCellSpacing(0);
-        want.setTopMargin(10);
-        want.setBottomMargin(10);
+        want.setTopMargin(frameGap(f));
+        want.setBottomMargin(0);
         want.setWidth(QTextLength(QTextLength::PercentageLength, 100));
         if (!(want == tf)) t->setFormat(want);
         for (int r = 0; r < t->rows(); ++r) {
@@ -122,8 +170,8 @@ void Styler::styleFrame(QTextFrame* f) const
         want.setBackground(m_p.codeBlockBg);
         want.setPadding(14);
         want.setLeftMargin(0);
-        want.setTopMargin(10);
-        want.setBottomMargin(10);
+        want.setTopMargin(frameGap(f));
+        want.setBottomMargin(0);
         want.setBorder(0);
         if (!(want == ff)) f->setFrameFormat(want);
     }
@@ -183,30 +231,28 @@ void Styler::styleBlock(QTextDocument* doc, const QTextBlock& b) const
     const bool prevSameList = list && prev.isValid() && prev.textList() == list;
     const bool prevInSameItem = prev.isValid() && (prev.textList() || prev.blockFormat().intProperty(BlockListContinuation) > 0)
                                 && (list || bf.intProperty(BlockListContinuation) > 0);
-    // Vertical rhythm: space is what groups the text. Paragraphs get a clear
-    // break. A list starts with extra room and ends with little, so a
-    // checklist item and the lines under it read as one entry. A heading gets
-    // a lot above and little below, so it belongs to what follows.
+    // Vertical rhythm: one rule decides the space between any two blocks
+    // (gapFor). Lines inside a code block or table sit together; the frame
+    // itself carries the space above it (styleFrame).
     const QTextBlockFormat pf = prev.isValid() ? prev.blockFormat() : QTextBlockFormat();
     const bool prevIsList = prev.isValid() && (prev.textList() || pf.intProperty(BlockListContinuation) > 0);
-    const bool prevIsHeading = prev.isValid() && pf.intProperty(BlockKind) == Heading;
     const bool isList = list || bf.intProperty(BlockListContinuation) > 0;
-    qreal top = m_p.basePx * 0.75;
-    if (isList && !prevIsList) top = m_p.basePx * 1.3;
-    else if (!isList && prevIsList) top = m_p.basePx * 0.5;
-    if (prevIsHeading) top = m_p.basePx * 0.45;
-    if (firstInFrame || code) top = 0;
-    else if (prevSameList || prevInSameItem || (isList && prevIsList)) top = m_p.basePx * 0.3;
-    if (headingLevel > 0 && !firstInFrame)
-        top = m_p.basePx * (headingLevel == 1 ? 2.0 : headingLevel == 2 ? 1.75 : 1.4);
-    if (inTable) top = firstInFrame ? 0 : m_p.basePx * 0.3;
+    const qreal unit = m_p.basePx / 16.0;
+    const QString kindNow = rhythmKind(b);
+    const QString kindPrev = rhythmKind(prev);
+    qreal top = gapFor(kindPrev, kindNow) * unit;
+    if (code || inTable) top = firstInFrame ? 0 : (inTable ? m_p.basePx * 0.3 : 0);
+    else if (!prev.isValid()) top = 0;
+    // Nested lists and the lines under a list item belong to it.
+    else if (isList && prevIsList && (prevSameList || prevInSameItem || kindNow != kindPrev)) top = 4 * unit;
+    else if (kindNow == u"quote" && kindPrev == u"quote") top = 8 * unit;
 
     want.setTopMargin(top);
     want.setBottomMargin(0);
     // Exact pixel line boxes, like CSS line-height. Proportional heights in Qt
     // scale the font's own (tall, on Windows) line spacing, which compounds.
-    const qreal linePx = code ? m_p.basePx * 0.87 * 1.55
-                       : headingLevel > 0 ? headingPx(headingLevel) * 1.25
+    const qreal linePx = code ? m_p.basePx * 0.8125 * 1.6
+                       : headingLevel > 0 ? headingPx(headingLevel) * (headingLevel == 1 ? 1.15 : headingLevel == 2 ? 1.35 : 1.4)
                                           : m_p.basePx * m_p.lineHeight / 100.0;
     want.setLineHeight(qRound(linePx), QTextBlockFormat::FixedHeight);
     want.setLeftMargin(quote > 0 ? quote * m_p.basePx * 1.2 : 0);
@@ -214,9 +260,11 @@ void Styler::styleBlock(QTextDocument* doc, const QTextBlock& b) const
     want.setIndent(!list && cont > 0 ? cont : 0);
     want.setNonBreakableLines(false);
     if (kind == HorizontalRule) {
-        want.setProperty(QTextFormat::BlockTrailingHorizontalRulerWidth, QTextLength(QTextLength::PercentageLength, 100));
-        want.setTopMargin(firstInFrame ? 0 : m_p.basePx * 0.9);
-        want.setBottomMargin(m_p.basePx * 0.4);
+        // Zero width: Qt would draw it in the text colour. The editor draws the
+        // divider itself, in the theme's line colour.
+        want.setProperty(QTextFormat::BlockTrailingHorizontalRulerWidth, QTextLength(QTextLength::FixedLength, 0));
+        want.setTopMargin(firstInFrame ? 0 : gapFor(kindPrev, kindNow) * unit);
+        want.setBottomMargin(0);
     } else {
         want.clearProperty(QTextFormat::BlockTrailingHorizontalRulerWidth);
     }
@@ -232,15 +280,15 @@ void Styler::styleBlock(QTextDocument* doc, const QTextBlock& b) const
         cf.setFontFamilies(QStringList{(mCode || code) ? m_p.monoFamily : m_p.bodyFamily});
         cf.setFontFixedPitch(mCode || code);
         qreal px = headingLevel > 0 ? headingPx(headingLevel) : m_p.basePx;
-        if (mCode || code) px = m_p.basePx * 0.87;
+        if (code) px = m_p.basePx * 0.8125;
+        else if (mCode) px = m_p.basePx * 0.875;
         if (isBox) px = m_p.basePx * 1.15;
         cf.setProperty(QTextFormat::FontPixelSize, qRound(px));
         cf.clearProperty(QTextFormat::FontPointSize);
 
         int weight = QFont::Normal;
-        if (headingLevel == 1) weight = QFont::Bold;
-        else if (headingLevel == 2) weight = 650;
-        else if (headingLevel >= 3) weight = QFont::DemiBold;
+        if (headingLevel == 1) weight = 650;
+        else if (headingLevel >= 2) weight = QFont::DemiBold;
         if (cf.boolProperty(MarkBold)) weight = QFont::Bold;
         if (headerCell && weight < QFont::DemiBold) weight = QFont::DemiBold;
         cf.setFontWeight(weight);
@@ -250,7 +298,7 @@ void Styler::styleBlock(QTextDocument* doc, const QTextBlock& b) const
         cf.setFontStrikeOut(cf.boolProperty(MarkStrike) || checked);
         if (headingLevel > 0) {
             cf.setFontLetterSpacingType(QFont::AbsoluteSpacing);
-            cf.setFontLetterSpacing(headingLevel == 1 ? -0.5 : -0.25);
+            cf.setFontLetterSpacing(headingLevel == 1 ? -0.02 * headingPx(1) : headingLevel == 2 ? -0.01 * headingPx(2) : 0);
         } else {
             cf.clearProperty(QTextFormat::FontLetterSpacing);
             cf.clearProperty(QTextFormat::FontLetterSpacingType);

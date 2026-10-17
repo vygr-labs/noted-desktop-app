@@ -33,6 +33,7 @@ Column {
                     radius: 5
                     color: Theme.c.codeBg
                     Text {
+                        textFormat: Text.PlainText
                         id: code
                         x: 8
                         y: 6
@@ -58,6 +59,7 @@ Column {
                     border.color: Theme.c.faint
                 }
                 Text {
+                    textFormat: Text.PlainText
                     visible: blk.t === "li" || blk.t === "ol"
                     text: blk.t === "ol" ? "1." : "•"
                     color: Theme.c.faint
@@ -65,6 +67,7 @@ Column {
                 }
                 Rectangle { visible: blk.t === "quote"; width: 2; height: parent.height; color: Theme.c.quote }
                 Text {
+                    textFormat: Text.PlainText
                     id: line
                     visible: blk.t !== "hr" && blk.t !== "code"
                     x: blk.t === "task" ? 17 : (blk.t === "li" || blk.t === "ol") ? 12 : blk.t === "quote" ? 8 : 0

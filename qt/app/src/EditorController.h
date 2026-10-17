@@ -126,6 +126,8 @@ public:
     // positionToRectangle(). `tick` only exists to make QML re-evaluate.
     Q_INVOKABLE QVariantMap blockGeometry(int blockNumber, int tick = 0) const;
     Q_INVOKABLE bool toggleTask(int blockNumber);
+    // Sets ("2026-10-21") or clears ("") a to-do's due date.
+    Q_INVOKABLE bool setTaskDue(int blockNumber, const QString& isoDate);
 
     // ── lifecycle ────────────────────────────────────────────────────
     // Loads a rich note (TipTap JSON). Flushes any pending save first.

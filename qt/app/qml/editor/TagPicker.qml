@@ -11,7 +11,7 @@ Picker {
     width: 260
     placeholder: "Find or create a tag"
     checkFirst: true
-    readonly property string wanted: query.trim().toLowerCase().replace(/^#/, "").replace(/\s+/g, "-")
+    readonly property string wanted: query.trim().toLowerCase().replace(/^#/, "").replace(/\s+/g, "-").replace(/[<>&"]/g, "")
     rows: {
         const has = {}
         for (const t of noteTags) has[t.id] = true

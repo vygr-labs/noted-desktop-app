@@ -20,12 +20,14 @@ ToolTip {
         topPadding: 5
         bottomPadding: 5
         Text {
+            textFormat: Text.PlainText
             text: tip.text
             color: "#f4f4f5"
             font.pixelSize: Theme.fontSm
             font.family: Theme.fontFamily
         }
         Text {
+            textFormat: Text.PlainText
             visible: tip.shortcut !== ""
             text: tip.shortcut
             color: "#a1a1aa"

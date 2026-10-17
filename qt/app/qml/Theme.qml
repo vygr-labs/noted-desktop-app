@@ -44,10 +44,10 @@ QtObject {
     })
 
     // ── shadows (see Shadow.qml) ─────────────────────────────────────
-    readonly property var shadowPop: dark ? { y: 10, blur: 28, color: "#73000000", ring: "#12FFFFFF" }
-                                          : { y: 8, blur: 24, color: "#1F000000", ring: "#14000000" }
-    readonly property var shadowModal: dark ? { y: 24, blur: 60, color: "#8C000000", ring: "#14FFFFFF" }
-                                            : { y: 24, blur: 60, color: "#29000000", ring: "#12000000" }
+    readonly property var shadowPop: dark ? ({ y: 10, blur: 28, color: "#73000000", ring: "#12FFFFFF" })
+                                          : ({ y: 8, blur: 24, color: "#1F000000", ring: "#14000000" })
+    readonly property var shadowModal: dark ? ({ y: 24, blur: 60, color: "#8C000000", ring: "#14FFFFFF" })
+                                            : ({ y: 24, blur: 60, color: "#29000000", ring: "#12000000" })
 
     // ── accent ───────────────────────────────────────────────────────
     // One user setting (qt.accent). In the dark it's lifted 22% towards
@@ -103,7 +103,7 @@ QtObject {
             chip: t.codeBg, chipText: t.secondary, chipActive: t.ink, chipActiveText: t.bg,
             danger: t.red, dangerText: t.red, success: accent, successText: accent, warning: swatch("yellow"),
             codeText: t.text, inlineCodeText: t.ink, checkedText: t.muted, highlight: t.hl,
-            shadow: shadowPop.color
+            shadow: shadowPop ? shadowPop.color : "#33000000"
         })
         return t
     }
