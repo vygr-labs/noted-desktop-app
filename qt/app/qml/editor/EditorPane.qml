@@ -419,8 +419,7 @@ Item {
         readonly property point selTop: { scroller.contentY; return edit.mapToItem(pane, a.x, a.y) }
         readonly property point selBottom: { scroller.contentY; return edit.mapToItem(pane, b.x, b.y + b.height) }
         visible: pane.hasNote && !pane.isPlain && !pane.locked && !pane.inTrash && hasSelection
-                 && (edit.activeFocus || turnMenuOpen) && selTop.y > scroller.y - 20 && selTop.y < footer.y
-        property bool turnMenuOpen: false
+                 && (edit.activeFocus || menuOpen) && selTop.y > scroller.y - 20 && selTop.y < footer.y
         x: Math.max(8, Math.min(pane.width - width - 8, (a.y === b.y ? (selTop.x + edit.mapToItem(pane, b.x, 0).x) / 2 : edit.mapToItem(pane, edit.width / 2, 0).x) - width / 2))
         y: selTop.y - height - 10 < scroller.y + 4 ? selBottom.y + 10 : selTop.y - height - 10
         z: 5

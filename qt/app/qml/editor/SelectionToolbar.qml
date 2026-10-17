@@ -87,6 +87,7 @@ Rectangle {
     }
 
     PopupMenu { id: turnMenu; minWidth: 200 }
+    readonly property bool menuOpen: turnMenu.opened
     function openTurnInto() {
         const e = editor
         const plainBlock = () => {
