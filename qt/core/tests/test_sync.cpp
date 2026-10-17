@@ -63,6 +63,7 @@ private slots:
     void mergeBlocks();
     void deltas();
     void libraryBetweenTwoComputers();
+    void joiningWithAnOlderCopy();
     void sideBySideEditsMerge();
     void sameTagAndDayFromBoth();
     void wrongPassphrase();
@@ -158,6 +159,34 @@ void TestSync::libraryBetweenTwoComputers()
     round({&a, &b});
     QVERIFY(b.store.note(gone.value("id").toString()).isEmpty());
     QCOMPARE(a.sync.devices().size(), 2);
+}
+
+void TestSync::joiningWithAnOlderCopy()
+{
+    QTemporaryDir dir;
+    QDir().mkpath(dir.filePath("cloud"));
+    QString x, y;
+    {
+        Database seedDb(dir.filePath("a.sqlite"));
+        NoteStore s(seedDb);
+        x = s.createNote({{"title", "one"}, {"content", doc({"first"})}}).value("id").toString();
+        y = s.createNote({{"title", "two"}}).value("id").toString();
+    }
+    QVERIFY(QFile::copy(dir.filePath("a.sqlite"), dir.filePath("b.sqlite")));
+    QTest::qWait(1100);
+    Device a(dir.filePath("a.sqlite"));
+    a.store.updateNote(x, {{"title", "one, edited on a"}, {"content", doc({"first", "more from a"})}});
+    QVERIFY(setUp(a, dir.filePath("cloud"), "passphrase!"));
+    Device b(dir.filePath("b.sqlite"));
+    b.store.updateNote(y, {{"title", "two, edited on b"}});
+    QVERIFY(setUp(b, dir.filePath("cloud"), "passphrase!"));
+    round({&a, &b});
+    for (Device* d : {&a, &b}) {
+        QCOMPARE(d->store.note(x).value("title").toString(), QStringLiteral("one, edited on a"));
+        QVERIFY(d->plain(x).contains("more from a"));
+        QCOMPARE(d->store.note(y).value("title").toString(), QStringLiteral("two, edited on b"));
+        QCOMPARE(d->count("SELECT count(*) FROM notes"), 2);
+    }
 }
 
 void TestSync::sideBySideEditsMerge()

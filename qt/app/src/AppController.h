@@ -47,6 +47,7 @@ public:
     // Puts the note on the clipboard as Markdown (its title as a # heading).
     // Locked notes are refused.
     Q_INVOKABLE bool copyAsMarkdown(const QString& noteId);
+    Q_INVOKABLE void copyText(const QString& text);
     Q_INVOKABLE QString suggestedFileName(const QString& noteId, const QString& format);
 
     // Copies a .md/.markdown/.txt file into a new note; returns its id.

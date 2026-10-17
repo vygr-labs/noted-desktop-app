@@ -102,6 +102,9 @@ qt_add_qml_module(noted
         qml/dialogs/QuickFind.qml
         qml/dialogs/PinDialog.qml
         qml/dialogs/QuickCapture.qml
+        qml/dialogs/SyncSetupDialog.qml
+        qml/dialogs/ShareListDialog.qml
+        qml/dialogs/JoinListDialog.qml
 )
 
 qt_add_resources(noted "noted_assets"

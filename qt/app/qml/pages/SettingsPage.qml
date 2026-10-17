@@ -14,7 +14,7 @@ Flickable {
 
     readonly property string section: AppState.view === "settings" && AppState.viewId ? AppState.viewId : "appearance"
     readonly property var sections: [
-        ["appearance", "Appearance"], ["editor", "Editor"], ["sharing", "Sharing"], ["security", "Security"],
+        ["appearance", "Appearance"], ["editor", "Editor"], ["sharing", "Sync"], ["security", "Security"],
         ["capture", "Quick capture"], ["data", "Data"], ["about", "About"]
     ]
     readonly property string title: (sections.find(s => s[0] === section) || sections[0])[1]
@@ -233,60 +233,74 @@ Flickable {
         }
     }
 
-    // Sharing
+    // Sync
     Component {
         id: sharing
         Column {
             width: parent ? parent.width : 0
-            property bool showToken: false
-            Intro { text: "Share a note to edit it with someone else in real time. Everything else stays on this computer." }
+            Intro { text: "Keep your notes the same on all your computers through a folder you already sync: OneDrive, Dropbox, Google Drive or Syncthing. Everything noted puts there is encrypted." }
             Item { width: 1; height: 14 }
             SettingRow {
                 first: true
-                label: "Connection"
-                description: "Live sync isn’t in this build yet, so shared notes save on this computer until it is. " + Fmt.plural(AppState.counts.synced || 0, "note is", "notes are") + " shared."
+                label: "Sync"
+                description: {
+                    if (!Sync.enabled) return "Off."
+                    const where = "Through " + Fmt.shortPath(Sync.folder) + ". "
+                    if (Sync.status === "unreachable" || Sync.status === "error") return where + Sync.error
+                    return where + (Sync.lastSynced && !isNaN(Sync.lastSynced) ? Fmt.editedPhrase(Sync.lastSynced).replace(/^Edited/, "Synced") + "." : "")
+                }
+                TextButton { visible: !Sync.enabled; text: "Set up…"; onClicked: AppState.syncSetupRequested() }
+                TextButton { visible: Sync.enabled; text: "Sync now"; onClicked: Sync.syncNow() }
+                TextButton { visible: Sync.enabled; text: "Turn off"; onClicked: turnOff.open() }
             }
-            Column {
+            SettingRow {
+                visible: Sync.enabled
+                label: "Computers"
+                description: Sync.devices.map(d => d.me ? d.name + " (this one)"
+                                                        : d.name + (d.seen && !isNaN(d.seen) ? ", " + Fmt.editedPhrase(d.seen).replace(/^Edited/, "last synced") : "")).join("
+")
+            }
+
+            Item { width: 1; height: 36 }
+            SectionLabel { text: "Shared lists"; bottomPadding: 6 }
+            Text {
+                textFormat: Text.PlainText
+                visible: Sync.sharedLists.length === 0
                 width: parent.width
-                topPadding: 16
-                bottomPadding: 16
-                Rectangle { width: parent.width; height: 1; color: Theme.c.lineFaint; y: 0 }
-                Text { textFormat: Text.PlainText; text: "Server"; color: Theme.c.ink; font.pointSize: Theme.pt(14.5); font.weight: Font.Medium; topPadding: 16 }
-                Text { textFormat: Text.PlainText; text: "Leave this alone to use the noted server."; color: Theme.c.muted; font.pointSize: Theme.pt(13.5); topPadding: 2 }
-                Item { width: 1; height: 10 }
-                Field {
-                    width: parent.width
-                    implicitHeight: 36
-                    mono: true
-                    font.pixelSize: 13
-                    text: Store.setting("syncServerUrl", "")
-                    placeholderText: "wss://…"
-                    onEditingFinished: AppState.save("syncServerUrl", text.trim())
+                bottomPadding: 12
+                text: "Share a list from its menu in the sidebar. Each one gets its own folder, which you share with people through your cloud drive."
+                color: Theme.c.muted
+                font.pointSize: Theme.pt(13.5)
+                lineHeightMode: Text.FixedHeight
+                lineHeight: Math.round(13.5 * 1.45)
+                wrapMode: Text.Wrap
+            }
+            Repeater {
+                model: Sync.sharedLists
+                delegate: SettingRow {
+                    required property var modelData
+                    required property int index
+                    first: index === 0
+                    label: modelData.name
+                    description: "Through " + Fmt.shortPath(modelData.folder)
+                    TextButton { text: "Copy code"; onClicked: { App.copyText(modelData.code); AppState.toast("Code copied") } }
+                    TextButton { text: "Stop sharing"; onClicked: Sync.stopSharing(modelData.listId) }
                 }
             }
-            Column {
-                id: tokenCol
-                width: parent.width
-                bottomPadding: 16
-                property bool show: false
-                Rectangle { width: parent.width; height: 1; color: Theme.c.lineFaint }
-                Text { textFormat: Text.PlainText; text: "Access token"; color: Theme.c.ink; font.pointSize: Theme.pt(14.5); font.weight: Font.Medium; topPadding: 16 }
-                Text { textFormat: Text.PlainText; width: parent.width; text: "Only needed for your own server. It has to match the server’s secret."; color: Theme.c.muted; font.pointSize: Theme.pt(13.5); topPadding: 2; wrapMode: Text.Wrap }
-                Item { width: 1; height: 10 }
-                RowLayout {
-                    width: parent.width
-                    spacing: 8
-                    Field {
-                        Layout.fillWidth: true
-                        implicitHeight: 36
-                        mono: true
-                        font.pixelSize: 13
-                        echoMode: tokenCol.show ? TextInput.Normal : TextInput.Password
-                        text: Store.setting("syncToken", "")
-                        onEditingFinished: AppState.save("syncToken", text.trim())
-                    }
-                    TextButton { implicitWidth: 64; implicitHeight: 36; text: tokenCol.show ? "Hide" : "Show"; onClicked: tokenCol.show = !tokenCol.show }
-                }
+            SettingRow {
+                label: "Join a shared list"
+                description: "Someone shared a list with you? Choose its folder and enter the code they sent."
+                TextButton { text: "Join…"; onClicked: AppState.joinListRequested() }
+            }
+
+            ModalDialog {
+                id: turnOff
+                title: "Turn off sync?"
+                description: "This computer stops syncing. Your notes stay here, and the folder stays as it is, so you can turn it back on with the same passphrase."
+                footer: [
+                    TextButton { text: "Cancel"; onClicked: turnOff.close() },
+                    TextButton { text: "Turn off"; variant: "danger"; onClicked: { turnOff.close(); Sync.turnOff() } }
+                ]
             }
         }
     }

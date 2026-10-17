@@ -226,6 +226,7 @@ void SyncEngine::setUp(const QString& folderIn, const QString& passphrase)
             m_ledger->saveSpace(s);
             m_ledger->seed(s);
             m_spaces = m_ledger->spaces();
+            m_scanAttachments = true;
         } catch (const db::Error& e) {
             emit changed();
             emit setupFinished(false, QString::fromUtf8(e.what()));
@@ -331,6 +332,7 @@ bool SyncEngine::joinList(const QString& folderIn, const QString& code)
         s.name = about.value(QStringLiteral("name")).toString();
         m_ledger->saveSpace(s);
         m_spaces = m_ledger->spaces();
+        m_scanAttachments = true;
     } catch (const db::Error& e) {
         setStatus(m_status, QString::fromUtf8(e.what()));
         return false;
@@ -492,6 +494,16 @@ void SyncEngine::finishPull(const QList<Pulled>& pulled)
         if (any) {
             m_ledger->capture();
             markSharedLists();
+        }
+        // Once per run (and after joining): images any note uses that aren't
+        // here, say from a copy of the notes made without them.
+        if (m_scanAttachments) {
+            m_scanAttachments = false;
+            static const QRegularExpression re(QStringLiteral("attachment:([A-Za-z0-9._-]+)"));
+            for (const QVariant& v : m_db.conn().all(QStringLiteral("SELECT content FROM notes WHERE content LIKE '%attachment:%'")))
+                for (auto it = re.globalMatch(v.toMap().value("content").toString()); it.hasNext();)
+                    attachments << it.next().captured(1);
+            attachments.removeDuplicates();
         }
         fetchAttachments(attachments);
         if (any) m_store.notifyExternal(notes);

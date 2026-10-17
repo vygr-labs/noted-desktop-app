@@ -125,6 +125,7 @@ private:
     QTimer m_debounce, m_poll;
     qint64 m_firstPending = 0;
     QSet<QString> m_missingAttachments;
+    bool m_scanAttachments = true;  // look for every image notes use, not just changed ones
     qint64 m_metaAt = 0;
     QFutureWatcher<QList<Pulled>> m_reader;
 };

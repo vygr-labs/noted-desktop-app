@@ -212,6 +212,21 @@ ApplicationWindow {
         onExportCurrentRequested: (fmt) => notePage.exportAs(fmt)
     }
     PinDialog { id: pinDialog }
+    SyncSetupDialog { id: syncSetup }
+    ShareListDialog { id: shareList }
+    JoinListDialog { id: joinList }
+    Connections {
+        target: AppState
+        function onSyncSetupRequested() { syncSetup.openDialog() }
+        function onShareListRequested(list) { shareList.openFor(list) }
+        function onJoinListRequested() { joinList.openDialog() }
+    }
+    Connections {
+        target: Sync
+        // Changes from another computer are about to be written: anything
+        // still being typed is saved first, so it's merged, not overwritten.
+        function onAboutToApply() { notePage.flush(); deskPage.flush() }
+    }
     QuickCapture { id: quickCapture }
 
     FileDialog {

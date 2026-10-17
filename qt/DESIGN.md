@@ -241,11 +241,7 @@ Each line is a frame in the prototype.
 - **Nothing found:** "Nothing matches “x”." Adds "with these filters" plus Clear filters when
   filters are on.
 - **Locked note:** see below.
-- **Shared note:** Synced / Syncing… / Offline in the footer. When syncing actually fails, a
-  notice sits under the meta row: "Changes to this note aren't syncing", what went wrong, that the
-  edits are safe locally, and the Try again and Sharing settings buttons. The footer says "Not
-  syncing" in `red` with Try again. Offline is not an error and gets no notice.
-- **Unshared notes** say "Saved" in the footer, not "Synced". Only shared notes sync.
+- **Footer** says "Saved". Sync problems show on the Sync settings page, not on every note.
 
 ### Locked notes
 
@@ -306,9 +302,9 @@ Sections are on the left; the section name is the page title.
 | Editor | New notes start as: Rich text / Plain text | `defaultNoteType` |
 | | Note previews (switch) | `showNotePreview` |
 | | Markdown and text files: open in noted (switch) | file association, OS-level |
-| Sharing | Connection status + Test connection | — |
-| | Server (mono field) | `syncServerUrl` |
-| | Access token (masked, Show/Hide) | `syncToken` |
+| Sync | Sync: Off + Set up…, or the folder, when it last synced, Sync now / Turn off | `sync_spaces` (own tables) |
+| | Computers: this one, then each other one with when it last synced | — |
+| | Shared lists: one row per list (folder, Copy code, Stop sharing), then Join a shared list | — |
 | Security | Lock PIN: Change / Remove, or Set a PIN | `lock_pin_hash`, `lock_pin_salt` |
 | | Locked notes: count and how locking works | — |
 | Quick capture | Shortcut (keycaps + Change) | global hotkey |
@@ -321,6 +317,26 @@ Sections are on the left; the section name is the page title.
 
 Rows are a label (14.5/500) with a description (13.5 `muted`) on the left and the control on the
 right, 16px padding, and `line-faint` between rows.
+
+## Sync and sharing
+
+There's no server. Sync goes through a folder something else already keeps in step between
+computers (OneDrive, Dropbox, Google Drive, Syncthing, a network share). How it works is in
+`core/include/noted/sync/SyncEngine.h` and `Ledger.h`. What people see:
+
+- **Setting up** (Settings, Sync, Set up…): a folder and a passphrase. A folder that already has
+  noted's notes is joined, and the dialog says so and asks for the passphrase used on the other
+  computer. Otherwise it's a new library, and the passphrase is asked for twice, with a line
+  saying it can't be recovered. Everything noted writes there is encrypted.
+- **Sharing a list** (its sidebar menu, Share…): noted makes "<List> (noted)" inside a folder you
+  pick. You share that folder with people through your cloud drive and send them the code: 13
+  groups of four, shown whole on two lines with Copy. On a shared list the item reads Sharing…
+  and shows the code, the folder and Stop sharing. Removing someone means unsharing the folder in
+  the cloud drive. The dialog says so.
+- **Joining a list** (Settings, Sync, Join…): the folder (once it's arrived) and the code.
+- **Conflicts never ask.** Fields take the latest edit. Note bodies edited on two computers at
+  once merge paragraph by paragraph. Where both changed the same paragraph, both versions stay,
+  the earlier one first.
 
 ## Mapping onto the current QML
 

@@ -7,6 +7,7 @@
 #include <QJsonDocument>
 #include <QRegularExpression>
 #include <QSysInfo>
+#include <QTimeZone>
 
 #include <algorithm>
 
@@ -134,6 +135,11 @@ QString Clock::next()
     if (ms > m_ms) { m_ms = ms; m_counter = 0; }
     else ++m_counter;
     return QStringLiteral("%1.%2.%3").arg(m_ms, 13, 10, QLatin1Char('0')).arg(m_counter, 4, 16, QLatin1Char('0')).arg(m_device);
+}
+
+QString Clock::at(qint64 ms) const
+{
+    return QStringLiteral("%1.0000.%2").arg(std::max<qint64>(ms, 0), 13, 10, QLatin1Char('0')).arg(m_device);
 }
 
 void Clock::observe(const QString& hlc)
@@ -408,7 +414,7 @@ void Ledger::markDirty(const QString& e, const QString& id)
 
 // ── capture ───────────────────────────────────────────────────────────────
 
-int Ledger::capture()
+int Ledger::capture(bool seeding)
 {
     auto& c = m_db.conn();
     const QVariantList dirty = c.all(QStringLiteral("SELECT entity, id FROM sync_dirty"));
@@ -445,7 +451,16 @@ int Ledger::capture()
         for (const QString& f : d->fields)
             if (fresh || !same(row.value(f), st.data.value(f))) changed << f;
         if (changed.isEmpty()) continue;
-        const QString h = m_clock.next();
+        QString h;
+        if (seeding && !st.exists) {
+            const QString when = row.value(QStringLiteral("updated_at")).toString().isEmpty()
+                                     ? row.value(QStringLiteral("created_at")).toString()
+                                     : row.value(QStringLiteral("updated_at")).toString();
+            const QDateTime t = QDateTime::fromString(when, QStringLiteral("yyyy-MM-dd HH:mm:ss"));
+            h = m_clock.at(t.isValid() ? QDateTime(t.date(), t.time(), QTimeZone::UTC).toMSecsSinceEpoch() : 0);
+        } else {
+            h = m_clock.next();
+        }
         if (e == u"note" && changed.contains(u"content")) {
             const QString hash = row.value(QStringLiteral("content")).toString();
             // A merge made here already knows both its parents.
@@ -483,7 +498,7 @@ void Ledger::seed(const Space& s)
         }
         tx.commit();
     }
-    capture();
+    capture(true);
     Transaction tx(c);
     const QString h = m_clock.next();
     c.run(QStringLiteral("INSERT INTO sync_journal (entity, id, fields, hlc, del, only) "

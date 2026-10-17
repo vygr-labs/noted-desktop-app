@@ -91,6 +91,9 @@ QtObject {
     signal pinPromptRequested(string mode, string noteId)  // set | unlock | remove
     signal editorTaskToggleRequested(string noteId, int taskIndex)  // an open note's n-th checklist item
     signal popOutRequested(string noteId)
+    signal syncSetupRequested()
+    signal shareListRequested(var list)
+    signal joinListRequested()
 
     // A note's right-click menu, the same wherever the note is listed.
     function noteMenuItems(note) {

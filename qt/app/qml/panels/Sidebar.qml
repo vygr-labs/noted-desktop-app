@@ -578,6 +578,7 @@ Rectangle {
             hidden ? { text: "Show in sidebar", action: () => Store.setListHidden(list.id, false) }
                    : { text: expanded ? "Collapse" : "Expand", action: () => AppState.setListExpanded(list.id, !expanded) },
             { text: "Rename…", action: () => renameDialog.openFor(list) },
+            { text: Sync.isShared(list.id) ? "Sharing…" : "Share…", action: () => AppState.shareListRequested(list) },
             { text: "Change colour", children: colours.map(s => ({
                 text: s.label, color: s.name, checked: list.color === s.name,
                 action: () => Store.updateList(list.id, { color: s.name })

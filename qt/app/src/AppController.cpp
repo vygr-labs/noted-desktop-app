@@ -202,6 +202,11 @@ bool AppController::copyAsMarkdown(const QString& noteId)
     return true;
 }
 
+void AppController::copyText(const QString& text)
+{
+    QGuiApplication::clipboard()->setText(text);
+}
+
 QString AppController::exportNote(const QString& noteId, const QString& format, const QUrl& target)
 {
     const QVariantMap n = m_store.note(noteId);

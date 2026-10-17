@@ -50,6 +50,7 @@ class Clock
 public:
     void setDevice(const QString& device) { m_device = device; }
     QString next();
+    QString at(qint64 ms) const;  // a clock for something last changed at `ms`
     void observe(const QString& hlc);
 
 private:
@@ -77,7 +78,10 @@ public:
     void removeSpace(const QString& id);
 
     // Journals what changed since the last capture. Returns the entries made.
-    int capture();
+    // `seeding`: rows met for the first time are dated by when they were last
+    // edited (their updated_at), not now, so a computer joining with an old
+    // copy of the notes doesn't overrule newer edits made elsewhere.
+    int capture(bool seeding = false);
     // Journals every row a new space should start with.
     void seed(const Space& s);
 

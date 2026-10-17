@@ -28,6 +28,7 @@
 #include "noted/Database.h"
 #include "noted/DateText.h"
 #include "noted/NoteStore.h"
+#include "noted/sync/SyncEngine.h"
 #include "noted/NotesModel.h"
 #include "noted/doc/TipTap.h"
 
@@ -156,6 +157,8 @@ int main(int argc, char* argv[])
         return 0;
     }
     database->startWatching();
+    // Syncs through a folder, when that's been set up (Settings, Sync).
+    noted::SyncEngine sync(*database, store);
 
     QQmlApplicationEngine engine;
     qml_register_types_Noted();
@@ -164,6 +167,7 @@ int main(int argc, char* argv[])
     qmlRegisterSingletonInstance("Noted", 1, 0, "Dates", &dates);
     qmlRegisterSingletonInstance("Noted", 1, 0, "App", &controller);
     qmlRegisterSingletonInstance("Noted", 1, 0, "Files", &files);
+    qmlRegisterSingletonInstance("Noted", 1, 0, "Sync", &sync);
     engine.rootContext()->setContextProperty(QStringLiteral("startupState"), cli.value(stateOpt));
     engine.rootContext()->setContextProperty(QStringLiteral("startupFiles"), cli.positionalArguments());
     engine.rootContext()->setContextProperty(QStringLiteral("startupQuickCapture"), cli.isSet(quickOpt));

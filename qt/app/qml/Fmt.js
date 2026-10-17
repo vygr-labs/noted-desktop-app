@@ -45,6 +45,18 @@ function editedPhrase(ts) {
     return "Edited " + e
 }
 
+// A folder path short enough for one line: "C:\…\OneDrive\noted".
+function shortPath(p, max) {
+    p = String(p || "")
+    max = max || 52
+    if (p.length <= max) return p
+    const sep = p.indexOf("\\") >= 0 ? "\\" : "/"
+    const parts = p.split(sep)
+    let tail = parts[parts.length - 1]
+    for (let i = parts.length - 2; i > 0 && (parts[0] + sep + "…" + sep + parts[i] + sep + tail).length <= max; --i) tail = parts[i] + sep + tail
+    return parts[0] + sep + "…" + sep + tail
+}
+
 // "Saturday, 17 October"
 function longDay(iso) { const d = fromIso(iso); return WEEKDAYS[d.getDay()] + ", " + d.getDate() + " " + MONTHS[d.getMonth()] }
 function monthTitle(d) { return MONTHS[d.getMonth()] + " " + d.getFullYear() }
