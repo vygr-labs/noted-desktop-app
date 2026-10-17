@@ -14,6 +14,8 @@ $root = Split-Path -Parent $PSScriptRoot
 Push-Location $root
 try {
     . (Join-Path $root 'dev-shell.ps1') *> $null
+    # CMake writes warnings to stderr; exit codes decide success, not stderr.
+    $ErrorActionPreference = 'Continue'
     if (-not (Test-Path (Join-Path $root 'build\build.ninja'))) {
         cmake --preset release
         if ($LASTEXITCODE -ne 0) { exit $LASTEXITCODE }

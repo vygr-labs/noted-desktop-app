@@ -163,6 +163,48 @@ ApplicationWindow {
 
     ResizeFrame { window: window }
 
+    // Drop text or markdown files anywhere to open them here. (Images dropped
+    // on a note's text go into the note: its own DropArea takes those.)
+    DropArea {
+        id: fileDrop
+        anchors.fill: parent
+        property bool wanted: false
+        property bool images: false   // image files, onto the open note
+        onEntered: (drag) => {
+            const urls = drag.hasUrls ? drag.urls.map(String) : []
+            images = notePage.active && notePage.takesImages && urls.some(u => App.isImageFile(u))
+            wanted = urls.some(u => Files.canOpen(u))
+            drag.accepted = wanted || images
+        }
+        onExited: wanted = false
+        onDropped: (drop) => {
+            wanted = false
+            const urls = drop.urls.map(String)
+            const paths = urls.filter(u => Files.canOpen(u))
+            const pics = images ? urls.filter(u => App.isImageFile(u)) : []
+            if (pics.length > 0) notePage.dropImages(pics, fileDrop, drop.x, drop.y)
+            if (paths.length > 0) AppState.openFiles(paths)
+            if (pics.length > 0 || paths.length > 0) drop.acceptProposedAction()
+        }
+        Rectangle {
+            visible: fileDrop.wanted
+            anchors.fill: parent
+            anchors.margins: 6
+            radius: 12
+            color: Qt.alpha(Theme.c.accent, 0.06)
+            border.width: 2
+            border.color: Qt.alpha(Theme.c.accent, 0.5)
+            Text {
+                anchors.centerIn: parent
+                textFormat: Text.PlainText
+                text: "Drop to open"
+                color: Theme.c.ink
+                font.pixelSize: 15
+                font.weight: Font.Medium
+            }
+        }
+    }
+
     // ── overlays ────────────────────────────────────────────────────
     QuickFind {
         id: commandPalette

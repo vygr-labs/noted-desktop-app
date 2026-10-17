@@ -38,6 +38,7 @@ Item {
 
     TextEdit {
         id: edit
+        cursorDelegate: Caret { target: edit }
         width: parent.width
         textFormat: TextEdit.PlainText
         wrapMode: TextEdit.Wrap

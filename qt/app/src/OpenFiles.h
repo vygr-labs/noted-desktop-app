@@ -42,6 +42,13 @@ public:
     Q_INVOKABLE QVariantMap note(const QString& id);
     // Writes the editor's text back to disk. Returns false on failure.
     Q_INVOKABLE bool writeText(const QString& id, const QString& text);
+    // Before noted first writes to a file, it keeps a copy of the file as it
+    // was (until the file is closed here). hasOriginal: that copy exists and
+    // differs from the file now. restoreOriginal puts it back.
+    Q_INVOKABLE bool hasOriginal(const QString& id) const;
+    Q_INVOKABLE bool restoreOriginal(const QString& id);
+    // Files that open here when dropped on the window (text, markdown, …).
+    Q_INVOKABLE static bool canOpen(const QString& pathOrUrl);
     bool writeDoc(const QString& id, const QJsonObject& doc);
 
 signals:
@@ -62,6 +69,7 @@ private:
     bool readFile(const QString& path, Format& out) const;
     bool write(const QString& path, const QString& text);
     void persist();
+    QString originalPath(const QString& path) const;
     void onDiskChange(const QString& path);
 
     noted::NoteStore& m_store;

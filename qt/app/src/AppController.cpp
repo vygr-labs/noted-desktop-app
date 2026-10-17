@@ -1,5 +1,7 @@
 #include "AppController.h"
 
+#include "EditorController.h"
+
 #include <QAbstractNativeEventFilter>
 #include <QCoreApplication>
 #include <QDesktopServices>
@@ -362,4 +364,9 @@ bool AppController::nativeHotkey(void* message)
     Q_UNUSED(message)
 #endif
     return false;
+}
+
+bool AppController::isImageFile(const QString& pathOrUrl) const
+{
+    return EditorController::isImageFile(pathOrUrl);
 }

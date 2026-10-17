@@ -4,6 +4,9 @@
 #include <QGuiApplication>
 #include <QJsonObject>
 #include <QKeySequence>
+#include <QMimeData>
+#include <QUrl>
+#include <qpa/qplatformdrag.h>
 #include <QQmlContext>
 #include <QQmlEngine>
 #include <QQmlExpression>
@@ -81,6 +84,16 @@ void DevDriver::next()
         }
     } else if (s.contains(QLatin1String("type"))) {
         for (const QChar ch : s.value(QLatin1String("type")).toString()) key(ch.toUpper().unicode(), Qt::NoModifier, QString(ch));
+    } else if (s.contains(QLatin1String("drop"))) {
+        // {"drop": [x, y], "files": ["C:/…"]}: drag files in and let go.
+        const QJsonArray p = s.value(QLatin1String("drop")).toArray();
+        const QPointF at = native(m_window, QPointF(p.at(0).toDouble(), p.at(1).toDouble()));
+        QList<QUrl> urls;
+        for (const QJsonValue& f : s.value(QLatin1String("files")).toArray()) urls << QUrl::fromLocalFile(f.toString());
+        QMimeData mime;
+        mime.setUrls(urls);
+        QWindowSystemInterface::handleDrag(m_window, &mime, at.toPoint(), Qt::CopyAction, Qt::LeftButton, Qt::NoModifier);
+        QWindowSystemInterface::handleDrop(m_window, &mime, at.toPoint(), Qt::CopyAction, Qt::LeftButton, Qt::NoModifier);
     } else if (s.contains(QLatin1String("eval"))) {
         // Main.qml's own context, so its imports (AppState, Store…) resolve.
         QQmlContext* ctx = qmlContext(m_window.data());

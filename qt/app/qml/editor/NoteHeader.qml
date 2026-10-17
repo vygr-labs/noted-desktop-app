@@ -29,6 +29,7 @@ ColumnLayout {
 
     TextEdit {
         id: title
+        cursorDelegate: Caret { target: title }
         textFormat: TextEdit.PlainText
         visible: header.showTitle
         Layout.fillWidth: true

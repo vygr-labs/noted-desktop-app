@@ -37,6 +37,8 @@ public:
 
     Q_INVOKABLE void openExternal(const QString& url);
     Q_INVOKABLE void revealFile(const QString& path);
+    // A file (path or file:// URL) the editor can show as an image.
+    Q_INVOKABLE bool isImageFile(const QString& pathOrUrl) const;
 
     // format: pdf | doc | html | md | txt. Returns an error string or "".
     Q_INVOKABLE QString exportNote(const QString& noteId, const QString& format, const QUrl& target);

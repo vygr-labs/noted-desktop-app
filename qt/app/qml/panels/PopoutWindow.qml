@@ -100,6 +100,7 @@ Window {
                 }
                 TextEdit {
                     id: plainView
+                    cursorDelegate: Caret { target: plainView }
                     readOnly: true
                     selectByMouse: true
                     visible: win.note.note_type === "plain" && !AppState.isLocked(win.note)

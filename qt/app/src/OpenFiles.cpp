@@ -10,7 +10,9 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QCryptographicHash>
 #include <QSaveFile>
+#include <QStandardPaths>
 #include <QUrl>
 
 namespace {
@@ -87,6 +89,7 @@ void OpenFiles::close(const QString& id)
 {
     const QString path = pathOf(id);
     if (!m_paths.removeOne(path)) return;
+    QFile::remove(originalPath(path));
     m_watcher.removePath(path);
     m_formats.remove(path);
     persist();
@@ -147,10 +150,59 @@ bool OpenFiles::readFile(const QString& path, Format& out) const
     return true;
 }
 
+QString OpenFiles::originalPath(const QString& path) const
+{
+    const QString dir = QStandardPaths::writableLocation(QStandardPaths::AppLocalDataLocation) + QStringLiteral("/file-originals");
+    const QByteArray key = QCryptographicHash::hash(QDir::cleanPath(path).toLower().toUtf8(), QCryptographicHash::Sha1).toHex();
+    return dir + u'/' + QString::fromLatin1(key);
+}
+
+bool OpenFiles::hasOriginal(const QString& id) const
+{
+    const QString path = pathOf(id);
+    QFile orig(originalPath(path)), now(path);
+    if (!m_paths.contains(path) || !orig.open(QIODevice::ReadOnly)) return false;
+    return !now.open(QIODevice::ReadOnly) || orig.readAll() != now.readAll();
+}
+
+bool OpenFiles::restoreOriginal(const QString& id)
+{
+    const QString path = pathOf(id);
+    QFile orig(originalPath(path));
+    if (!m_paths.contains(path) || !orig.open(QIODevice::ReadOnly)) return false;
+    const QByteArray bytes = orig.readAll();
+    QSaveFile file(path);
+    if (!file.open(QIODevice::WriteOnly) || file.write(bytes) < 0 || !file.commit()) {
+        emit writeFailed(id, file.errorString());
+        return false;
+    }
+    if (!m_watcher.files().contains(path)) m_watcher.addPath(path);
+    Format f;
+    if (readFile(path, f)) m_formats.insert(path, f);
+    emit externallyChanged(id);   // the editor shows what's on disk now
+    return true;
+}
+
+bool OpenFiles::canOpen(const QString& pathOrUrl)
+{
+    const QUrl url(pathOrUrl);
+    const QFileInfo info(url.isLocalFile() ? url.toLocalFile() : pathOrUrl);
+    static const QStringList kinds{QStringLiteral("md"), QStringLiteral("markdown"), QStringLiteral("txt"), QStringLiteral("text"),
+                                   QStringLiteral("log"), QStringLiteral("csv"), QStringLiteral("json"), QStringLiteral("yaml"),
+                                   QStringLiteral("yml"), QStringLiteral("toml"), QStringLiteral("ini")};
+    return info.isFile() && kinds.contains(info.suffix().toLower());
+}
+
 bool OpenFiles::write(const QString& path, const QString& text)
 {
     Format& f = m_formats[path];
     if (f.text == text && QFileInfo::exists(path)) return true;
+    // The first time noted changes this file, keep the file as it was.
+    const QString orig = originalPath(path);
+    if (!QFileInfo::exists(orig) && QFileInfo::exists(path)) {
+        QDir().mkpath(QFileInfo(orig).absolutePath());
+        QFile::copy(path, orig);
+    }
     QString out = text;
     if (f.crlf) out.replace(QLatin1Char('\n'), QStringLiteral("\r\n"));
     if (f.bom) out.prepend(QChar(0xFEFF));

@@ -57,6 +57,7 @@ Row {
                 id: winArea
                 anchors.fill: parent
                 hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
                 onClicked: {
                     const w = buttons.window
                     if (btn.modelData === "min") w.showMinimized()

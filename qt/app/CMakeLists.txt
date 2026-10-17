@@ -49,6 +49,7 @@ qt_add_qml_module(noted
         qml/controls/Icon.qml
         qml/controls/IconButton.qml
         qml/controls/Kbd.qml
+        qml/controls/Caret.qml
         qml/controls/MenuRow.qml
         qml/controls/ModalDialog.qml
         qml/controls/PopupMenu.qml

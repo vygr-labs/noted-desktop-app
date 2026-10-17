@@ -76,6 +76,7 @@ Window {
                     clip: true
                     TextEdit {
                         id: input
+                        cursorDelegate: Caret { target: input }
                         width: parent.width
                         wrapMode: TextEdit.Wrap
                         color: Theme.c.text

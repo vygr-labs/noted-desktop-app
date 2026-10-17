@@ -68,6 +68,14 @@ Item {
     function cleanAndFormat() { if (!isPlain) rich.controller.cleanAndFormat() }
     // Image files (paths or URLs) into the open note at its cursor.
     function insertImages(files) { return isPlain || locked ? 0 : rich.controller.insertImageFiles(files) }
+    // Dropped on the window at (x, y) in `from`: where the text is, or the cursor.
+    readonly property bool takesImages: hasNote && !isPlain && !locked && !inTrash
+    function dropImages(files, from, x, y) {
+        if (!takesImages) return 0
+        const p = from.mapToItem(rich.textEdit, x, y)
+        const inside = p.x >= -40 && p.x <= rich.textEdit.width + 40 && p.y >= 0 && p.y <= rich.textEdit.height
+        return rich.controller.insertImageFiles(files, inside ? rich.textEdit.positionAt(p.x, p.y) : -1)
+    }
 
     function loadCurrent(force) {
         if (!hasNote) {
@@ -101,6 +109,9 @@ Item {
     }
 
     onHasNoteChanged: loadCurrent(false)
+    // selectedNoteId changes before currentNote catches up, so going from one
+    // note straight to another is only seen here.
+    onNoteChanged: loadCurrent(false)
     Connections {
         target: AppState
         function onSelectedNoteIdChanged() { pane.loadCurrent(false) }
@@ -162,6 +173,23 @@ Item {
     }
 
     PopupMenu { id: menu }
+    ModalDialog {
+        id: restoreDialog
+        title: "Restore " + (pane.note.title || "this file") + "?"
+        description: "The file goes back to how it was before noted first changed it. What’s in it now is replaced."
+        footer: [
+            TextButton { text: "Cancel"; onClicked: restoreDialog.close() },
+            TextButton {
+                text: "Restore"
+                variant: "destructive"
+                onClicked: {
+                    restoreDialog.close()
+                    pane.flush()
+                    AppState.toast(Files.restoreOriginal(pane.note.id) ? "Restored" : "Couldn’t restore the file")
+                }
+            }
+        ]
+    }
     PopoutManager { id: popouts }
     function popOut(id) { popouts.openNote(id) }
 
@@ -195,6 +223,7 @@ Item {
             { separator: true },
             { text: "Show in folder", action: () => App.revealFile(n.file_path) },
             { text: "Copy into notes", action: () => AppState.copyFileToNotes(n.id) },
+            { text: "Restore the version you opened…", disabled: !Files.hasOriginal(n.id), action: () => restoreDialog.open() },
             { separator: true },
             { text: "Close file", action: () => AppState.closeFile(n.id) }
         ]

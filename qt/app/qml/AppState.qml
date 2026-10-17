@@ -256,8 +256,11 @@ QtObject {
         view = v
         viewId = id
         if (selectedNoteId !== noteId) {
-            selectedNoteId = noteId
-            refreshCurrent()
+            // The note first, then its id: anything reacting to the id sees it.
+            const n = noteId ? noteData(noteId) : ({})
+            currentNote = n.id ? n : ({})
+            currentTags = n.id && !n.is_file ? Store.tagsForNote(noteId) : []
+            selectedNoteId = n.id ? noteId : ""
         }
         findOpen = false
         if (!_navigating) {

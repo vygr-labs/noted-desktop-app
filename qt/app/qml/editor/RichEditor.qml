@@ -44,6 +44,7 @@ Item {
 
     TextEdit {
         id: edit
+        cursorDelegate: Caret { target: edit }
         width: parent.width
         textFormat: TextEdit.RichText
         wrapMode: TextEdit.Wrap
@@ -64,7 +65,9 @@ Item {
         // line's extra space above its text, so line 0's caret sits lower than y 0.
         Text {
             textFormat: Text.PlainText
-            visible: ctl.empty && !edit.activeFocus || (ctl.empty && edit.length <= 1)
+            // Only on a truly empty page: spaces or an empty list item hide it,
+            // so the caret never sits inside the hint's words.
+            visible: edit.length === 0 && ctl.listKind < 0
             text: root.placeholder
             color: Theme.c.placeholder
             x: 1

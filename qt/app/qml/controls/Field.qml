@@ -6,6 +6,7 @@ import Noted
 // turns the border to the accent.
 TextField {
     id: field
+    cursorDelegate: Caret { target: field }
     property bool mono: false
     property string leadingIcon: ""
     property bool error: false
