@@ -58,8 +58,8 @@ QtObject {
     ]
     property string accentChoice: "#2F5AC8"
     readonly property bool inkAccent: accentChoice.toUpperCase() === "#1B1B1A"
-    // The logo's red-orange, for the wordmark's full stop only; not an accent.
-    readonly property color brand: dark ? "#FF7A45" : "#E0410C"
+    // The logo's terracotta, for the wordmark's full stop only; not an accent.
+    readonly property color brand: dark ? "#E0805A" : "#B8502A"
     readonly property color accent: !dark ? accentChoice : (inkAccent ? darkTokens.ink : mix(accentChoice, "#FFFFFF", 0.22))
     readonly property color accentInk: dark && inkAccent ? darkTokens.bg : "#FFFFFF"
     readonly property color selection: Qt.alpha(accent, dark ? 0.34 : 0.2)
