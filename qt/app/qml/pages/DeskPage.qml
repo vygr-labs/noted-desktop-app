@@ -42,7 +42,12 @@ PageColumns {
         target: Store
         function onNotesChanged() { if (desk.active) reloadLater.restart() }
         function onNoteChanged(id) { if (id === desk.daily.id) desk.daily = Store.note(id) }
-        function onExternalChange() { if (desk.active && !editor.controller.dirty) { desk.daily = ({}); desk.loadDaily() } }
+        // Changed elsewhere (sync, noted-cli): new text in place, caret kept.
+        function onExternalChange() {
+            if (!desk.active || editor.controller.dirty) return
+            desk.daily = Store.dailyNote(AppState.todayIso)
+            editor.controller.refresh(desk.daily.id, desk.daily.content || "")
+        }
     }
     Connections {
         target: AppState

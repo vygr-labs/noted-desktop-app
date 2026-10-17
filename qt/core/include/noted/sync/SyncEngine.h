@@ -21,6 +21,7 @@
 // notes travel through both.
 
 #include <QDateTime>
+#include <QFileSystemWatcher>
 #include <QFutureWatcher>
 #include <QObject>
 #include <QSet>
@@ -128,7 +129,9 @@ private:
     QVariantList m_devices;
     bool m_busy = false;
     bool m_pulling = false;
-    QTimer m_debounce, m_poll;
+    QTimer m_debounce, m_poll, m_arrived;
+    QFileSystemWatcher m_watcher;  // the other computers' folders: read as soon as a file lands
+    void watch();
     qint64 m_firstPending = 0;
     QSet<QString> m_missingAttachments;
     bool m_scanAttachments = true;  // look for every image notes use, not just changed ones

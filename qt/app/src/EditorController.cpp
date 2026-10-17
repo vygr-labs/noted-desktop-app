@@ -26,6 +26,7 @@
 #include <QTextTable>
 
 #include "noted/NoteStore.h"
+#include "noted/sync/Merge.h"
 #include "noted/doc/Export.h"
 #include "noted/doc/Schema.h"
 #include "noted/doc/TipTap.h"
@@ -203,9 +204,59 @@ void EditorController::setPalette(const QVariantMap& p)
 
 void EditorController::load(const QString& noteId, const QString& json)
 {
-    QTextDocument* d = doc();
-    if (!d) return;
+    if (!doc()) return;
     flush();
+    build(noteId, json);
+    // Inserting the content dragged the view's caret to the end; start at the top.
+    emit requestCursor(0, 0);
+    updateFormatState();
+}
+
+bool EditorController::refresh(const QString& noteId, const QString& json)
+{
+    QTextDocument* d = doc();
+    if (!d) return false;
+    if (noteId != m_noteId) { load(noteId, json); return true; }
+    if (m_dirty || json == m_json) return false;
+    // Where the caret is, by block and offset, so it can be found again in
+    // the new text: unchanged blocks are matched up, and in a block that
+    // changed it keeps its distance from whichever end didn't.
+    QStringList before;
+    QList<int> beforeAt;
+    for (QTextBlock b = d->begin(); b.isValid(); b = b.next()) { before << b.text(); beforeAt << b.position(); }
+    const int anchor = m_cursor == m_selEnd ? m_selStart : m_selEnd;
+    const int caret = m_cursor;
+    build(noteId, json);
+    QStringList after;
+    QList<int> afterAt;
+    for (QTextBlock b = d->begin(); b.isValid(); b = b.next()) { after << b.text(); afterAt << b.position(); }
+    const auto pairs = sync::matchBlocks(before, after);
+    auto map = [&](int pos) {
+        int bi = 0;
+        while (bi + 1 < beforeAt.size() && beforeAt[bi + 1] <= pos) ++bi;
+        const int off = pos - beforeAt.value(bi);
+        int bj = -1, lastI = -1, lastJ = -1;
+        for (const auto& [i, j] : pairs) {
+            if (i == bi) { bj = j; break; }
+            if (i < bi) { lastI = i; lastJ = j; }
+        }
+        if (bj >= 0) return afterAt[bj] + std::min(off, int(after[bj].size()));
+        bj = std::clamp(lastJ + (bi - lastI), 0, int(after.size()) - 1);
+        const QString &o = before.value(bi), &n = after[bj];
+        int prefix = 0;
+        while (prefix < o.size() && prefix < n.size() && o[prefix] == n[prefix]) ++prefix;
+        const int inBlock = off <= prefix ? off : std::clamp(off + int(n.size() - o.size()), prefix, int(n.size()));
+        return afterAt[bj] + inBlock;
+    };
+    const int end = std::max(0, d->characterCount() - 1);
+    emit requestCursor(std::min(map(caret), end), std::min(map(anchor), end));
+    updateFormatState();
+    return true;
+}
+
+void EditorController::build(const QString& noteId, const QString& json)
+{
+    QTextDocument* d = doc();
     QElapsedTimer t;
     t.start();
     // Drop the old note's overlays first: they hold positions in its text.
@@ -226,6 +277,7 @@ void EditorController::load(const QString& noteId, const QString& json)
     d->clearUndoRedoStacks();
     d->setModified(false);
     m_loading = false;
+    m_json = json;
     if (t.elapsed() > 40)
         qInfo().noquote() << "slow note load" << noteId << json.size() << "bytes: build" << parsed << "ms, style"
                           << t.elapsed() - parsed << "ms";
@@ -243,9 +295,6 @@ void EditorController::load(const QString& noteId, const QString& json)
     recomputeStats();
     if (!m_findQuery.isEmpty()) rebuildFind();
     rebuildDecorations();
-    // Inserting the content dragged the view's caret to the end; start at the top.
-    emit requestCursor(0, 0);
-    updateFormatState();
 }
 
 void EditorController::unload()
@@ -319,7 +368,8 @@ void EditorController::save()
         if (!m_files || !m_files->writeDoc(m_noteId, j)) return;  // stays dirty; the next edit retries
     } else {
         if (!m_store) return;
-        m_store->updateNote(m_noteId, {{"content", doc::stringify(j)}, {"content_plain", doc::toPlainText(j)}});
+        m_json = doc::stringify(j);
+        m_store->updateNote(m_noteId, {{"content", m_json}, {"content_plain", doc::toPlainText(j)}});
     }
     m_dirty = false;
     emit dirtyChanged();

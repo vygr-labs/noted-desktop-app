@@ -10,6 +10,9 @@
 #include <QString>
 #include <QStringList>
 
+#include <utility>
+#include <vector>
+
 namespace noted::sync {
 
 // A body cut into blocks, keeping the exact text around them, so joining it
@@ -33,6 +36,9 @@ QStringList merge3(const QStringList& base, const QStringList& a, const QStringL
 QStringList merge2(const QStringList& a, const QStringList& b, bool firstIsA);
 
 QString mergeContent(const QString* base, const QString& a, const QString& b, bool firstIsA, bool plain);
+
+// Pairs (i, j) of blocks a[i] == b[j] in a longest common run, in order.
+std::vector<std::pair<int, int>> matchBlocks(const QStringList& a, const QStringList& b);
 
 // A compact edit script turning `from` into `to`: [n] keeps n blocks,
 // [-n] drops n, ["block", ...] inserts. Small when an edit touches one block

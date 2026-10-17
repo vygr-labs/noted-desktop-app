@@ -62,11 +62,19 @@ SyncEngine::SyncEngine(Database& db, NoteStore& store, QObject* parent)
         return plain ? content : NoteStore::plainFromContent(content);
     }))
 {
+    // Near-live: edits go out a second after typing stops (the editor saves
+    // 600 ms after the last key), and files from elsewhere are read as soon
+    // as the cloud drive puts them in the folder. The poll is the fallback
+    // for folders that don't report changes (some network shares).
     m_debounce.setSingleShot(true);
-    m_debounce.setInterval(3000);
+    m_debounce.setInterval(1000);
     connect(&m_debounce, &QTimer::timeout, this, &SyncEngine::publish);
-    m_poll.setInterval(20000);
+    m_poll.setInterval(15000);
     connect(&m_poll, &QTimer::timeout, this, &SyncEngine::pull);
+    m_arrived.setSingleShot(true);
+    m_arrived.setInterval(250);  // a cloud drive often writes a file in steps
+    connect(&m_arrived, &QTimer::timeout, this, &SyncEngine::pull);
+    connect(&m_watcher, &QFileSystemWatcher::directoryChanged, &m_arrived, qOverload<>(&QTimer::start));
     connect(&m_reader, &QFutureWatcher<QList<Pulled>>::finished, this, [this] { finishPull(m_reader.result()); });
 
     for (auto sig : {&NoteStore::notesChanged, &NoteStore::listsChanged, &NoteStore::tagsChanged, &NoteStore::todosChanged,
@@ -252,6 +260,7 @@ void SyncEngine::turnOff()
         if (m_spaces.isEmpty()) {
             m_ledger->uninstall();
             m_poll.stop();
+            if (!m_watcher.directories().isEmpty()) m_watcher.removePaths(m_watcher.directories());
             m_status = QStringLiteral("off");
         }
     } catch (const db::Error& e) {
@@ -355,6 +364,7 @@ void SyncEngine::stopSharing(const QString& listId)
         if (m_spaces.isEmpty()) {
             m_ledger->uninstall();
             m_poll.stop();
+            if (!m_watcher.directories().isEmpty()) m_watcher.removePaths(m_watcher.directories());
             m_status = QStringLiteral("off");
         }
     } catch (const db::Error& e) {
@@ -378,8 +388,8 @@ void SyncEngine::schedule()
     if (m_spaces.isEmpty()) return;
     const qint64 now = QDateTime::currentMSecsSinceEpoch();
     if (!m_firstPending) m_firstPending = now;
-    // Typing for a long stretch still goes out every 20 seconds.
-    if (now - m_firstPending > 20000) publish();
+    // Typing for a long stretch still goes out every 8 seconds.
+    if (now - m_firstPending > 8000) publish();
     else m_debounce.start();
 }
 
@@ -510,9 +520,31 @@ QList<SyncEngine::Pulled> SyncEngine::read(const QList<Space>& spaces, const QSt
     return out;
 }
 
+void SyncEngine::watch()
+{
+    QStringList want;
+    for (const Space& s : m_spaces) {
+        const QString devices = s.root + QStringLiteral("/devices");
+        if (!QFileInfo::exists(devices)) continue;
+        want << devices;  // a new computer
+        for (const QString& dev : QDir(devices).entryList(QDir::Dirs | QDir::NoDotAndDotDot))
+            if (dev != m_me) want << devices + QLatin1Char('/') + dev;
+    }
+    const QStringList have = m_watcher.directories();
+    QStringList gone;
+    for (const QString& d : have)
+        if (!want.contains(d)) gone << d;
+    if (!gone.isEmpty()) m_watcher.removePaths(gone);
+    QStringList added;
+    for (const QString& d : want)
+        if (!have.contains(d)) added << d;
+    if (!added.isEmpty()) m_watcher.addPaths(added);
+}
+
 void SyncEngine::pull()
 {
-    if (m_pulling || m_spaces.isEmpty()) return;
+    if (m_pulling) { m_arrived.start(); return; }  // try again once this one's done
+    if (m_spaces.isEmpty()) return;
     m_pulling = true;
     m_reader.setFuture(QtConcurrent::run(&SyncEngine::read, m_spaces, m_me));
 }
@@ -520,6 +552,7 @@ void SyncEngine::pull()
 void SyncEngine::finishPull(const QList<Pulled>& pulled)
 {
     m_pulling = false;
+    watch();
     QString unreachable;
     QSet<QString> own;
     if (const Space* lib = library())

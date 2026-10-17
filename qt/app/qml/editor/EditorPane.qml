@@ -140,7 +140,7 @@ Item {
         // noted-cli (or another instance) wrote to the database.
         function onExternalChange() {
             if (!pane.hasNote) return
-            if (!rich.controller.dirty && !plain.dirty) pane.loadCurrent(true)
+            if (!rich.controller.dirty && !plain.dirty) pane.refreshCurrent()
         }
     }
     Connections {
@@ -152,6 +152,15 @@ Item {
             if (rich.controller.dirty || plain.dirty) AppState.toast(pane.note.title + " changed on disk; your edits here will replace it")
             else pane.loadCurrent(true)
         }
+    }
+    // The open note changed elsewhere: its new text in place, caret and
+    // scroll kept. Anything more (a lock, a change of type) loads it afresh.
+    readonly property alias editor: rich  // for --drive checks
+    function refreshCurrent() {
+        const n = AppState.noteData(note.id)
+        if (locked || loadedId !== n.id || (n.note_type === "plain") !== isPlain) { loadCurrent(true); return }
+        if (isPlain) plain.refresh(n.id, n.content || "")
+        else rich.controller.refresh(n.id, n.content || "")
     }
     onIsPlainChanged: if (hasNote) loadCurrent(true)
     onLockedChanged: loadCurrent(true)

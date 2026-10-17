@@ -59,6 +59,8 @@ QStringList both(const QStringList& first, const QStringList& second)
 
 }  // namespace
 
+std::vector<std::pair<int, int>> matchBlocks(const QStringList& a, const QStringList& b) { return lcs(a, b); }
+
 Body splitBody(const QString& content, bool plain)
 {
     Body b;

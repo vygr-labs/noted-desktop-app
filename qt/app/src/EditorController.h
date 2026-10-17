@@ -135,6 +135,9 @@ public:
     // ── lifecycle ────────────────────────────────────────────────────
     // Loads a rich note (TipTap JSON). Flushes any pending save first.
     Q_INVOKABLE void load(const QString& noteId, const QString& json);
+    // The same note changed elsewhere (sync): show the new text, keeping the
+    // caret and selection where they were in it. False when nothing changed.
+    Q_INVOKABLE bool refresh(const QString& noteId, const QString& json);
     Q_INVOKABLE void unload();
     Q_INVOKABLE bool flush();                 // save now if dirty; true if a save happened
     Q_INVOKABLE QString json() const;
@@ -256,6 +259,8 @@ private:
     noted::doc::Styler m_styler;
     QVariantMap m_paletteMap;
     QString m_noteId;
+    QString m_json;  // what's loaded, or was last saved
+    void build(const QString& noteId, const QString& json);
     int m_cursor = 0, m_selStart = 0, m_selEnd = 0;
     Fmt m_fmt;
     int m_words = 0;
