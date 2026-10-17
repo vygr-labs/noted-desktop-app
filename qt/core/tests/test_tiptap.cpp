@@ -26,6 +26,7 @@ private slots:
     void markdownImport();
     void enterInListCreatesNewItem();
     void scryptMatchesNode();
+    void imagesRoundTrip();
 };
 
 namespace {
@@ -144,6 +145,21 @@ void TestTipTap::scryptMatchesNode()
                             "4c64ed4f2ccc65812c72bae6152efc3b2082ced12f67bf7d0fdaa5e5c32f16fd"));
 }
 
+
+void TestTipTap::imagesRoundTrip()
+{
+    // Between paragraphs, after a heading, and with alt text kept; text typed
+    // next to an image comes back as a paragraph after it.
+    const QJsonObject in = j(R"({"type":"doc","content":[
+        {"type":"paragraph","content":[{"type":"text","text":"before"}]},
+        {"type":"image","attrs":{"src":"attachment:abc.png","alt":"a cat","title":null}},
+        {"type":"heading","attrs":{"level":2},"content":[{"type":"text","text":"Then"}]},
+        {"type":"image","attrs":{"src":"https://example.com/x.jpg"}},
+        {"type":"paragraph","content":[{"type":"text","text":"after"}]}]})");
+    QCOMPARE(roundTrip(in), in);
+    QVERIFY(doc::toMarkdown(in).contains(QStringLiteral("![a cat](")));
+    QCOMPARE(doc::toPlainText(in).contains(QStringLiteral("attachment")), false);
+}
 
 QTEST_MAIN(TestTipTap)
 #include "test_tiptap.moc"

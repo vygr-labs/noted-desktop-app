@@ -9,6 +9,7 @@ QtObject {
 
     readonly property var map: ({
         "calendar": "\ue063",
+        "image": "\ue0f6",
         "sliders-horizontal": "\ue29a",
         "users": "\ue1a4",
         "file": "\ue0c0",

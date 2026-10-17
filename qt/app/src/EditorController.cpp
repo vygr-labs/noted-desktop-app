@@ -2,6 +2,14 @@
 
 #include <QClipboard>
 #include <QDate>
+#include <QDir>
+#include <QFile>
+#include <QFileInfo>
+#include <QImage>
+#include <QImageReader>
+#include <QJsonArray>
+#include <QUrl>
+#include <QUuid>
 #include <QElapsedTimer>
 #include <QGuiApplication>
 #include <QJsonDocument>
@@ -1556,6 +1564,80 @@ bool EditorController::clickAt(int position, qreal x, qreal lineX)
 
 // ── clipboard ─────────────────────────────────────────────────────────────
 
+namespace {
+
+QString localPath(const QString& pathOrUrl)
+{
+    const QUrl u(pathOrUrl);
+    return u.isLocalFile() ? u.toLocalFile() : pathOrUrl;
+}
+
+// Saves into the attachments folder; returns the node src ("attachment:…"),
+// or an empty string if it couldn't be written.
+QString attachmentName(const QString& ext)
+{
+    return QUuid::createUuid().toString(QUuid::WithoutBraces).remove(u'-') + u'.' + ext;
+}
+QString storeImage(const QImage& img)
+{
+    if (img.isNull() || !QDir().mkpath(doc::attachmentDir())) return {};
+    const QString name = attachmentName(QStringLiteral("png"));
+    return img.save(QDir(doc::attachmentDir()).filePath(name), "PNG") ? QStringLiteral("attachment:") + name : QString();
+}
+QString storeImageFile(const QString& path)
+{
+    if (!QDir().mkpath(doc::attachmentDir())) return {};
+    QString ext = QFileInfo(path).suffix().toLower();
+    if (ext.isEmpty()) ext = QString::fromLatin1(QImageReader::imageFormat(path));
+    const QString name = attachmentName(ext);
+    return QFile::copy(path, QDir(doc::attachmentDir()).filePath(name)) ? QStringLiteral("attachment:") + name : QString();
+}
+
+QJsonObject imagesDoc(const QStringList& srcs)
+{
+    QJsonArray blocks;
+    for (const QString& s : srcs)
+        blocks.append(QJsonObject{{QStringLiteral("type"), QStringLiteral("image")},
+                                  {QStringLiteral("attrs"), QJsonObject{{QStringLiteral("src"), s}}}});
+    return QJsonObject{{QStringLiteral("type"), QStringLiteral("doc")}, {QStringLiteral("content"), blocks}};
+}
+
+}  // namespace
+
+bool EditorController::isImageFile(const QString& pathOrUrl)
+{
+    const QString p = localPath(pathOrUrl);
+    return QFileInfo(p).isFile() && !QImageReader::imageFormat(p).isEmpty();
+}
+
+int EditorController::insertImageFiles(const QStringList& files, int position)
+{
+    QTextDocument* d = doc();
+    if (!d || m_noteId.isEmpty()) return 0;
+    QStringList srcs;
+    for (const QString& f : files) {
+        if (!isImageFile(f)) continue;
+        const QString src = storeImageFile(localPath(f));
+        if (!src.isEmpty()) srcs << src;
+    }
+    if (srcs.isEmpty()) return 0;
+    QTextCursor c = position >= 0 ? QTextCursor(d) : selectionCursor();
+    if (position >= 0) c.setPosition(qBound(0, position, d->characterCount() - 1));
+    if (codeFrameAt(c) || c.currentTable()) return 0;
+    c.beginEditBlock();
+    if (c.hasSelection()) c.removeSelectedText();
+    const int from = c.block().position();
+    doc::insert(c, imagesDoc(srcs));
+    c.endEditBlock();
+    // The block after the images takes a new gap above it: restyle through it.
+    const QTextBlock after = c.block().next();
+    m_pendingFrom = m_pendingFrom < 0 ? from : qMin(m_pendingFrom, from);
+    m_pendingTo = qMax(m_pendingTo, after.isValid() ? after.position() + after.length() : c.position() + 1);
+    m_restyleTimer.start();
+    emitCursor(c);
+    return int(srcs.size());
+}
+
 void EditorController::paste(bool plainOnly)
 {
     QTextDocument* d = doc();
@@ -1588,6 +1670,17 @@ void EditorController::paste(bool plainOnly)
     } else if (mime->hasFormat(kNotedMime)) {
         QJsonObject j = doc::parse(QString::fromUtf8(mime->data(kNotedMime)));
         doc::insert(c, j);
+    } else if (mime->hasImage() && !qvariant_cast<QImage>(mime->imageData()).isNull()) {
+        // A screenshot or a copied image: saved beside the database.
+        const QString src = storeImage(qvariant_cast<QImage>(mime->imageData()));
+        if (!src.isEmpty()) doc::insert(c, imagesDoc({src}));
+    } else if (mime->hasUrls() && std::all_of(mime->urls().cbegin(), mime->urls().cend(),
+                                              [](const QUrl& u) { return isImageFile(u.toString()); })) {
+        // Image files copied in Explorer.
+        QStringList srcs;
+        for (const QUrl& u : mime->urls())
+            if (const QString s = storeImageFile(u.toLocalFile()); !s.isEmpty()) srcs << s;
+        if (!srcs.isEmpty()) doc::insert(c, imagesDoc(srcs));
     } else if (!text.isEmpty() && doc::looksLikeMarkdown(text)) {
         doc::insert(c, doc::fromMarkdown(text));
         structured = true;

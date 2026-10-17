@@ -1,5 +1,7 @@
 #include "noted/doc/TipTap.h"
 
+#include <QDir>
+#include <QFileInfo>
 #include <QFont>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -11,6 +13,7 @@
 #include <QTextFrame>
 #include <QTextList>
 #include <QTextTable>
+#include <QUrl>
 
 #include <memory>
 #include <vector>
@@ -20,6 +23,12 @@
 namespace noted::doc {
 
 namespace {
+
+QString& attachmentDirRef()
+{
+    static QString dir;
+    return dir;
+}
 
 const QString kType = QStringLiteral("type");
 const QString kAttrs = QStringLiteral("attrs");
@@ -87,6 +96,8 @@ private:
         const QString type = n.value(kType).toString();
         if (type == u"paragraph" || type == u"heading" || type == u"horizontalRule") {
             leaf(n);
+        } else if (type == u"image") {
+            image(n);
         } else if (type == u"codeBlock") {
             codeBlock(n);
         } else if (isListType(type)) {
@@ -248,6 +259,24 @@ private:
         }
         placeLeaf(bf);
         if (type != u"horizontalRule") inlines(n.value(kContent).toArray());
+    }
+
+    // An image node: its own block holding one image character.
+    void image(const QJsonObject& n)
+    {
+        const QJsonObject attrs = n.value(kAttrs).toObject();
+        QTextBlockFormat bf;
+        bf.setProperty(BlockKind, ImageBlock);
+        if (n.contains(kAttrs)) bf.setProperty(BlockNodeAttrs, compact(attrs));
+        placeLeaf(bf);
+        const QString src = attrs.value(QStringLiteral("src")).toString();
+        QTextImageFormat img;
+        img.setName(imageUrl(src));
+        img.setProperty(ImageSrc, src);
+        // Its own size, never wider than the column (it keeps its proportions).
+        img.setMaximumWidth(QTextLength(QTextLength::PercentageLength, 100));
+        if (const int w = attrs.value(QStringLiteral("width")).toInt(0); w > 0) img.setWidth(w);
+        m_cur.insertImage(img);
     }
 
     // Leaves the cursor in a fresh scaffold block after `frame`.
@@ -430,7 +459,9 @@ struct Node {
         } else {
             QJsonArray arr;
             for (const auto& k : kids) arr.append(k->toJson());
-            if (!arr.isEmpty() || o.value(kType).toString() != u"horizontalRule") o.insert(kContent, arr);
+            // Atoms (rule, image) have no content key at all.
+            const QString t = o.value(kType).toString();
+            if (!arr.isEmpty() || (t != u"horizontalRule" && t != u"image")) o.insert(kContent, arr);
         }
         return o;
     }
@@ -656,7 +687,20 @@ private:
             attrs.insert(QStringLiteral("level"), bf.headingLevel());
         } else if (kind == HorizontalRule) {
             lo.insert(kType, QStringLiteral("horizontalRule"));
+        } else if (kind == ImageBlock && !imageSrc(b).isNull()) {
+            attrs.insert(QStringLiteral("src"), imageSrc(b));
+            lo.insert(kType, QStringLiteral("image"));
+            lo.insert(kAttrs, attrs);
+            parent->add(lo);   // a leaf with no content key; any text typed beside it follows as a paragraph
+            const QJsonArray rest = inlines(b, false);
+            if (!rest.isEmpty()) {
+                Node* p = parent->add(QJsonObject{{kType, QStringLiteral("paragraph")}});
+                p->isLeaf = true;
+                p->inlines = rest;
+            }
+            return;
         } else {
+            if (kind == ImageBlock) attrs = {};   // the image was deleted: plain text is left
             lo.insert(kType, QStringLiteral("paragraph"));
         }
         if (!attrs.isEmpty()) lo.insert(kAttrs, attrs);
@@ -667,6 +711,19 @@ private:
         } else {
             leaf->isLeaf = false;  // horizontalRule has no content key at all
         }
+    }
+
+    // The src of the first image character in the block (null if none).
+    static QString imageSrc(const QTextBlock& b)
+    {
+        for (auto it = b.begin(); !it.atEnd(); ++it) {
+            const QTextCharFormat cf = it.fragment().charFormat();
+            if (cf.isImageFormat()) {
+                const QString s = cf.property(ImageSrc).toString();
+                return s.isEmpty() ? cf.toImageFormat().name() : s;
+            }
+        }
+        return QString();
     }
 
     void addCode(Node* parent, const QString& text, const QJsonObject& attrs)
@@ -789,6 +846,7 @@ private:
             }
             const QString text = frag.text().mid(fs - frag.position(), fe - fs);
             const QTextCharFormat cf = frag.charFormat();
+            if (cf.isImageFormat()) continue;   // images are their own nodes (see addBlock)
 
             if (cf.boolProperty(InlineCheckbox)) {
                 flush();
@@ -898,6 +956,18 @@ private:
 // ════════════════════════════════════════════════════════════════════════
 //  Public API
 // ════════════════════════════════════════════════════════════════════════
+
+void setAttachmentDir(const QString& dir) { attachmentDirRef() = dir; }
+QString attachmentDir() { return attachmentDirRef(); }
+
+QString imageUrl(const QString& src)
+{
+    if (src.startsWith(QLatin1String("attachment:")))
+        return QUrl::fromLocalFile(QDir(attachmentDirRef()).filePath(src.mid(11))).toString();
+    const QUrl u(src);
+    if (u.scheme().size() > 1) return src;   // http(s), data, file (one letter is a drive)
+    return QUrl::fromLocalFile(QFileInfo(src).absoluteFilePath()).toString();
+}
 
 QJsonObject emptyDoc()
 {

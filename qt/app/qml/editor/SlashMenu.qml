@@ -28,6 +28,7 @@ Popup {
         { kind: "quote", label: "Quote", md: ">", glyph: "“", aliases: "blockquote" },
         { kind: "code", label: "Code block", md: "```", glyph: "{ }", aliases: "snippet pre" },
         { kind: "table", label: "Table", md: "", icon: "table", aliases: "grid columns" },
+        { kind: "image", label: "Image", md: "", icon: "image", aliases: "picture photo screenshot img" },
         { kind: "hr", label: "Divider", md: "---", glyph: "—", aliases: "rule line hr separator" }
     ]
     readonly property var items: {

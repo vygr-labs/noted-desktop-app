@@ -64,6 +64,8 @@ Item {
         plain.flush()
     }
     function cleanAndFormat() { if (!isPlain) rich.controller.cleanAndFormat() }
+    // Image files (paths or URLs) into the open note at its cursor.
+    function insertImages(files) { return isPlain || locked ? 0 : rich.controller.insertImageFiles(files) }
 
     function loadCurrent(force) {
         if (!hasNote) {

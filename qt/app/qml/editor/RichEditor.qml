@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls.Basic
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import Noted
 import "../Fmt.js" as Fmt
 
@@ -359,8 +360,31 @@ Item {
         case "code": if (!ctl.inCodeBlock) ctl.toggleCodeBlock(); break
         case "table": ctl.insertTable(3, 3); break
         case "hr": ctl.insertHorizontalRule(); break
+        case "image": imageDialog.open(); return
         }
         edit.forceActiveFocus()
+    }
+
+    FileDialog {
+        id: imageDialog
+        title: "Add an image"
+        fileMode: FileDialog.OpenFiles
+        nameFilters: ["Images (*.png *.jpg *.jpeg *.gif *.webp *.bmp)", "All files (*)"]
+        onAccepted: {
+            if (ctl.insertImageFiles(selectedFiles.map(String)) === 0) AppState.toast("That file isn’t an image noted can show")
+            edit.forceActiveFocus()
+        }
+        onRejected: edit.forceActiveFocus()
+    }
+    // Drop image files onto the page to add them where they land.
+    DropArea {
+        anchors.fill: edit
+        enabled: !root.readOnly
+        onEntered: (drag) => { drag.accepted = drag.hasUrls && drag.urls.some(u => ctl.isImageFile(String(u))) }
+        onDropped: (drop) => {
+            const n = ctl.insertImageFiles(drop.urls.map(String), edit.positionAt(drop.x, drop.y))
+            if (n > 0) { drop.acceptProposedAction(); edit.forceActiveFocus() }
+        }
     }
 
     DuePicker {

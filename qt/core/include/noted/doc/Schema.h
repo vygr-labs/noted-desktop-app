@@ -34,6 +34,9 @@ enum Property : int {
     InlineCheckboxChecked,
     // Search/find decorations — never exported.
     FindMatch,
+    // On an image's character (QTextImageFormat): the node's src as stored,
+    // e.g. "attachment:3f…c1.png"; the format's name is where it's loaded from.
+    ImageSrc,
 
     // ── block ───────────────────────────────────────────────────────
     // Headings use the native headingLevel, blockquotes the native
@@ -69,6 +72,7 @@ enum BlockKindValue : int {
     Paragraph = 0,
     Heading = 1,
     HorizontalRule = 3,
+    ImageBlock = 4,   // a TipTap `image` node: one image character, attrs in BlockNodeAttrs
 };
 
 enum FrameKindValue : int {

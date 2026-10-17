@@ -184,6 +184,11 @@ public:
 
     // ── clipboard ────────────────────────────────────────────────────
     Q_INVOKABLE void paste(bool plainOnly = false);
+    // Copies image files (paths or file:// URLs) into the attachments folder
+    // and inserts them as image blocks at `position` (-1: the cursor).
+    // Returns how many went in.
+    Q_INVOKABLE int insertImageFiles(const QStringList& files, int position = -1);
+    Q_INVOKABLE static bool isImageFile(const QString& pathOrUrl);
     Q_INVOKABLE void copy(const QString& as = QStringLiteral("rich"));  // rich | markdown | plain
     Q_INVOKABLE void cut();
 

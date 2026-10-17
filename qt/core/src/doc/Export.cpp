@@ -2,6 +2,9 @@
 
 #include <QJsonArray>
 #include <QStringList>
+#include <QUrl>
+
+#include "noted/doc/TipTap.h"
 
 namespace noted::doc {
 
@@ -170,6 +173,10 @@ QString mdBlocks(const QJsonArray& blocks, const QString& indent)
             parts << lines.join(QLatin1Char('\n'));
         } else if (t == u"horizontalRule") {
             parts << QStringLiteral("---");
+        } else if (t == u"image") {
+            const QJsonObject a = n.value(kAttrs).toObject();
+            parts << QStringLiteral("![%1](%2)").arg(a.value(QStringLiteral("alt")).toString(),
+                                                    QUrl(imageUrl(a.value(QStringLiteral("src")).toString())).toString(QUrl::FullyEncoded));
         } else if (t == u"table") {
             QString tbl = mdTable(n);
             tbl.chop(1);
@@ -242,6 +249,9 @@ QString htmlNode(const QJsonObject& n)
     }
     if (t == u"blockquote") return QStringLiteral("<blockquote>%1</blockquote>").arg(kids);
     if (t == u"horizontalRule") return QStringLiteral("<hr>");
+    if (t == u"image")
+        return QStringLiteral("<p><img src=\"%1\" alt=\"%2\" style=\"max-width:100%\"></p>")
+            .arg(escapeHtml(imageUrl(a.value(QStringLiteral("src")).toString())), escapeHtml(a.value(QStringLiteral("alt")).toString()));
     if (t == u"hardBreak") return QStringLiteral("<br>");
     if (t == u"inlineCheckbox")
         return a.value(QStringLiteral("checked")).toBool() ? QStringLiteral("<input type=\"checkbox\" checked disabled>")

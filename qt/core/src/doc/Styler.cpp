@@ -58,6 +58,7 @@ QString rhythmKind(const QTextBlock& b)
     const QTextBlockFormat f = b.blockFormat();
     const int kind = f.intProperty(BlockKind);
     if (kind == HorizontalRule || f.hasProperty(QTextFormat::BlockTrailingHorizontalRulerWidth)) return QStringLiteral("hr");
+    if (kind == ImageBlock) return QStringLiteral("image");
     if (kind == Heading || f.headingLevel() > 0) {
         const int level = qMax(1, f.headingLevel());
         return level == 1 ? QStringLiteral("h1") : level == 2 ? QStringLiteral("h2") : QStringLiteral("h3");
@@ -84,7 +85,7 @@ qreal Styler::gapFor(const QString& prev, const QString& cur)
     if (cur == u"h3") return prev == u"h2" ? 14 : 30;
     if (prev == u"h2" || prev == u"h3") return 10;
     if ((cur == u"task" || cur == u"li" || cur == u"ol") && prev == cur) return 4;
-    const auto boxed = [](const QString& k) { return k == u"code" || k == u"table" || k == u"quote"; };
+    const auto boxed = [](const QString& k) { return k == u"code" || k == u"table" || k == u"quote" || k == u"image"; };
     if (boxed(cur) || boxed(prev)) return 22;
     return 16;
 }
@@ -256,7 +257,9 @@ void Styler::styleBlock(QTextDocument* doc, const QTextBlock& b) const
     const qreal linePx = code ? m_p.basePx * 0.8125 * 1.5
                        : headingLevel > 0 ? headingPx(headingLevel) * (headingLevel == 1 ? 1.15 : headingLevel == 2 ? 1.35 : 1.4)
                                           : m_p.basePx * m_p.lineHeight / 100.0;
-    want.setLineHeight(qRound(linePx), QTextBlockFormat::FixedHeight);
+    // An image's line is as tall as the image.
+    if (kind == ImageBlock) want.setLineHeight(100, QTextBlockFormat::SingleHeight);
+    else want.setLineHeight(qRound(linePx), QTextBlockFormat::FixedHeight);
     want.setLeftMargin(quote > 0 ? quote * m_p.basePx * 1.2 : 0);
     const int cont = bf.intProperty(BlockListContinuation);
     want.setIndent(!list && cont > 0 ? cont : 0);

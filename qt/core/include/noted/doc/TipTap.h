@@ -38,6 +38,14 @@ QJsonObject fromMarkdown(const QString& markdown);
 QJsonObject fromHtml(const QString& html);
 QJsonObject fromPlainText(const QString& text);  // one paragraph per line
 
+// Images: `image` nodes keep their src as written. "attachment:<file>" names
+// a file in the attachments folder (beside the database), set once at start.
+void setAttachmentDir(const QString& dir);
+QString attachmentDir();
+// Where to load an image src from: a file:// URL for attachments and paths,
+// anything else (http, data:) unchanged.
+QString imageUrl(const QString& src);
+
 QJsonObject emptyDoc();
 QJsonObject parse(const QString& json);  // tolerant: invalid/empty → emptyDoc()
 QString stringify(const QJsonObject& json);

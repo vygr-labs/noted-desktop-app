@@ -136,6 +136,11 @@ keeps its own back/forward, and the set comes back next launch (`qt.tabs`).
 **Sidebar tree.** An open list shows its 8 latest notes, then "Show more" (20 at a time). While you
 scroll through an open list its row stays pinned at the top of the tree.
 
+**Images.** Paste, drop, or `/` Image. An image is its own block, as wide as it is up to the text
+column, with the box gap (22px) around it. Files are copied to `attachments/` beside the database and
+the note keeps `{"type":"image","attrs":{"src":"attachment:<file>"}}`. Electron has no image node and
+drops it if it saves that note.
+
 **Note page.** A four-column grid gives equal gutters either side of the text, with the outline in
 a column of its own:
 
