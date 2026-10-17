@@ -405,6 +405,13 @@ QtObject {
     }
 
     // Opens a note from anywhere. Today's daily note lives on the desk.
+    // From search: open the note with its find bar on `query`, at the first match.
+    signal findInNoteRequested(string query)
+    function openNoteAt(id, query, mouse) {
+        if (mouse && wantsNewTab(mouse)) openNoteInNewTab(id)
+        else openNote(id)
+        if (selectedNoteId === id && (query || "").trim() !== "") findInNoteRequested(query.trim())
+    }
     function openNote(id) {
         const n = noteData(id)
         if (!n.id) return

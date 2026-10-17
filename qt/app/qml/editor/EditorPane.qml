@@ -117,6 +117,18 @@ Item {
         function onSelectedNoteIdChanged() { pane.loadCurrent(false) }
         function onFocusTitleRequested(selectAll) { if (pane.active) Qt.callLater(() => header.focusTitle(selectAll)) }
         function onFocusEditorRequested() { pane.focusBody() }
+        function onFindInNoteRequested(query) {
+            if (!pane.active || !pane.hasNote || pane.isPlain || pane.locked) return
+            const ctl = rich.controller
+            ctl.findQuery = query
+            // A search for several words can match a note without the exact
+            // phrase: fall back to its longest word.
+            if (ctl.findMatches.length === 0 && /\s/.test(query))
+                ctl.findQuery = query.split(/\s+/).sort((a, b) => b.length - a.length)[0]
+            if (ctl.findMatches.length === 0) { ctl.findQuery = ""; return }
+            AppState.replaceOpen = false
+            AppState.findOpen = true
+        }
         function onEditorTaskToggleRequested(noteId, index) {
             if (!pane.hasNote || noteId !== pane.loadedId || pane.isPlain) return
             const t = pane.taskDecos
@@ -164,6 +176,22 @@ Item {
         if (top < scroller.contentY + margin) scroller.contentY = Math.max(0, top - margin)
         else if (top + r.height > scroller.contentY + scroller.height - margin)
             scroller.contentY = Math.min(scroller.contentHeight - scroller.height, top + r.height - scroller.height + margin)
+    }
+    // The current find match, brought into view (a third of the way down)
+    // when it's off screen. The caret stays put: focus is in the find field.
+    function revealFind() {
+        const ctl = rich.controller
+        const m = ctl.findMatches[ctl.findIndex]
+        if (!m || !findBar.visible) return
+        const r = rich.textEdit.positionToRectangle(m.start)
+        const top = rich.textEdit.mapToItem(scroller.contentItem, 0, r.y).y
+        if (top >= scroller.contentY + 60 && top + r.height <= scroller.contentY + scroller.height - 60) return
+        scroller.contentY = Math.max(0, Math.min(scroller.contentHeight - scroller.height, top - scroller.height / 3))
+    }
+    Connections {
+        target: rich.controller
+        // Not while typing in the note: its edits rebuild the matches too.
+        function onFindChanged() { if (!rich.textEdit.activeFocus) Qt.callLater(pane.revealFind) }
     }
     function scrollToBlock(block) {
         const g = rich.controller.blockGeometry(block, rich.controller.layoutTick)

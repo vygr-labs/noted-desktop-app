@@ -48,7 +48,7 @@ PageColumns {
         recent = r
         AppState.save("qt.recentSearches", JSON.stringify(r))
     }
-    function open(id, mouse) { remember(query); if (mouse) AppState.openNoteFrom(mouse, id); else AppState.openNote(id) }
+    function open(id, mouse) { remember(query); AppState.openNoteAt(id, needle, mouse) }
 
     // ── results ──────────────────────────────────────────────────────
     readonly property string q: query.trim()
