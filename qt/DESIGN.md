@@ -295,7 +295,7 @@ Sections are on the left; the section name is the page title.
 
 | Section | Rows | Key |
 |---|---|---|
-| Appearance | Theme: Light / Dark / Match Windows (preview cards) | `appTheme` = `light` \| `dark` \| `system` |
+| Appearance | Theme: Light / Warm / Dark / Match Windows (preview cards) | `appTheme` = `light` \| `warm` \| `dark` \| `system` |
 | | Accent: 4 swatches | **new** `qt.accent` (hex) |
 | | Text size: Small / Default / Large / Larger, with a live sample | `qt.textScale` = 0.9375 / 1 / 1.094 / 1.1875 (15 / 16 / 17.5 / 19px body) |
 | | Text width: Normal / Wide | `qt.wideText` |
@@ -357,8 +357,8 @@ computers (OneDrive, Dropbox, Google Drive, Syncthing, a network share). How it 
 
 ## Still open
 
-- **Warm and Slate themes are gone.** Migrate `appTheme` `warm` → `light` and `slate` → `dark` on
-  first launch of the new build.
+- **Warm is back** (parchment, from the Electron build; `Theme.warmTokens`). Slate is gone and
+  becomes Light.
 - **Hover and focus.** Not prototyped. Suggested: hover = `pressed` at 60%, keyboard focus = a 2px
   accent ring offset 2px, only on keyboard focus.
 - **Narrow windows.** The right columns wrap under the content below about 900px, and the outline

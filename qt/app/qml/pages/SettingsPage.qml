@@ -115,7 +115,7 @@ Flickable {
                 width: parent.width
                 spacing: 16
                 Repeater {
-                    model: [["light", "Light"], ["dark", "Dark"], ["system", "Match Windows"]]
+                    model: [["light", "Light"], ["warm", "Warm"], ["dark", "Dark"], ["system", "Match Windows"]]
                     delegate: ThemeCard {
                         required property var modelData
                         kind: modelData[0]
@@ -432,9 +432,10 @@ Flickable {
         spacing: 8
         readonly property var lightSide: ({ bg: "#FFFFFF", side: "#F5F4F1", bar: "#D6D3CC", ink: "#3A3936", line: "#E2E0DA", edge: "#E2E0DA" })
         readonly property var darkSide: ({ bg: "#1C1C1B", side: "#161615", bar: "#46453F", ink: "#CAC9C3", line: "#353532", edge: "#353532" })
+        readonly property var warmSide: ({ bg: "#F4ECE2", side: "#EBE1D4", bar: "#D3C8BA", ink: "#41382F", line: "#DED4C8", edge: "#D8CDBF" })
         Item {
-            width: 148
-            height: 92
+            width: 132
+            height: 88
             Rectangle {
                 visible: card.selected
                 anchors.fill: parent
@@ -449,7 +450,7 @@ Flickable {
                 anchors.fill: parent
                 radius: 9
                 clip: true
-                readonly property var p: card.kind === "dark" ? card.darkSide : card.lightSide
+                readonly property var p: card.kind === "dark" ? card.darkSide : card.kind === "warm" ? card.warmSide : card.lightSide
                 color: p.bg
                 border.color: p.edge
                 Rectangle {
@@ -469,7 +470,7 @@ Flickable {
                 // Match Windows: the right half in dark.
                 Rectangle {
                     visible: card.kind === "system"
-                    x: 74; width: parent.width - 74; height: parent.height
+                    x: Math.round(parent.width / 2); width: parent.width - x; height: parent.height
                     topRightRadius: 9; bottomRightRadius: 9; topLeftRadius: 0; bottomLeftRadius: 0
                     color: card.darkSide.bg
                     border.color: card.darkSide.edge

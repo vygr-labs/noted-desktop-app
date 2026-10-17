@@ -8,10 +8,11 @@ import QtQuick
 QtObject {
     id: theme
 
-    // light | dark | system ("Match Windows")
+    // light | warm | dark | system ("Match Windows")
     property string mode: "system"
     readonly property bool dark: mode === "dark" || (mode === "system" && Qt.styleHints.colorScheme === Qt.ColorScheme.Dark)
-    readonly property string resolved: dark ? "dark" : "light"
+    readonly property bool warm: mode === "warm"
+    readonly property string resolved: dark ? "dark" : warm ? "warm" : "light"
 
     // Body text size in notes (Settings → Text size, Ctrl +/-).
     property real textScale: 1.0
@@ -27,6 +28,21 @@ QtObject {
         cardLine: "#E5E3DE", menuLine: "#EDEBE6",
         red: "#B4432F", scrim: "#291B1B1A",
         segTrack: "#EFEDE8", segOn: "#FFFFFF", switchOff: "#D6D3CC", knob: "#FFFFFF"
+    })
+    // Parchment, after the Electron build's Warm theme (its greys run
+    // #f4ece2 → #231f1a). A light theme: shadows, accents and the editor
+    // treat it as one.
+    readonly property var warmTokens: ({
+        bg: "#F4ECE2", sidebar: "#EBE1D4", selected: "#DFD3C4", pressed: "#E4D9CB",
+        raised: "#FAF5EE", card: "#FAF5EE", field: "#FAF5EE", folder: "#F0E7DB",
+        codeBg: "#EDE4D8", inlineCode: "#E6DCCE", hl: "#F2DD9C",
+        ink: "#231F1A", ink2: "#2A251F", text: "#322B24", text2: "#41382F", secondary: "#53483C",
+        tertiary: "#65594B", muted: "#76695A", placeholder: "#7D7061", faint: "#988A7A", faintest: "#C4B7A7",
+        underline: "#C2B5A5", linkLine: "#A89A89", quote: "#D3C8BA",
+        line: "#DED4C8", lineStrong: "#D8CDBF", lineSoft: "#E3D9CC", lineFaint: "#E8DFD3",
+        cardLine: "#DCD1C3", menuLine: "#E4DACD",
+        red: "#A8432C", scrim: "#2E231F1A",
+        segTrack: "#E6DCCE", segOn: "#FAF5EE", switchOff: "#D3C8BA", knob: "#FFFFFF"
     })
     // Warm near-black. The sidebar sits darker than the page, menus lift
     // lighter, and depth comes from a faint light ring instead of shadow.
@@ -89,7 +105,7 @@ QtObject {
 
     // ── colours in use ───────────────────────────────────────────────
     readonly property var c: {
-        const t = Object.assign({}, dark ? darkTokens : light)
+        const t = Object.assign({}, dark ? darkTokens : warm ? warmTokens : light)
         t.accent = accent
         t.onAccent = accentInk
         t.selection = selection

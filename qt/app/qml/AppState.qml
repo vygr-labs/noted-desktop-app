@@ -121,10 +121,9 @@ QtObject {
     }
 
     function load() {
-        // Warm and Slate are gone: fold them into Light and Dark once.
+        // Slate (the Electron build's light grey) is gone: it becomes Light.
         let theme = Store.setting("appTheme", "system")
-        if (theme === "warm") { theme = "light"; save("appTheme", theme) }
-        else if (theme === "slate") { theme = "dark"; save("appTheme", theme) }
+        if (theme === "slate") { theme = "light"; save("appTheme", theme) }
         Theme.mode = theme
         Theme.accentChoice = Store.setting("qt.accent", "#2F5AC8")
         noteSort = Store.setting("noteSort", "updated_at")
@@ -145,7 +144,7 @@ QtObject {
     function save(key, value) { Store.setSetting(key, String(value)) }
 
     function setTheme(m) { Theme.mode = m; save("appTheme", m) }
-    function cycleTheme() { setTheme(Theme.dark ? "light" : "dark") }
+    function cycleTheme() { setTheme(Theme.dark ? "light" : Theme.warm ? "dark" : "warm") }
     function setAccent(hex) { Theme.accentChoice = hex; save("qt.accent", hex) }
     function setSort(s) { noteSort = s; Notes.sort = s; save("noteSort", s) }
     function setShowPreview(v) { showPreview = v; save("showNotePreview", v ? "1" : "0") }
