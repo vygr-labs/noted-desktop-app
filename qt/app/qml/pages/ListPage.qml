@@ -10,6 +10,7 @@ PageColumns {
     id: page
 
     property bool active: false
+    PopupMenu { id: menu }
     readonly property string listId: AppState.view === "list" ? AppState.viewId : ""
     readonly property var list: AppState.listById(listId) || ({})
     readonly property bool sheets: AppState.listLayout !== "rows"
@@ -25,7 +26,8 @@ PageColumns {
     property var previewCache: ({})
     function reload() {
         if (!listId) { notes = []; return }
-        notes = Store.notesInList(listId, byTitle ? "title" : "updated_at")
+        // Preview text only shows in rows with previews on.
+        notes = Store.notesInList(listId, byTitle ? "title" : "updated_at", !sheets && AppState.showPreview)
         fillPreviews()
     }
     function fillPreviews() {
@@ -242,12 +244,15 @@ PageColumns {
                                 radius: 10
                                 color: "#0A000000"
                             }
-                            SheetPreview {
-                                visible: !sheet.locked
+                            // Built in the background: the page shows at once and
+                            // the previews fill in over the next frames.
+                            Loader {
+                                active: !sheet.locked
+                                asynchronous: true
                                 x: 16
                                 y: 14
                                 width: parent.width - 32
-                                blocks: sheet.locked ? [] : (page.previews[sheet.modelData.id] || [])
+                                sourceComponent: Component { SheetPreview { blocks: page.previews[sheet.modelData.id] || [] } }
                             }
                             Column {
                                 visible: sheet.locked
@@ -301,8 +306,9 @@ PageColumns {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-                            onClicked: (e) => AppState.openNoteFrom(e, sheet.modelData.id)
+                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
+                            onClicked: (e) => e.button === Qt.RightButton ? menu.openAt(sheetArea, e.x, e.y, AppState.noteMenuItems(sheet.modelData))
+                                                                          : AppState.openNoteFrom(e, sheet.modelData.id)
                         }
                     }
                 }
@@ -385,8 +391,9 @@ PageColumns {
                             anchors.fill: parent
                             hoverEnabled: true
                             cursorShape: Qt.PointingHandCursor
-                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-                            onClicked: (e) => AppState.openNoteFrom(e, noteRow.modelData.id)
+                            acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
+                            onClicked: (e) => e.button === Qt.RightButton ? menu.openAt(rowArea, e.x, e.y, AppState.noteMenuItems(noteRow.modelData))
+                                                                          : AppState.openNoteFrom(e, noteRow.modelData.id)
                         }
                     }
                 }

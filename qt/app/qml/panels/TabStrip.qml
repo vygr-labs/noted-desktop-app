@@ -24,13 +24,20 @@ Rectangle {
     Rectangle { anchors.bottom: parent.bottom; width: parent.width; height: 1; color: Theme.c.line }
 
     readonly property real addW: 34
-    readonly property real tabsW: width - caption.width - addW - 16
-    readonly property real tabW: Math.max(96, Math.min(220, tabsW / Math.max(1, AppState.tabs.length)))
+    readonly property real moreW: overflow ? 44 : 0
+    readonly property real tabsW: width - caption.width - addW - moreW - 16
+    // Tabs shrink to 96px; past that the strip shows a run of them around
+    // the active one, and the rest are under the count button at the end.
+    readonly property int fits: Math.max(1, Math.floor((width - caption.width - addW - 44 - 16) / 96))
+    readonly property bool overflow: AppState.tabs.length > Math.max(1, Math.floor((width - caption.width - addW - 16) / 96))
+    readonly property int shown: overflow ? fits : AppState.tabs.length
+    readonly property int first: overflow ? Math.max(0, Math.min(AppState.activeTab - Math.floor(shown / 2), AppState.tabs.length - shown)) : 0
+    readonly property real tabW: Math.max(96, Math.min(220, tabsW / Math.max(1, shown)))
 
     Item {
         id: tabsArea
         x: 8
-        width: Math.min(strip.tabsW, strip.tabW * AppState.tabs.length)
+        width: Math.min(strip.tabsW, strip.tabW * strip.shown)
         height: parent.height
         clip: true
 
@@ -49,7 +56,8 @@ Rectangle {
                 // it's over; the rest keep theirs.
                 property bool dragging: false
                 property real dragX: 0
-                x: dragging ? dragX : index * strip.tabW
+                visible: index >= strip.first && index < strip.first + strip.shown
+                x: dragging ? dragX : (index - strip.first) * strip.tabW
                 y: 0
                 z: dragging ? 2 : (active ? 1 : 0)
                 width: strip.tabW
@@ -144,7 +152,7 @@ Rectangle {
                     }
                     onReleased: {
                         if (!tab.dragging) return
-                        const to = Math.max(0, Math.min(AppState.tabs.length - 1, Math.round(tab.dragX / strip.tabW)))
+                        const to = Math.max(0, Math.min(AppState.tabs.length - 1, strip.first + Math.round(tab.dragX / strip.tabW)))
                         tab.dragging = false
                         AppState.moveTab(tab.index, to)
                     }
@@ -162,8 +170,43 @@ Rectangle {
         }
     }
 
-    IconButton {
+    // The tabs that don't fit: how many, and a menu of every tab.
+    Rectangle {
+        id: moreButton
+        visible: strip.overflow
         x: tabsArea.x + tabsArea.width + 4
+        y: 6 + (strip.height - 6 - height) / 2
+        width: moreRow.implicitWidth + 14
+        height: 28
+        radius: 6
+        color: moreArea.pressed || menu.opened && menu.owner === moreButton ? Theme.c.pressed : (moreArea.containsMouse ? Qt.alpha(Theme.c.pressed, 0.6) : "transparent")
+        Row {
+            id: moreRow
+            anchors.centerIn: parent
+            spacing: 4
+            Text {
+                textFormat: Text.PlainText
+                text: "+" + (AppState.tabs.length - strip.shown)
+                color: Theme.c.secondary
+                font.pointSize: Theme.pt(13)
+                font.features: { "tnum": 1 }
+                anchors.verticalCenter: parent.verticalCenter
+            }
+            Icon { name: "chevron-down"; size: 11; color: Theme.c.secondary; anchors.verticalCenter: parent.verticalCenter }
+        }
+        MouseArea {
+            id: moreArea
+            anchors.fill: parent
+            hoverEnabled: true
+            cursorShape: Qt.PointingHandCursor
+            onClicked: menu.openAt(moreButton, 0, moreButton.height + 4, AppState.tabs.map((t, i) => ({
+                text: AppState.tabInfo(t).title, checked: i === AppState.activeTab, action: () => AppState.switchTab(i)
+            })), -4)
+        }
+    }
+
+    IconButton {
+        x: tabsArea.x + tabsArea.width + 4 + strip.moreW
         y: 6 + (strip.height - 6 - height) / 2
         size: 28
         iconSize: 15

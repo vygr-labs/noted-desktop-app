@@ -11,7 +11,6 @@ Rectangle {
     id: side
 
     signal openFileRequested()
-    signal popoutRequested(string noteId)
 
     width: 256
     color: Theme.c.sidebar
@@ -38,12 +37,13 @@ Rectangle {
         if (n <= treeLimit) delete m[id]
         else m[id] = n
         listLimits = m
+        reload()
     }
     function reload() {
         pinned = Store.pinnedNotes()
         const m = {}
         for (const id in AppState.expandedLists)
-            if (AppState.expandedLists[id]) m[id] = Store.notesInList(id, "updated_at")
+            if (AppState.expandedLists[id]) m[id] = Store.treeNotes(id, limitFor(id))
         listNotes = m
     }
     Component.onCompleted: reload()
@@ -400,6 +400,7 @@ Rectangle {
                         readonly property bool expanded: !!AppState.expandedLists[modelData.id]
                         readonly property var notes: expanded ? (side.listNotes[modelData.id] || []) : []
                         readonly property int limit: side.limitFor(modelData.id)
+                        readonly property int total: modelData.note_count || 0
                         Layout.fillWidth: true
                         spacing: 1
 
@@ -429,8 +430,8 @@ Rectangle {
                             }
                             // More (or fewer) of a long list.
                             Row_ {
-                                readonly property int rest: listItem.notes.length - listItem.limit
-                                visible: listItem.notes.length > side.treeLimit
+                                readonly property int rest: listItem.total - listItem.limit
+                                visible: listItem.total > side.treeLimit
                                 nested: true
                                 leftPad: 50
                                 label: rest > 0 ? "Show more" : "Show fewer"
@@ -567,26 +568,7 @@ Rectangle {
     }
 
     // ── menus ────────────────────────────────────────────────────────
-    function moveTargets(note) {
-        return AppState.lists.map(l => ({
-            text: l.name, color: l.color || "gray", checked: note.list_id === l.id,
-            action: () => { Store.moveToList(note.id, l.id); AppState.refreshCurrent() }
-        }))
-    }
-    function noteMenu(item, x, y, note) {
-        const locked = AppState.isLocked(note)
-        menu.openAt(item, x, y, [
-            { text: "Open", action: () => AppState.openNote(note.id) },
-            { text: "Open in new tab", action: () => AppState.openNoteInNewTab(note.id) },
-            { text: "Open in new window", action: () => side.popoutRequested(note.id) },
-            { text: note.is_pinned ? "Unpin" : "Pin", action: () => Store.setPinned(note.id, !note.is_pinned) },
-            { text: "Move to", children: moveTargets(note) },
-            { text: "Copy as Markdown", disabled: locked, action: () => { if (App.copyAsMarkdown(note.id)) AppState.toast("Copied as Markdown") } },
-            { text: "Duplicate", disabled: locked, action: () => AppState.duplicate(note.id) },
-            { separator: true },
-            { text: "Move to trash", danger: true, action: () => AppState.trashNote(note.id) }
-        ])
-    }
+    function noteMenu(item, x, y, note) { menu.openAt(item, x, y, AppState.noteMenuItems(note)) }
     function listMenu(item, x, y, list, expanded, hidden) {
         const colours = Theme.pickerSwatches.concat(
             Theme.pickerSwatches.some(s => s.name === list.color) ? [] : [{ name: list.color, label: list.color.charAt(0).toUpperCase() + list.color.slice(1) }])

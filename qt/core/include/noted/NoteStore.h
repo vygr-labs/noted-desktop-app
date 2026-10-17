@@ -42,8 +42,14 @@ public:
     // is_locked, is_shared, is_daily, daily_date, created_at, updated_at,
     // preview (first 400 chars of plain text, "" while locked), tags [names].
     // sort: updated_at | title. Pinned notes come first.
-    Q_INVOKABLE QVariantList notesInList(const QString& listId, const QString& sort = QStringLiteral("updated_at"));
+    Q_INVOKABLE QVariantList notesInList(const QString& listId, const QString& sort = QStringLiteral("updated_at"), bool withPreview = true);
     Q_INVOKABLE QVariantList pinnedNotes();
+    // An open list's notes for the sidebar tree: no preview text.
+    Q_INVOKABLE QVariantList treeNotes(const QString& listId, int limit);
+    // [{list_id, title, updated_at}]: each list's most recently edited note.
+    Q_INVOKABLE QVariantList listSummaries();
+    // Daily notes with something written in them, newest first, before a date.
+    Q_INVOKABLE QVariantList pastDailyNotes(const QString& beforeIso, int limit);
     Q_INVOKABLE QVariantList notesWithTag(const QString& name);
     Q_INVOKABLE QVariantList recentEdited(int limit = 4, bool includeDaily = false);
 
@@ -153,7 +159,8 @@ signals:
     void externalChange();
 
 private:
-    QVariantList noteRows(const QString& where, const QVariantList& args, const QString& order, int limit);
+    // withPreview false skips the body text: the rest comes from idx_notes_meta.
+    QVariantList noteRows(const QString& where, const QVariantList& args, const QString& order, int limit, bool withPreview = true);
     void ftsReplace(const QString& id, const QString& title, const QString& plain);
     void ftsDelete(const QString& id);
     QVariantMap todo(const QString& id);
@@ -162,6 +169,11 @@ private:
 
     Database& m_db;
     QSet<QString> m_unlocked;
+    // allTasks() per note, keyed by edit time and body size, so a save only
+    // re-reads the note it changed.
+    struct TaskCache { QString stamp; QVariantList items; };
+    QHash<QString, TaskCache> m_taskCache;
+    QHash<QString, TaskCache> m_previewCache;   // previewBlocks(), same keys (max is always 9)
 };
 
 }  // namespace noted

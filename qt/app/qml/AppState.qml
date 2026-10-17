@@ -90,6 +90,26 @@ QtObject {
     signal newListRequested()
     signal pinPromptRequested(string mode, string noteId)  // set | unlock | remove
     signal editorTaskToggleRequested(string noteId, int taskIndex)  // an open note's n-th checklist item
+    signal popOutRequested(string noteId)
+
+    // A note's right-click menu, the same wherever the note is listed.
+    function noteMenuItems(note) {
+        const locked = isLocked(note)
+        return [
+            { text: "Open", action: () => openNote(note.id) },
+            { text: "Open in new tab", action: () => openNoteInNewTab(note.id) },
+            { text: "Open in new window", action: () => popOutRequested(note.id) },
+            { text: note.is_pinned ? "Unpin" : "Pin", action: () => Store.setPinned(note.id, !note.is_pinned) },
+            { text: "Move to", children: lists.map(l => ({
+                text: l.name, color: l.color || "gray", checked: note.list_id === l.id,
+                action: () => { Store.moveToList(note.id, l.id); refreshCurrent() }
+            })) },
+            { text: "Copy as Markdown", disabled: locked, action: () => { if (App.copyAsMarkdown(note.id)) toast("Copied as Markdown") } },
+            { text: "Duplicate", disabled: locked, action: () => duplicate(note.id) },
+            { separator: true },
+            { text: "Move to trash", danger: true, action: () => trashNote(note.id) }
+        ]
+    }
 
     function listById(id) {
         for (const l of lists) if (l.id === id) return l

@@ -1427,6 +1427,12 @@ void EditorController::rebuildDecorations()
                 out.append(QVariantMap{{"k", "task"}, {"block", b.blockNumber()}, {"checked", taskChecked(b.blockFormat())},
                                        {"due", attrs.value(QLatin1String("due")).toString()}});
             }
+            // Bullets are drawn by the editor too: Qt's are a thin dot at text size.
+            if (b.textList() && listKindOf(b.textList()) == BulletList) {
+                const int style = b.textList()->format().style();
+                out.append(QVariantMap{{"k", "bullet"}, {"block", b.blockNumber()},
+                                       {"shape", style == QTextListFormat::ListCircle ? "ring" : style == QTextListFormat::ListSquare ? "square" : "disc"}});
+            }
             if (b.blockFormat().intProperty(BlockKind) == HorizontalRule)
                 out.append(QVariantMap{{"k", "hr"}, {"block", b.blockNumber()}});
             QTextFrame* f = QTextCursor(b).currentFrame();

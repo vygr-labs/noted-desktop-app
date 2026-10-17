@@ -113,6 +113,31 @@ Item {
                     color: Theme.c.line
                 }
 
+                // A bullet: cover Qt's thin one and draw a fuller dot (a ring,
+                // then a square, for nested lists).
+                Rectangle {
+                    visible: deco.modelData.k === "bullet"
+                    x: deco.first.x - Math.round(18 * Theme.textScale)
+                    y: deco.first.y
+                    width: Math.round(17 * Theme.textScale)
+                    height: deco.first.height
+                    color: root.pageColor
+                    Rectangle {
+                        readonly property string shape: deco.modelData.shape || "disc"
+                        readonly property real d: Math.round((shape === "square" ? 5 : 6) * Theme.textScale)
+                        anchors.right: parent.right
+                        anchors.rightMargin: Math.round(8 * Theme.textScale)
+                        // On the middle of the first line's x-height, not the line box.
+                        y: Math.round(deco.first.height * 0.56 - d / 2)
+                        width: d
+                        height: d
+                        radius: shape === "square" ? 1 : d / 2
+                        color: shape === "ring" ? "transparent" : Theme.c.text
+                        border.width: shape === "ring" ? 1.3 : 0
+                        border.color: Theme.c.text
+                    }
+                }
+
                 // Qt draws a bullet in front of a to-do's text; cover it.
                 Rectangle {
                     visible: deco.isTask

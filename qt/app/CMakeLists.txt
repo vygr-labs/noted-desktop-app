@@ -14,6 +14,9 @@ qt_add_executable(noted WIN32 MACOSX_BUNDLE
     # Qt::FramelessWindowHint takes away. Compiles to nothing elsewhere.
     src/WindowChrome.cpp
     src/WindowChrome.h
+    # Input playback for checking the UI (--drive).
+    src/DevDriver.cpp
+    src/DevDriver.h
 )
 
 if(WIN32)
@@ -117,6 +120,7 @@ target_include_directories(noted PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/src)
 target_link_libraries(noted PRIVATE
     Noted::Core
     Qt6::Gui
+    Qt6::GuiPrivate
     Qt6::Qml
     Qt6::Quick
     Qt6::QuickControls2

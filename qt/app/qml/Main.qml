@@ -75,6 +75,7 @@ ApplicationWindow {
         function onPaletteOpenChanged() { if (AppState.paletteOpen) commandPalette.open(); else commandPalette.close() }
         function onPinPromptRequested(mode, noteId) { pinDialog.openFor(mode, noteId) }
         function onToast(message) { toast.show(message) }
+        function onPopOutRequested(id) { notePage.popOut(id) }
     }
 
     // ── layout ──────────────────────────────────────────────────────
@@ -88,7 +89,6 @@ ApplicationWindow {
             Layout.fillHeight: true
             Layout.preferredWidth: width
             onOpenFileRequested: importDialog.open()
-            onPopoutRequested: (id) => notePage.popOut(id)
         }
 
         ColumnLayout {

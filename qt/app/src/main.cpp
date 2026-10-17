@@ -5,6 +5,8 @@
 #include <QFileInfo>
 #include <QFont>
 #include <QFontDatabase>
+#include <QJsonArray>
+#include <QJsonDocument>
 #include <QGuiApplication>
 #include <QIcon>
 #include <QQmlApplicationEngine>
@@ -21,6 +23,7 @@
 #include "AppController.h"
 #include "EditorController.h"
 #include "OpenFiles.h"
+#include "DevDriver.h"
 #include "WindowChrome.h"
 #include "noted/Database.h"
 #include "noted/DateText.h"
@@ -97,8 +100,9 @@ int main(int argc, char* argv[])
     QCommandLineOption shotOpt(QStringLiteral("screenshot"), QStringLiteral("Save a window screenshot and quit."), QStringLiteral("png"));
     QCommandLineOption delayOpt(QStringLiteral("screenshot-delay"), QStringLiteral("Delay before the screenshot (ms)."), QStringLiteral("ms"), QStringLiteral("1500"));
     QCommandLineOption stateOpt(QStringLiteral("state"), QStringLiteral("Startup UI state as JSON (dev/testing)."), QStringLiteral("json"));
+    QCommandLineOption driveOpt(QStringLiteral("drive"), QStringLiteral("Play input steps from a JSON file, then quit (dev/testing)."), QStringLiteral("json"));
     QCommandLineOption quickOpt(QStringLiteral("quick-capture"), QStringLiteral("Open the quick capture window."));
-    cli.addOptions({dbOpt, realDataOpt, shotOpt, delayOpt, stateOpt, quickOpt});
+    cli.addOptions({dbOpt, realDataOpt, shotOpt, delayOpt, stateOpt, quickOpt, driveOpt});
     cli.addPositionalArgument(QStringLiteral("files"), QStringLiteral("Markdown or text files to open as notes."), QStringLiteral("[files...]"));
     cli.process(app);
 
@@ -142,7 +146,8 @@ int main(int argc, char* argv[])
     AppController controller(store, dbPath, devData);
     OpenFiles files(store);
 
-    const bool takeShot = cli.isSet(shotOpt);
+    // --drive runs like --screenshot: out of the way, one-off, no hotkey.
+    const bool takeShot = cli.isSet(shotOpt) || cli.isSet(driveOpt);
     if (!takeShot && !controller.claimSingleInstance(cli.positionalArguments())) {
         qInfo() << "handed off to the running instance";
         return 0;
@@ -181,6 +186,12 @@ int main(int argc, char* argv[])
         window->setScreen(target);
         window->setPosition(target->availableGeometry().topLeft());
         window->show();
+    }
+    if (cli.isSet(driveOpt) && window) {
+        QFile f(cli.value(driveOpt));
+        const QJsonArray steps = f.open(QIODevice::ReadOnly) ? QJsonDocument::fromJson(f.readAll()).array() : QJsonArray();
+        (new DevDriver(window, &engine, steps, window))->start(cli.value(delayOpt).toInt());
+    } else if (cli.isSet(shotOpt) && window) {
         const QString out = cli.value(shotOpt);
         QTimer::singleShot(cli.value(delayOpt).toInt(), window, [window, out] {
             const QImage img = window->grabWindow();

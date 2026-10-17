@@ -6,6 +6,8 @@ import Noted
 // Centered modal card with title, description, body slot and footer slot.
 Popup {
     id: dlg
+    // In the window's own scene: clamped to it, closed by a press outside.
+    popupType: Popup.Item
 
     property string title: ""
     property string description: ""

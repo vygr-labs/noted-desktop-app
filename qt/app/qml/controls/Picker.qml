@@ -8,6 +8,8 @@ import Noted
 // highlighted while typing and Enter picks it.
 Popup {
     id: picker
+    // In the window's own scene: clamped to it, closed by a press outside.
+    popupType: Popup.Item
 
     property alias query: field.text
     property string placeholder: ""

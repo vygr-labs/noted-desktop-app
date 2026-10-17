@@ -9,6 +9,8 @@ import "../Fmt.js" as Fmt
 // "Create a note called …". Start with ">" for commands.
 Popup {
     id: find
+    // In the window's own scene: clamped to it, closed by a press outside.
+    popupType: Popup.Item
 
     signal importRequested()
     signal exportCurrentRequested(string format)

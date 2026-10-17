@@ -223,16 +223,17 @@ QVariantMap NoteStore::counts()
     };
 }
 
-QVariantList NoteStore::noteRows(const QString& where, const QVariantList& args, const QString& order, int limit)
+QVariantList NoteStore::noteRows(const QString& where, const QVariantList& args, const QString& order, int limit, bool withPreview)
 {
     QVariantList rows = m_db.conn().all(
         QStringLiteral("SELECT n.id, n.title, n.note_type, n.list_id, n.is_pinned, n.is_locked, n.is_shared, n.is_daily, "
-                       "n.daily_date, n.created_at, n.updated_at, substr(COALESCE(n.content_plain, ''), 1, 400) AS preview, "
+                       "n.daily_date, n.created_at, n.updated_at, %4 AS preview, "
                        "(SELECT group_concat(t.name, ' ') FROM note_tags nt JOIN tags t ON t.id = nt.tag_id "
                        " WHERE nt.note_id = n.id) AS tag_names "
                        "FROM notes n WHERE n.is_trashed = 0 AND %1 ORDER BY %2 LIMIT %3")
             .arg(where, order)
-            .arg(limit),
+            .arg(limit)
+            .arg(withPreview ? QStringLiteral("substr(COALESCE(n.content_plain, ''), 1, 400)") : QStringLiteral("''")),
         args);
     for (QVariant& v : rows) {
         QVariantMap m = v.toMap();
@@ -245,11 +246,11 @@ QVariantList NoteStore::noteRows(const QString& where, const QVariantList& args,
     return rows;
 }
 
-QVariantList NoteStore::notesInList(const QString& listId, const QString& sort)
+QVariantList NoteStore::notesInList(const QString& listId, const QString& sort, bool withPreview)
 {
     const QString order = sort == u"title" ? QStringLiteral("n.is_pinned DESC, n.title COLLATE NOCASE ASC")
                                            : QStringLiteral("n.is_pinned DESC, n.updated_at DESC");
-    return noteRows(QStringLiteral("n.list_id = ?"), {listId}, order, 2000);
+    return noteRows(QStringLiteral("n.list_id = ?"), {listId}, order, 2000, withPreview);
 }
 
 QVariantList NoteStore::notesWithTag(const QString& name)
@@ -258,9 +259,28 @@ QVariantList NoteStore::notesWithTag(const QString& name)
                     {name}, QStringLiteral("n.updated_at DESC"), 500);
 }
 
+QVariantList NoteStore::treeNotes(const QString& listId, int limit)
+{
+    return noteRows(QStringLiteral("n.list_id = ?"), {listId}, QStringLiteral("n.is_pinned DESC, n.updated_at DESC"), limit, false);
+}
+
+QVariantList NoteStore::listSummaries()
+{
+    // The latest note in each list, from the index alone.
+    return m_db.conn().all(QStringLiteral(
+        "SELECT list_id, title, MAX(updated_at) AS updated_at FROM notes "
+        "WHERE is_trashed = 0 AND list_id IS NOT NULL GROUP BY list_id"));
+}
+
+QVariantList NoteStore::pastDailyNotes(const QString& beforeIso, int limit)
+{
+    return noteRows(QStringLiteral("n.is_daily = 1 AND n.daily_date < ? AND COALESCE(n.content_plain, '') <> ''"), {beforeIso},
+                    QStringLiteral("n.daily_date DESC"), limit);
+}
+
 QVariantList NoteStore::pinnedNotes()
 {
-    return noteRows(QStringLiteral("n.is_pinned = 1"), {}, QStringLiteral("n.updated_at DESC"), 50);
+    return noteRows(QStringLiteral("n.is_pinned = 1"), {}, QStringLiteral("n.updated_at DESC"), 50, false);
 }
 
 QVariantList NoteStore::recentEdited(int limit, bool includeDaily)
@@ -853,21 +873,59 @@ void previewOf(const QJsonObject& node, int max, QVariantList& out)
 
 QVariantList NoteStore::allTasks(bool includeDone)
 {
+    // Metadata first (from idx_notes_meta, no bodies); bodies only for notes
+    // that changed since the last call. octet_length is read from the row
+    // header, so it doesn't load the body either.
     const QVariantList rows = m_db.conn().all(QStringLiteral(
-        R"(SELECT id, title, list_id, is_daily, daily_date, updated_at, is_locked, content FROM notes
-           WHERE is_trashed = 0 AND note_type = 'rich' AND content LIKE '%"type":"taskItem"%'
+        R"(SELECT id, title, list_id, is_daily, daily_date, updated_at, is_locked,
+                  updated_at || '/' || octet_length(content) AS stamp FROM notes
+           WHERE is_trashed = 0 AND note_type = 'rich'
              AND (list_id IS NULL OR list_id NOT IN (SELECT id FROM lists WHERE is_hidden = 1))
            ORDER BY updated_at DESC)"));
+    QStringList stale;
+    QSet<QString> seen;
+    for (const QVariant& v : rows) {
+        const QVariantMap m = v.toMap();
+        const QString id = m.value("id").toString();
+        seen.insert(id);
+        if (m.value("is_locked").toBool() && !m_unlocked.contains(id)) continue;
+        const auto it = m_taskCache.constFind(id);
+        if (it == m_taskCache.constEnd() || it->stamp != m.value("stamp").toString()) stale << id;
+    }
+    for (auto it = m_taskCache.begin(); it != m_taskCache.end();) {
+        if (seen.contains(it.key())) ++it;
+        else it = m_taskCache.erase(it);
+    }
+    for (int at = 0; at < stale.size(); at += 200) {
+        const QStringList batch = stale.mid(at, 200);
+        QVariantList args;
+        for (const QString& id : batch) args << id;
+        const QString marks = QStringList(batch.size(), QStringLiteral("?")).join(u',');
+        const QVariantList bodies = m_db.conn().all(
+            QStringLiteral("SELECT id, updated_at || '/' || octet_length(content) AS stamp, "
+                           "CASE WHEN content LIKE '%\"type\":\"taskItem\"%' THEN content END AS content "
+                           "FROM notes WHERE id IN (%1)").arg(marks), args);
+        for (const QVariant& v : bodies) {
+            const QVariantMap m = v.toMap();
+            TaskCache entry{m.value("stamp").toString(), {}};
+            const QString content = m.value("content").toString();
+            if (!content.isEmpty()) {
+                int counter = 0;
+                collectAllTasks(doc::parse(content), counter, true, entry.items);
+            }
+            m_taskCache.insert(m.value("id").toString(), entry);
+        }
+    }
     QVariantList out;
     for (const QVariant& v : rows) {
         const QVariantMap m = v.toMap();
         const QString id = m.value("id").toString();
         if (m.value("is_locked").toBool() && !m_unlocked.contains(id)) continue;
-        int counter = 0;
-        QVariantList items;
-        collectAllTasks(doc::parse(m.value("content").toString()), counter, includeDone, items);
-        for (QVariant& item : items) {
+        const auto it = m_taskCache.constFind(id);
+        if (it == m_taskCache.constEnd()) continue;
+        for (const QVariant& item : it->items) {
             QVariantMap t = item.toMap();
+            if (!includeDone && t.value("checked").toBool()) continue;
             t.insert(QStringLiteral("noteId"), id);
             t.insert(QStringLiteral("title"), m.value("title"));
             t.insert(QStringLiteral("listId"), m.value("list_id").toString());
@@ -945,18 +1003,24 @@ int NoteStore::appendTask(const QString& noteId, const QString& text)
 
 QVariantList NoteStore::previewBlocks(const QString& noteId, int max)
 {
-    const QVariantMap n = m_db.conn().one(
-        QStringLiteral("SELECT note_type, content, is_locked FROM notes WHERE id = ?"), {noteId});
-    if (n.isEmpty() || (n.value("is_locked").toBool() && !m_unlocked.contains(noteId))) return {};
+    const QVariantMap meta = m_db.conn().one(
+        QStringLiteral("SELECT is_locked, updated_at || '/' || octet_length(content) || '/' || ? AS stamp FROM notes WHERE id = ?"),
+        {max, noteId});
+    if (meta.isEmpty() || (meta.value("is_locked").toBool() && !m_unlocked.contains(noteId))) return {};
+    const QString stamp = meta.value("stamp").toString();
+    const auto hit = m_previewCache.constFind(noteId);
+    if (hit != m_previewCache.constEnd() && hit->stamp == stamp) return hit->items;
+    const QVariantMap n = m_db.conn().one(QStringLiteral("SELECT note_type, content FROM notes WHERE id = ?"), {noteId});
     QVariantList out;
     if (n.value("note_type").toString() == u"plain") {
         for (const QString& line : n.value("content").toString().split(u'\n')) {
             if (out.size() >= max) break;
             out << QVariantMap{{QStringLiteral("t"), QStringLiteral("p")}, {QStringLiteral("text"), line.trimmed()}};
         }
-        return out;
+    } else {
+        previewOf(doc::parse(n.value("content").toString()), max, out);
     }
-    previewOf(doc::parse(n.value("content").toString()), max, out);
+    m_previewCache.insert(noteId, TaskCache{stamp, out});
     return out;
 }
 

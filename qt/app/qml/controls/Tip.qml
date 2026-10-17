@@ -5,6 +5,8 @@ import Noted
 // Small dark tooltip with an optional shortcut hint.
 ToolTip {
     id: tip
+    // In the window's own scene: clamped to it, closed by a press outside.
+    popupType: Popup.Item
     property string shortcut: ""
 
     delay: 450

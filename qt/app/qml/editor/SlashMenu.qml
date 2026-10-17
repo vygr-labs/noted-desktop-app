@@ -7,6 +7,8 @@ import Noted
 // and aliases). The editor drives it: it passes keys in and runs the pick.
 Popup {
     id: slash
+    // In the window's own scene: clamped to it, closed by a press outside.
+    popupType: Popup.Item
     property string query: ""
     property int current: 0
     signal picked(string kind)

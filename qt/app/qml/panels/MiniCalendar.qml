@@ -97,14 +97,15 @@ Column {
                         font.features: { "tnum": 1 }
                     }
                 }
+                // A day you wrote in: a dot under the number.
                 Rectangle {
                     visible: day.has && !day.isToday
                     anchors.horizontalCenter: parent.horizontalCenter
-                    y: 25
-                    width: 3
-                    height: 3
-                    radius: 1.5
-                    color: Theme.c.faint
+                    y: 26
+                    width: 4
+                    height: 4
+                    radius: 2
+                    color: Theme.c.muted
                 }
                 MouseArea {
                     id: dayArea

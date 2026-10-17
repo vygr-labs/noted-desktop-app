@@ -8,6 +8,8 @@ import "../Fmt.js" as Fmt
 // Monday-first month, and Remove date. 272px wide.
 Popup {
     id: picker
+    // In the window's own scene: clamped to it, closed by a press outside.
+    popupType: Popup.Item
     property string due: ""          // the current ISO date, "" for none
     property date month: new Date()
     signal picked(string iso)        // "" removes the date

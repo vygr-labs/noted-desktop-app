@@ -21,7 +21,17 @@ Database::Database(const QString& filePath, QObject* parent)
     m_conn->exec(QStringLiteral("PRAGMA journal_mode = WAL"));
     m_conn->exec(QStringLiteral("PRAGMA foreign_keys = ON"));
     m_conn->exec(QStringLiteral("PRAGMA synchronous = NORMAL"));
+    // Note bodies are large (pasted images run to megabytes), so the default
+    // 2 MB page cache re-reads them from disk on every scan.
+    m_conn->exec(QStringLiteral("PRAGMA cache_size = -65536"));
     migrate();
+    // Every column after `content` sits behind that note's overflow pages, so
+    // a count or a list of titles would walk the bodies. This index holds the
+    // columns lists and the sidebar read, so they never touch a body. Not a
+    // schema step: Electron's schema stays as it is, an extra index is inert.
+    m_conn->exec(QStringLiteral(
+        "CREATE INDEX IF NOT EXISTS idx_notes_meta ON notes(list_id, is_trashed, updated_at, id, title, note_type, "
+        "is_pinned, is_locked, is_shared, is_daily, daily_date, created_at)"));
 
     connect(&m_watch, &QTimer::timeout, this, [this] {
         try {

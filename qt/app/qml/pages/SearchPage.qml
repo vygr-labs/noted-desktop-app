@@ -17,6 +17,7 @@ PageColumns {
     property var tagFilter: ({})    // tag name -> true
     property var recent: []
     asideTop: 106
+    PopupMenu { id: menu }
 
     onActiveChanged: {
         if (!active) return
@@ -279,8 +280,9 @@ PageColumns {
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
-                acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-                onClicked: (e) => page.open(n.id, e)
+                acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
+                onClicked: (e) => e.button === Qt.RightButton ? menu.openAt(noteArea, e.x, e.y, AppState.noteMenuItems(Store.note(n.id)))
+                                                              : page.open(n.id, e)
             }
         }
     }

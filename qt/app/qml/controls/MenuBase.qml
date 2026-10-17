@@ -17,6 +17,8 @@ import Noted
 // it was opened from, so a sidebar row can keep its ring while it's open.
 Popup {
     id: menu
+    // In the window's own scene: clamped to it, closed by a press outside.
+    popupType: Popup.Item
 
     property var items: []
     property real minWidth: 224
@@ -27,32 +29,51 @@ Popup {
     property var sub: null          // a submenu (PopupMenu sets one)
 
     padding: 6
-    modal: false
+    // Like a Windows menu, a click outside only closes it (nothing under it
+    // gets the click). A submenu isn't modal, so the root's rows still work.
+    modal: !isSub
+    dim: false
     focus: true
     width: Math.max(minWidth, col.implicitWidth + leftPadding + rightPadding)
-    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutsideParent | Popup.CloseOnPressOutside
+    // Not CloseOnPressOutsideParent: with both, a press must miss the parent too,
+    // and the parent here is the whole window.
+    closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
 
-    function openAt(item, px, py, list) {
+    // Where it was asked to open, in the window, and where its bottom goes if
+    // it has to flip above (no room below). Re-placed as its size settles.
+    property point wanted: Qt.point(0, 0)
+    property real flipBottom: 0
+    property bool alignRight: false
+    function openAt(item, px, py, list, flipAt) {
         items = list
         owner = item
         current = -1
         const win = item.Window.contentItem || item
         parent = win
-        const p = item.mapToItem(win, px, py)
+        wanted = item.mapToItem(win, px, py)
+        flipBottom = flipAt !== undefined ? item.mapToItem(win, 0, flipAt).y : wanted.y
+        alignRight = false
         open()
-        const w = width, h = implicitHeight
-        let gx = p.x, gy = p.y
-        if (gx + w > win.width - 8) gx = Math.max(8, win.width - w - 8)
-        if (gy + h > win.height - 8) gy = Math.max(8, Math.min(p.y - h, win.height - h - 8))
-        x = gx
-        y = gy
+        place()
     }
-    function openBelow(item, list) { openAt(item, 0, item.height + 4, list) }
+    function place() {
+        if (isSub || !parent) return
+        const w = width, h = implicitHeight, W = parent.width, H = parent.height
+        let gx = alignRight ? wanted.x - w : wanted.x
+        let gy = wanted.y
+        if (gx + w > W - 8) gx = W - w - 8
+        if (gy + h > H - 8) gy = flipBottom - h >= 8 ? flipBottom - h : H - h - 8
+        x = Math.max(8, gx)
+        y = Math.max(8, gy)
+    }
+    onImplicitHeightChanged: if (visible) place()
+    onWidthChanged: if (visible) place()
+    function openBelow(item, list) { openAt(item, 0, item.height + 4, list, -4) }
     // Right-aligned under the item (header buttons at the window's right).
     function openBelowRight(item, list) {
-        openAt(item, 0, item.height + 4, list)
-        const win = item.Window.contentItem || item
-        x = Math.max(8, item.mapToItem(win, item.width, 0).x - width)
+        openAt(item, item.width, item.height + 4, list, -4)
+        alignRight = true
+        place()
     }
 
     // Beside a row of a parent menu.

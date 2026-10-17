@@ -9,21 +9,25 @@ PageColumns {
     id: desk
 
     property bool active: false
+    PopupMenu { id: menu }
     signal openFileRequested()
 
     // ── data ─────────────────────────────────────────────────────────
     property var daily: ({})
     property var recent: []
     property var listCards: []
+    property var pastDays: []       // daily notes you wrote in, before today
     // To-dos ticked here stay on the page, struck through, until you leave.
     property var ticked: ({})
 
     function reload() {
         recent = Store.recentEdited(6, false)
+        pastDays = Store.pastDailyNotes(AppState.todayIso, 4)
+        const latest = {}
+        for (const s of Store.listSummaries()) latest[s.list_id] = s
         listCards = AppState.lists.map(l => {
-            const notes = Store.notesInList(l.id, "updated_at")
-            const latest = notes.slice().sort((a, b) => (b.updated_at > a.updated_at) - (b.updated_at < a.updated_at))[0]
-            return { list: l, count: notes.length, latest: latest ? latest.title : "No notes yet", edited: latest ? Fmt.editedPhrase(latest.updated_at) : "" }
+            const n = latest[l.id]
+            return { list: l, count: l.note_count || 0, latest: n ? n.title : "No notes yet", edited: n ? Fmt.editedPhrase(n.updated_at) : "" }
         })
     }
     function loadDaily() {
@@ -175,8 +179,9 @@ PageColumns {
                         anchors.fill: parent
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
-                        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
-                        onClicked: (e) => AppState.openNoteFrom(e, card.modelData.id)
+                        acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
+                        onClicked: (e) => e.button === Qt.RightButton ? menu.openAt(cardArea, e.x, e.y, AppState.noteMenuItems(card.modelData))
+                                                                      : AppState.openNoteFrom(e, card.modelData.id)
                     }
                 }
             }
@@ -245,6 +250,58 @@ PageColumns {
             onDayPicked: (iso) => {
                 if (iso === AppState.todayIso) return
                 AppState.openNote(Store.dailyNote(iso).id)
+            }
+        },
+        // The last few days you wrote in, for getting back to them.
+        Column {
+            visible: desk.pastDays.length > 0
+            width: parent.width
+            topPadding: 26
+            SectionLabel { text: "Earlier days" }
+            Item { width: 1; height: 6 }
+            Repeater {
+                model: desk.pastDays
+                delegate: Item {
+                    id: day
+                    required property var modelData
+                    width: parent.width
+                    height: dayCol.implicitHeight + 12
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.leftMargin: -8
+                        anchors.rightMargin: -8
+                        radius: 6
+                        color: dayArea.containsMouse ? Qt.alpha(Theme.c.pressed, 0.5) : "transparent"
+                    }
+                    Column {
+                        id: dayCol
+                        y: 6
+                        width: parent.width
+                        spacing: 2
+                        Text {
+                            textFormat: Text.PlainText
+                            text: Fmt.longDay(day.modelData.daily_date)
+                            color: Theme.c.ink
+                            font.pixelSize: 14
+                        }
+                        Text {
+                            textFormat: Text.PlainText
+                            width: parent.width
+                            text: AppState.isLocked(day.modelData) ? "Locked" : (day.modelData.preview || "").replace(/\s+/g, " ")
+                            color: Theme.c.muted
+                            font.pointSize: Theme.pt(12.5)
+                            elide: Text.ElideRight
+                        }
+                    }
+                    MouseArea {
+                        id: dayArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        acceptedButtons: Qt.LeftButton | Qt.MiddleButton
+                        onClicked: (e) => AppState.openNoteFrom(e, day.modelData.id)
+                    }
+                }
             }
         },
         Item { width: 1; height: 34 },
