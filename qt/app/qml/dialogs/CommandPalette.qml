@@ -43,17 +43,14 @@ Popup {
         const cmds = [
             { kind: "cmd", icon: "square-pen", title: "New note", hint: "Ctrl+N", run: () => AppState.newNote() },
             { kind: "cmd", icon: "type", title: "New plain-text note", run: () => AppState.newNote({ type: "plain" }) },
-            { kind: "cmd", icon: "calendar", title: "Go to Today", hint: "Ctrl+.", run: () => AppState.setView("today") },
-            { kind: "cmd", icon: "file-text", title: "Go to All Notes", run: () => AppState.setView("all") },
+            { kind: "cmd", icon: "calendar", title: "Go to Today", hint: "Ctrl+.", run: () => AppState.go("desk") },
             { kind: "cmd", icon: "square-check", title: "Go to To-dos", run: () => AppState.setView("todos") },
             { kind: "cmd", icon: "trash-2", title: "Go to Trash", run: () => AppState.setView("trash") },
             { kind: "cmd", icon: "folder-open", title: "Open file…", hint: "Ctrl+O", keywords: "import markdown md txt", run: () => cmdp.importRequested() },
-            { kind: "cmd", icon: "settings", title: "Settings", hint: "Ctrl+,", run: () => AppState.settingsOpen = true },
+            { kind: "cmd", icon: "settings", title: "Settings", hint: "Ctrl+,", run: () => AppState.openSettings() },
             { kind: "cmd", icon: "sun", title: "Theme: Light", run: () => AppState.setTheme("light") },
-            { kind: "cmd", icon: "coffee", title: "Theme: Warm", run: () => AppState.setTheme("warm") },
-            { kind: "cmd", icon: "cloudy", title: "Theme: Slate", run: () => AppState.setTheme("slate") },
             { kind: "cmd", icon: "moon", title: "Theme: Dark", run: () => AppState.setTheme("dark") },
-            { kind: "cmd", icon: "monitor", title: "Theme: System", run: () => AppState.setTheme("system") },
+            { kind: "cmd", icon: "monitor", title: "Theme: Match Windows", run: () => AppState.setTheme("system") },
             { kind: "cmd", icon: "panel-left", title: "Toggle sidebar", hint: "Ctrl+\\", run: () => AppState.setSidebarCollapsed(!AppState.sidebarCollapsed) },
             { kind: "cmd", icon: "maximize-2", title: "Toggle focus mode", hint: "F11", run: () => AppState.focusMode = !AppState.focusMode }
         ]

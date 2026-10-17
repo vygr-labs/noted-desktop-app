@@ -6,6 +6,8 @@
 #include <QDir>
 #include <QFile>
 #include <QFileInfo>
+#include <QClipboard>
+#include <QGuiApplication>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QJsonObject>
@@ -186,6 +188,16 @@ QString AppController::suggestedFileName(const QString& noteId, const QString& f
 {
     const QVariantMap n = m_store.note(noteId);
     return safeFileName(n.value("title").toString()) + QLatin1Char('.') + format;
+}
+
+bool AppController::copyAsMarkdown(const QString& noteId)
+{
+    const QVariantMap n = m_store.note(noteId);
+    if (n.isEmpty() || (n.value("is_locked").toBool() && !m_store.isUnlocked(noteId))) return false;
+    const bool plain = n.value("note_type").toString() == u"plain";
+    const QString body = plain ? n.value("content").toString() : doc::toMarkdown(doc::parse(n.value("content").toString()));
+    QGuiApplication::clipboard()->setText(QStringLiteral("# ") + n.value("title").toString() + QStringLiteral("\n\n") + body);
+    return true;
 }
 
 QString AppController::exportNote(const QString& noteId, const QString& format, const QUrl& target)

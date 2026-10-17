@@ -40,9 +40,8 @@ qt_add_qml_module(noted
         qml/Theme.qml
         qml/AppState.qml
         qml/Icons.qml
+        qml/Fmt.js
 
-        qml/controls/Badge.qml
-        qml/controls/ColorDot.qml
         qml/controls/Field.qml
         qml/controls/Icon.qml
         qml/controls/IconButton.qml
@@ -50,6 +49,7 @@ qt_add_qml_module(noted
         qml/controls/MenuRow.qml
         qml/controls/ModalDialog.qml
         qml/controls/PopupMenu.qml
+        qml/controls/MenuBase.qml
         qml/controls/ResizeFrame.qml
         qml/controls/WindowButtons.qml
         qml/controls/DragArea.qml
@@ -57,29 +57,42 @@ qt_add_qml_module(noted
         qml/controls/TextButton.qml
         qml/controls/Tip.qml
         qml/controls/Toggle.qml
+        qml/controls/Shadow.qml
+        qml/controls/Checkbox.qml
+        qml/controls/Segmented.qml
+        qml/controls/SectionLabel.qml
+        qml/controls/SettingRow.qml
+        qml/controls/PageColumns.qml
+        qml/controls/Picker.qml
+        qml/controls/Tabs.qml
 
         qml/panels/MiniCalendar.qml
-        qml/panels/OpenTasks.qml
+        qml/panels/Header.qml
+        qml/panels/SideTask.qml
+        qml/panels/FolderCard.qml
+        qml/panels/SheetPreview.qml
         qml/panels/Sidebar.qml
-        qml/panels/NoteListPane.qml
-        qml/panels/NoteCard.qml
         qml/panels/PopoutManager.qml
         qml/panels/PopoutWindow.qml
 
         qml/editor/EditorPane.qml
-        qml/editor/EditorToolbar.qml
         qml/editor/FindBar.qml
-        qml/editor/LockOverlay.qml
         qml/editor/NoteHeader.qml
         qml/editor/PlainEditor.qml
         qml/editor/RichEditor.qml
-        qml/editor/TagsBar.qml
+        qml/editor/LockPanel.qml
+        qml/editor/SelectionToolbar.qml
+        qml/editor/MovePicker.qml
+        qml/editor/TagPicker.qml
 
-        qml/todos/TodoView.qml
-        qml/todos/TodoRow.qml
+        qml/pages/DeskPage.qml
+        qml/pages/ListPage.qml
+        qml/pages/TodosPage.qml
+        qml/pages/SearchPage.qml
+        qml/pages/SettingsPage.qml
+        qml/pages/TrashPage.qml
 
         qml/dialogs/CommandPalette.qml
-        qml/dialogs/SettingsDialog.qml
         qml/dialogs/PinDialog.qml
         qml/dialogs/QuickCapture.qml
 )
@@ -88,12 +101,8 @@ qt_add_resources(noted "noted_assets"
     PREFIX "/"
     BASE resources
     FILES
-        resources/fonts/IBMPlexSans-Variable.ttf
-        resources/fonts/IBMPlexSans-Italic-Variable.ttf
-        resources/fonts/IBMPlexMono-Regular.ttf
-        resources/fonts/IBMPlexMono-Italic.ttf
-        resources/fonts/IBMPlexMono-Medium.ttf
-        resources/fonts/IBMPlexMono-SemiBold.ttf
+        resources/fonts/Geist-Variable.ttf
+        resources/fonts/GeistMono-Variable.ttf
         resources/fonts/lucide.ttf
         resources/brand/icon.png
         resources/brand/noted-logo.svg

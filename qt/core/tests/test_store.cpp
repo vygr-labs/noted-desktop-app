@@ -19,6 +19,8 @@ private slots:
     void lockPin();
     void checklistProgressAndOpenTasks();
     void listGroupsAndSnippets();
+    void tasksInEitherKeyOrder();
+    void lockedNotesStayPrivate();
 };
 
 void TestStore::freshDatabaseIsAtLatestSchema()
@@ -161,6 +163,85 @@ void TestStore::listGroupsAndSnippets()
     QCOMPARE(model.data(model.index(1), NotesModel::GroupRole).toString(), QStringLiteral("Today"));
 }
 
+void TestStore::tasksInEitherKeyOrder()
+{
+    QTemporaryDir dir;
+    Database db(dir.filePath("app.sqlite"));
+    NoteStore store(db);
+
+    // As this build saves it: keys sorted, so "attrs" comes before "type".
+    const QString sorted = QStringLiteral(
+        R"({"content":[{"content":[)"
+        R"({"attrs":{"checked":false},"content":[{"content":[{"text":"first","type":"text"}],"type":"paragraph"}],"type":"taskItem"},)"
+        R"({"attrs":{"checked":false},"content":[{"content":[{"text":"second","type":"text"}],"type":"paragraph"}],"type":"taskItem"})"
+        R"(],"type":"taskList"}],"type":"doc"})");
+    const QString id = store.createNote({{"title", "Sorted"}, {"content", sorted}}).value("id").toString();
+    QCOMPARE(store.allTasks().size(), 2);
+    QCOMPARE(store.openTasks().size(), 1);
+
+    QVERIFY(store.setTaskChecked(id, 1, true));
+    QVERIFY(store.setTaskDue(id, 0, QStringLiteral("2026-10-21")));
+    const QVariantList all = store.allTasks(true);
+    QCOMPARE(all.size(), 2);
+    QCOMPARE(all[0].toMap().value("due").toString(), QStringLiteral("2026-10-21"));
+    QVERIFY(!all[0].toMap().value("checked").toBool());
+    QVERIFY(all[1].toMap().value("checked").toBool());
+    QVERIFY(store.setTaskDue(id, 0, QString()));
+    QCOMPARE(store.allTasks(true)[0].toMap().value("due").toString(), QString());
+
+    // TipTap's own order keeps the byte-level edit, due date and all.
+    const QString tiptap = QStringLiteral(
+        R"({"type":"doc","content":[{"type":"taskList","content":[)"
+        R"({"type":"taskItem","attrs":{"checked":false},"content":[{"type":"paragraph","content":[{"type":"text","text":"call"}]}]}]}]})");
+    const QString id2 = store.createNote({{"title", "TipTap"}, {"content", tiptap}}).value("id").toString();
+    QVERIFY(store.setTaskDue(id2, 0, QStringLiteral("2026-10-17")));
+    QVERIFY(store.note(id2).value("content").toString().contains(QStringLiteral(R"("attrs":{"checked":false,"due":"2026-10-17"})")));
+    QVERIFY(store.setTaskChecked(id2, 0, true));
+    QVERIFY(store.note(id2).value("content").toString().contains(QStringLiteral(R"("attrs":{"checked":true,"due":"2026-10-17"})")));
+
+    // Adding to an empty daily note replaces its blank paragraph.
+    const QString daily = store.dailyNote(QStringLiteral("2026-10-17")).value("id").toString();
+    QCOMPARE(store.appendTask(daily, QStringLiteral("Buy milk")), 0);
+    QCOMPARE(store.appendTask(daily, QStringLiteral("Call Tolu")), 1);
+    const QVariantList blocks = store.previewBlocks(daily);
+    QCOMPARE(blocks.size(), 2);
+    QCOMPARE(blocks[0].toMap().value("t").toString(), QStringLiteral("task"));
+    QCOMPARE(blocks[1].toMap().value("text").toString(), QStringLiteral("Call Tolu"));
+}
+
+void TestStore::lockedNotesStayPrivate()
+{
+    QTemporaryDir dir;
+    Database db(dir.filePath("app.sqlite"));
+    NoteStore store(db);
+    store.setLockPin("2468");
+
+    const QString body = QStringLiteral(
+        R"({"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"the vault code is 4411"}]},)"
+        R"({"type":"taskList","content":[{"type":"taskItem","attrs":{"checked":false},"content":[{"type":"paragraph","content":[{"type":"text","text":"rotate the vault key"}]}]}]}]})");
+    const QString id = store.createNote({{"title", "Vault notes"}, {"content", body}}).value("id").toString();
+    QVERIFY(store.toggleNoteLock(id));
+
+    // Body text doesn't find it; the title does, with nothing of the body.
+    QCOMPARE(store.searchNotes("4411").size(), 0);
+    const QVariantList byTitle = store.searchNotes("vault");
+    QCOMPARE(byTitle.size(), 1);
+    QCOMPARE(byTitle[0].toMap().value("snippet").toString(), QString());
+    QCOMPARE(byTitle[0].toMap().value("hits").toInt(), 1);
+    QVERIFY(byTitle[0].toMap().value("is_locked").toBool());
+
+    QVERIFY(store.previewBlocks(id).isEmpty());
+    QVERIFY(store.allTasks(true).isEmpty());
+    QCOMPARE(store.recentEdited(4, true)[0].toMap().value("preview").toString(), QString());
+
+    // Unlocked for the session, it behaves like any note.
+    store.markUnlocked(id);
+    QCOMPARE(store.searchNotes("4411").size(), 1);
+    QCOMPARE(store.previewBlocks(id).size(), 2);
+    QCOMPARE(store.allTasks().size(), 1);
+    store.relock(id);
+    QVERIFY(store.previewBlocks(id).isEmpty());
+}
 
 QTEST_MAIN(TestStore)
 #include "test_store.moc"

@@ -1,17 +1,18 @@
 import QtQuick
 import QtQuick.Layouts
 import Noted
+import "../Fmt.js" as Fmt
 
-// Month grid for daily notes: days with an entry are bold, today is filled,
-// the open day is outlined. Clicking a day opens (or creates) its note.
-ColumnLayout {
+// Month grid for daily notes, Monday first. Today is an accent circle; days
+// with a daily note are darker with a small dot under them. Clicking a day
+// opens (or starts) its note.
+Column {
     id: cal
 
-    property string selectedIso: ""       // yyyy-MM-dd of the open daily note
     property date month: new Date()       // any day in the shown month
     signal dayPicked(string iso)
 
-    spacing: 4
+    spacing: 0
 
     readonly property string monthKey: Qt.formatDate(month, "yyyy-MM")
     property var marked: ({})
@@ -24,18 +25,8 @@ ColumnLayout {
     Component.onCompleted: reloadMarks()
     Connections { target: Store; function onNotesChanged() { cal.reloadMarks() } }
 
-    function shift(delta) {
-        const d = new Date(month.getFullYear(), month.getMonth() + delta, 1)
-        month = d
-    }
-    function showDate(iso) {
-        if (!iso) return
-        const d = new Date(iso + "T12:00:00")
-        if (d.getFullYear() !== month.getFullYear() || d.getMonth() !== month.getMonth()) month = d
-    }
-    onSelectedIsoChanged: showDate(selectedIso)
+    function shift(delta) { month = new Date(month.getFullYear(), month.getMonth() + delta, 1) }
 
-    // Monday-first cells: leading blanks then 1..n.
     readonly property var cells: {
         const first = new Date(month.getFullYear(), month.getMonth(), 1)
         const days = new Date(month.getFullYear(), month.getMonth() + 1, 0).getDate()
@@ -47,60 +38,71 @@ ColumnLayout {
     }
 
     RowLayout {
-        Layout.fillWidth: true
-        Layout.leftMargin: 4
-        spacing: 2
+        width: cal.width
+        height: 28
+        spacing: 4
         Text {
-            text: Qt.formatDate(cal.month, "MMMM yyyy")
-            color: Theme.c.text
-            font.pixelSize: 13
-            font.weight: Font.DemiBold
             Layout.fillWidth: true
+            text: Fmt.monthTitle(cal.month)
+            color: Theme.c.ink
+            font.pixelSize: 14
+            font.weight: Font.DemiBold
         }
-        IconButton { icon: "chevron-left"; size: 24; iconSize: 14; dim: true; tooltip: "Previous month"; onClicked: cal.shift(-1) }
-        IconButton { icon: "chevron-right"; size: 24; iconSize: 14; dim: true; tooltip: "Next month"; onClicked: cal.shift(1) }
+        IconButton { size: 28; iconSize: 14; icon: "chevron-left"; tooltip: "Previous month"; onClicked: cal.shift(-1) }
+        IconButton { size: 28; iconSize: 14; icon: "chevron-right"; tooltip: "Next month"; onClicked: cal.shift(1) }
     }
-
-    GridLayout {
-        Layout.fillWidth: true
-        columns: 7
-        rowSpacing: 2
-        columnSpacing: 2
-
+    Item { width: 1; height: 8 }
+    Row {
         Repeater {
             model: ["M", "T", "W", "T", "F", "S", "S"]
             delegate: Text {
                 required property string modelData
-                Layout.fillWidth: true
+                width: cal.width / 7
                 horizontalAlignment: Text.AlignHCenter
                 text: modelData
-                color: Theme.c.subtle
-                font.pixelSize: 11
-                bottomPadding: 2
+                color: Theme.c.muted
+                font.pixelSize: 12
+                bottomPadding: 4
             }
         }
+    }
+    Grid {
+        columns: 7
+        rowSpacing: 2
         Repeater {
             model: cal.cells
-            delegate: Rectangle {
+            delegate: Item {
                 id: day
                 required property int modelData
                 readonly property string iso: modelData > 0 ? Qt.formatDate(new Date(cal.month.getFullYear(), cal.month.getMonth(), modelData), "yyyy-MM-dd") : ""
                 readonly property bool isToday: iso === AppState.todayIso
-                readonly property bool isSelected: iso !== "" && iso === cal.selectedIso
-                readonly property bool future: iso > AppState.todayIso
-                Layout.fillWidth: true
-                Layout.preferredHeight: 26
-                radius: Theme.radius
-                color: isToday ? Theme.c.accent : (dayArea.containsMouse && modelData > 0 ? Theme.c.hover : "transparent")
-                border.width: isSelected && !isToday ? 1.5 : 0
-                border.color: Theme.c.accent
-                Text {
-                    anchors.centerIn: parent
+                readonly property bool has: !!cal.marked[iso]
+                width: cal.width / 7
+                height: 34
+                Rectangle {
                     visible: day.modelData > 0
-                    text: day.modelData
-                    color: day.isToday ? Theme.c.onAccent : (cal.marked[day.iso] ? Theme.c.text : (day.future ? Theme.c.faint : Theme.c.subtle))
-                    font.pixelSize: 12
-                    font.weight: cal.marked[day.iso] || day.isToday ? Font.DemiBold : Font.Normal
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: 28
+                    height: 28
+                    radius: 14
+                    color: day.isToday ? Theme.c.accent : (dayArea.containsMouse ? Qt.alpha(Theme.c.pressed, 0.8) : "transparent")
+                    Text {
+                        anchors.centerIn: parent
+                        text: day.modelData
+                        color: day.isToday ? Theme.c.onAccent : (day.has ? Theme.c.ink : Theme.c.muted)
+                        font.pixelSize: 13
+                        font.weight: day.isToday ? Font.DemiBold : (day.has ? Font.Medium : Font.Normal)
+                        font.features: { "tnum": 1 }
+                    }
+                }
+                Rectangle {
+                    visible: day.has && !day.isToday
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    y: 25
+                    width: 3
+                    height: 3
+                    radius: 1.5
+                    color: Theme.c.faint
                 }
                 MouseArea {
                     id: dayArea

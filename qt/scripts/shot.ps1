@@ -2,12 +2,14 @@
 #
 #   .\scripts\shot.ps1 out.png                       # default state
 #   .\scripts\shot.ps1 out.png '{"view":"todos"}'    # startup UI state (see Main.qml)
+#   .\scripts\shot.ps1 out.png -Demo                 # the sample notes in personal/qt-demo
 
 param(
     [Parameter(Mandatory = $true)][string]$Out,
     [string]$State = '',
     [int]$Delay = 2500,
-    [switch]$NoBuild
+    [switch]$NoBuild,
+    [switch]$Demo
 )
 
 $ErrorActionPreference = 'Stop'
@@ -18,6 +20,7 @@ if (-not $NoBuild) {
 }
 $env:PATH = "C:\Qt\6.11.1\msvc2022_64\bin;$env:PATH"
 $argv = @('--screenshot', $Out, '--screenshot-delay', "$Delay")
+if ($Demo) { $argv += @('--db', (Join-Path (Split-Path -Parent $root) 'personal\qt-demo\app.sqlite')) }
 if ($State) { $argv += @('--state', ('"' + ($State -replace '"', '\"') + '"')) }
 $err = [System.IO.Path]::GetTempFileName()
 $p = Start-Process -FilePath (Join-Path $root 'build\noted.exe') -ArgumentList $argv -PassThru -Wait -NoNewWindow -RedirectStandardError $err

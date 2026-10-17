@@ -327,16 +327,26 @@ void EditorController::recomputeStats()
     const int words = trimmed.isEmpty() ? 0 : int(trimmed.split(ws, Qt::SkipEmptyParts).size());
     const bool empty = trimmed.isEmpty() && (!d || d->blockCount() <= 1);
     QString lead;
+    QVariantList outline;
     if (d) {
         const QTextBlock first = d->begin();
         const QTextBlockFormat bf = first.blockFormat();
         if (bf.intProperty(BlockKind) == Heading && bf.headingLevel() == 1 && !first.textList())
             lead = first.text().simplified();
+        for (QTextBlock b = d->begin(); b.isValid(); b = b.next()) {
+            const QTextBlockFormat f = b.blockFormat();
+            if (f.intProperty(BlockKind) != Heading || f.headingLevel() < 2 || f.headingLevel() > 3 || b.textList()) continue;
+            const QString t = b.text().simplified();
+            if (!t.isEmpty())
+                outline << QVariantMap{{QStringLiteral("text"), t}, {QStringLiteral("level"), f.headingLevel()},
+                                       {QStringLiteral("block"), b.blockNumber()}};
+        }
     }
-    if (words != m_words || empty != m_empty || lead != m_leadingHeading) {
+    if (words != m_words || empty != m_empty || lead != m_leadingHeading || outline != m_outline) {
         m_words = words;
         m_empty = empty;
         m_leadingHeading = lead;
+        m_outline = outline;
         emit statsChanged();
     }
     if (m_dirty && !m_noteId.isEmpty()) emit livePreview(m_noteId, trimmed.left(240));

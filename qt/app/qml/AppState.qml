@@ -10,26 +10,29 @@ QtObject {
     id: state
 
     // ── navigation ───────────────────────────────────────────────────
-    // all | today | synced | todos | trash | list | tag
-    property string view: "all"
+    // One page fills the main area:
+    //   desk      home: today's note, recent notes, lists, calendar, open to-dos
+    //   note      selectedNoteId (a note, or a file opened from disk)
+    //   list      viewId = list id
+    //   todos     every open to-do
+    //   search    viewId = the query
+    //   settings  viewId = section (appearance, editor, sharing, …)
+    //   trash
+    property string view: "desk"
     property string viewId: ""
     property string selectedNoteId: ""
     property var currentNote: ({})
     property var currentTags: []
 
-    // Back/forward through opened notes (Alt+Left / Alt+Right).
+    // Back/forward through pages (Alt+Left / Alt+Right): [{view, viewId, note}].
     property var history: []
     property int historyIndex: -1
     property bool _navigating: false
 
     // ── layout ───────────────────────────────────────────────────────
     property bool sidebarCollapsed: false
-    property bool noteListCollapsed: false
     property bool focusMode: false
-    property real noteListWidth: 328
-    property string toolbarPosition: "top"   // top | right | bottom | left | hidden
-    property string layout: "vertical"       // vertical | horizontal (tabs)
-    property bool fullWidth: false           // editor text fills the pane instead of a centred column
+    property bool fullWidth: false           // note text fills the page instead of a centred column
 
     // ── preferences ──────────────────────────────────────────────────
     property string noteSort: "updated_at"
@@ -37,10 +40,11 @@ QtObject {
     property string defaultNoteType: "rich"
     property bool popoutSkipTaskbar: false
     property bool spellcheckHint: true
+    property string listLayout: "sheets"     // sheets | rows (list pages)
+    property var expandedLists: ({})         // list id -> true while open in the sidebar tree
 
     // ── overlays ─────────────────────────────────────────────────────
     property bool paletteOpen: false
-    property bool settingsOpen: false
     property bool findOpen: false
     property bool replaceOpen: false
 
@@ -52,6 +56,12 @@ QtObject {
     property var todoLists: []
     property string selectedTodoListId: ""
     property bool hasLockPin: Store.hasLockPin
+    // Every checklist item in the notes (done ones too), see Store.allTasks.
+    property var tasks: []
+    readonly property int openTaskCount: tasks.filter(t => !t.checked).length
+    // Bumps when a note is unlocked or locked again, so bindings that ask
+    // isLocked() re-evaluate.
+    property int lockTick: 0
 
     // Local date, kept current across midnight.
     property string todayIso: Store.todayIso()
@@ -68,67 +78,57 @@ QtObject {
     signal focusTitleRequested(bool selectAll)
     signal focusEditorRequested()
     signal toast(string message)
+    signal newListRequested()
     signal pinPromptRequested(string mode, string noteId)  // set | unlock | remove
-    signal editorTaskToggleRequested(int taskIndex)          // the open note's n-th checklist item
+    signal editorTaskToggleRequested(string noteId, int taskIndex)  // an open note's n-th checklist item
 
-    readonly property string viewTitle: {
-        switch (view) {
-        case "today": return "Today"
-        case "synced": return "Synced"
-        case "todos": return "To-dos"
-        case "trash": return "Trash"
-        case "list": {
-            for (let i = 0; i < lists.length; ++i) if (lists[i].id === viewId) return lists[i].name
-            for (let j = 0; j < hiddenLists.length; ++j) if (hiddenLists[j].id === viewId) return hiddenLists[j].name
-            return "List"
-        }
-        case "tag": {
-            for (let k = 0; k < tags.length; ++k) if (tags[k].id === viewId) return "#" + tags[k].name
-            return "Tag"
-        }
-        default: return "All Notes"
-        }
+    function listById(id) {
+        for (const l of lists) if (l.id === id) return l
+        for (const h of hiddenLists) if (h.id === id) return h
+        return null
     }
 
     function load() {
-        Theme.mode = Store.setting("appTheme", "system")
+        // Warm and Slate are gone: fold them into Light and Dark once.
+        let theme = Store.setting("appTheme", "system")
+        if (theme === "warm") { theme = "light"; save("appTheme", theme) }
+        else if (theme === "slate") { theme = "dark"; save("appTheme", theme) }
+        Theme.mode = theme
+        Theme.accentChoice = Store.setting("qt.accent", "#2F5AC8")
         noteSort = Store.setting("noteSort", "updated_at")
         showPreview = Store.setting("showNotePreview", "1") !== "0"
-        layout = Store.setting("noteListLayout", "vertical")
         defaultNoteType = Store.setting("defaultNoteType", "rich")
         popoutSkipTaskbar = Store.setting("popoutSkipTaskbar", "false") === "true"
-        toolbarPosition = Store.setting("qt.toolbarPosition", "top")
         fullWidth = Store.setting("qt.wideText", "false") === "true"
-        noteListWidth = parseFloat(Store.setting("qt.noteListWidth", "328")) || 328
         sidebarCollapsed = Store.setting("qt.sidebarCollapsed", "false") === "true"
+        listLayout = Store.setting("qt.listLayout", "sheets")
+        try { expandedLists = JSON.parse(Store.setting("qt.expandedLists", "{}")) } catch (e) { expandedLists = ({}) }
         Theme.textScale = parseFloat(Store.setting("qt.textScale", "1")) || 1
         Notes.sort = noteSort
         refreshAll()
-        const last = Store.setting("qt.lastNote", "")
-        if (last !== "") {
-            const n = noteData(last)
-            if (n.id && !n.is_trashed) selectNote(last)
-        }
+        go("desk")
     }
 
     function save(key, value) { Store.setSetting(key, String(value)) }
 
     function setTheme(m) { Theme.mode = m; save("appTheme", m) }
-    function cycleTheme() {
-        const order = ["light", "warm", "slate", "dark"]
-        const i = order.indexOf(Theme.resolved)
-        setTheme(order[(i + 1) % order.length])
-    }
+    function cycleTheme() { setTheme(Theme.dark ? "light" : "dark") }
+    function setAccent(hex) { Theme.accentChoice = hex; save("qt.accent", hex) }
     function setSort(s) { noteSort = s; Notes.sort = s; save("noteSort", s) }
     function setShowPreview(v) { showPreview = v; save("showNotePreview", v ? "1" : "0") }
-    function setLayout(v) { layout = v; save("noteListLayout", v) }
+    function setListLayout(v) { listLayout = v; save("qt.listLayout", v) }
     function setFullWidth(v) { fullWidth = v; save("qt.wideText", v) }
-    function setToolbarPosition(v) { toolbarPosition = v; save("qt.toolbarPosition", v) }
-    function setNoteListWidth(w) { noteListWidth = w; save("qt.noteListWidth", Math.round(w)) }
     function setSidebarCollapsed(v) { sidebarCollapsed = v; save("qt.sidebarCollapsed", v) }
     function setTextScale(s) {
-        Theme.textScale = Math.max(0.8, Math.min(1.6, Math.round(s * 10) / 10))
+        Theme.textScale = Math.max(0.8, Math.min(1.6, Math.round(s * 1000) / 1000))
         save("qt.textScale", Theme.textScale)
+    }
+    function setListExpanded(id, open) {
+        const e = Object.assign({}, expandedLists)
+        if (open) e[id] = true
+        else delete e[id]
+        expandedLists = e
+        save("qt.expandedLists", JSON.stringify(e))
     }
 
     function refreshAll() {
@@ -136,8 +136,28 @@ QtObject {
         refreshLists()
         refreshTags()
         refreshTodoLists()
+        refreshTasks()
         refreshCurrent()
     }
+    // Note to-dos, then the standalone ones from the older To-dos lists
+    // (kind "todo"), shaped alike so every page can show both.
+    function refreshTasks() {
+        const owners = {}
+        for (const l of Store.todoLists()) owners[l.id] = l
+        const standalone = Store.todos("").map(t => ({
+            kind: "todo", todoId: t.id, noteId: "", index: -1, text: t.text, checked: !!t.is_completed,
+            due: (t.due_date || "").slice(0, 10), title: owners[t.todo_list_id] ? owners[t.todo_list_id].name : "To-dos",
+            listId: "", isDaily: false, dailyDate: "", updatedAt: t.updated_at
+        }))
+        tasks = Store.allTasks(true).concat(standalone)
+    }
+    function taskKey(t) { return t.kind === "todo" ? "todo:" + t.todoId : t.noteId + ":" + t.index }
+    function setTaskDone(t, done) {
+        if (t.kind === "todo") Store.updateTodo(t.todoId, { is_completed: done })
+        else checkTask(t.noteId, t.index, done)
+    }
+    function openTask(t) { if (t.kind === "todo") go("todos"); else openNote(t.noteId) }
+    property Timer _tasksLater: Timer { interval: 300; onTriggered: state.refreshTasks() }
     function refreshCounts() { counts = Store.counts() }
     function refreshLists() { lists = Store.lists(); hiddenLists = Store.hiddenLists() }
     function refreshTags() { tags = Store.tags() }
@@ -153,6 +173,9 @@ QtObject {
     // A note from the database, or a file opened from disk ("file:" ids).
     function noteData(id) { return Files.isFile(id) ? Files.note(id) : Store.note(id) }
 
+    // A locked note stays closed until its PIN is entered this session.
+    function isLocked(n) { lockTick; return !!n && !!n.is_locked && !Store.isUnlocked(n.id || n.note_id || "") }
+
     // ── files on disk (edited in place, see OpenFiles.h) ─────────────
     // Opens each path and shows the last one. Returns how many opened.
     function openFiles(paths) {
@@ -161,60 +184,70 @@ QtObject {
             const id = Files.open(p)
             if (id) { last = id; opened++ }
         }
-        if (last) selectNote(last)
+        if (last) openNote(last)
         if (opened < paths.length) toast(paths.length > 1 ? (paths.length - opened) + " files couldn't be opened" : "Couldn't open that file")
         return opened
     }
     function closeFile(id) {
-        // Deselect first so the editor writes any pending change to the file.
-        if (selectedNoteId === id) selectNote("")
+        // Leave the page first so the editor writes any pending change to the file.
+        if (selectedNoteId === id) go("desk")
         Files.close(id)
     }
     // Copies an open file into the database as an ordinary note.
     function copyFileToNotes(id) {
         const noteId = App.importFile(Files.pathOf(id))
-        if (noteId) { setView("all"); selectNote(noteId); toast("Copied into your notes") }
+        if (noteId) { openNote(noteId); toast("Copied into your notes") }
     }
 
     // ── navigation actions ───────────────────────────────────────────
-    function setView(v, id) {
-        view = v
-        viewId = id || ""
-        if (v === "todos") return
-        Notes.filter = ""
-        Notes.view = v === "today" ? "daily" : v
-        Notes.filterId = viewId
-        if (v === "today") {
-            const today = Store.dailyNote(Store.todayIso())
-            refreshCounts()
-            selectNote(today.id)
+    // Shows a page. A note page needs `noteId`.
+    function go(v, id, noteId) {
+        if (v === "today" || v === "all" || v === "") v = "desk"
+        id = id || ""
+        noteId = v === "note" ? (noteId || id) : ""
+        if (v === "note") id = ""
+        if (v === "list") {
+            Notes.filter = ""
+            Notes.view = "list"
+            Notes.filterId = id
+        } else if (v === "trash") {
+            Notes.filter = ""
+            Notes.view = "trash"
+            Notes.filterId = ""
         }
-    }
-
-    function selectNote(id) {
-        if (id === selectedNoteId) return
-        selectedNoteId = id || ""
-        refreshCurrent()
-        if (id) save("qt.lastNote", id)
-        if (!_navigating && id) {
-            const h = history.slice(0, historyIndex + 1).filter(x => x !== id)
-            h.push(id)
-            history = h.slice(-50)
-            historyIndex = history.length - 1
+        view = v
+        viewId = id
+        if (selectedNoteId !== noteId) {
+            selectedNoteId = noteId
+            refreshCurrent()
         }
         findOpen = false
+        if (!_navigating) {
+            const entry = { view: v, viewId: id, note: noteId }
+            const top = history[historyIndex]
+            if (!top || top.view !== v || top.viewId !== id || top.note !== noteId) {
+                const h = history.slice(0, historyIndex + 1)
+                h.push(entry)
+                history = h.slice(-60)
+                historyIndex = history.length - 1
+            }
+        }
     }
+    // Older callers.
+    function setView(v, id) { if (v === "tag") openTag(id); else go(v, id) }
+    function selectNote(id) { if (id) openNote(id); else go("desk") }
 
     function goBack() { navigate(-1) }
     function goForward() { navigate(1) }
     function navigate(delta) {
         let i = historyIndex + delta
         while (i >= 0 && i < history.length) {
-            const n = noteData(history[i])
-            if (n.id && !n.is_trashed) {
+            const e = history[i]
+            const n = e.note ? noteData(e.note) : null
+            if (!e.note || (n.id && !n.is_trashed)) {
                 historyIndex = i
                 _navigating = true
-                selectNote(history[i])
+                go(e.view, e.viewId, e.note)
                 _navigating = false
                 return
             }
@@ -222,42 +255,38 @@ QtObject {
         }
     }
 
-    // Opens a note from anywhere (search, palette), switching to a view that
-    // contains it.
+    // Opens a note from anywhere. Today's daily note lives on the desk.
     function openNote(id) {
-        const n = Store.note(id)
+        const n = noteData(id)
         if (!n.id) return
-        if (n.is_trashed) setView("trash")
-        else if (view === "todos" || view === "trash" || view === "today"
-                 || (view === "list" && n.list_id !== viewId) || view === "tag" || view === "synced") {
-            if (n.list_id) setView("list", n.list_id)
-            else setView("all")
-        }
-        selectNote(id)
+        if (n.is_daily && n.daily_date === todayIso && !n.is_trashed) { go("desk"); return }
+        if (n.id && !Files.isFile(id)) save("qt.lastNote", id)
+        go("note", "", id)
     }
+    function openTag(tagId) {
+        for (const t of tags) if (t.id === tagId) { go("search", "#" + t.name); return }
+    }
+    function openSettings(section) { go("settings", section || "appearance") }
+    function openSearch(query) { go("search", query || "") }
 
     function newNote(opts) {
         const data = {
-            title: "Untitled",
+            title: (opts && opts.title) || "Untitled",
             note_type: (opts && opts.type) || defaultNoteType,
-            list_id: view === "list" ? viewId : ""
+            list_id: (opts && opts.listId !== undefined) ? opts.listId : (view === "list" ? viewId : (currentNote.list_id || ""))
         }
-        if (view === "trash" || view === "todos" || view === "today" || view === "synced") setView(data.list_id ? "list" : "all", data.list_id)
         const n = Store.createNote(data)
-        if (view === "tag" && viewId !== "") {
-            for (let i = 0; i < tags.length; ++i) if (tags[i].id === viewId) Store.addTagToNote(n.id, tags[i].name)
-        }
-        selectNote(n.id)
-        focusTitleRequested(true)
+        openNote(n.id)
+        if (!(opts && opts.title)) focusTitleRequested(true)
         return n.id
     }
 
     function trashNote(id) {
-        const idx = Notes.indexOf(id)
+        const n = Store.note(id)
         Store.trashNote(id)
         if (id === selectedNoteId) {
-            const next = Notes.idAt(Math.min(idx, Notes.count - 1))
-            selectNote(next !== id ? next : "")
+            if (n.list_id) go("list", n.list_id)
+            else go("desk")
         }
         toast("Moved to trash")
     }
@@ -265,12 +294,11 @@ QtObject {
     function restoreNote(id) { Store.restoreNote(id); if (id === selectedNoteId) refreshCurrent(); toast("Restored") }
 
     function deleteForever(id) {
-        const idx = Notes.indexOf(id)
         Store.deleteNotePermanently(id)
-        if (id === selectedNoteId) selectNote(Notes.idAt(Math.min(idx, Notes.count - 1)))
+        if (id === selectedNoteId) go("trash")
     }
 
-    function duplicate(id) { const n = Store.duplicateNote(id); if (n.id) selectNote(n.id) }
+    function duplicate(id) { const n = Store.duplicateNote(id); if (n.id) openNote(n.id) }
 
     function toggleLock(id) {
         if (!Store.hasLockPin) { pinPromptRequested("set", id); return }
@@ -279,13 +307,24 @@ QtObject {
         refreshCurrent()
         toast(locked ? "Note locked" : "Note unlocked")
     }
-
-    // Ticks a checklist item from outside the editor (open to-dos panel). The
-    // open note goes through the editor so its undo stack and caret survive.
-    function checkTask(noteId, index) {
-        if (noteId === selectedNoteId && currentNote.note_type !== "plain") editorTaskToggleRequested(index)
-        else Store.setTaskChecked(noteId, index, true)
+    // Closes an unlocked note again without asking for the PIN.
+    function lockAgain(id) {
+        Store.relock(id)
+        refreshCurrent()
     }
+
+    // Ticks a checklist item from outside the editor (desk, to-dos, search).
+    // An open editor gets it, so its undo stack and caret survive.
+    signal taskChecked(string noteId, int index, bool checked)
+    function checkTask(noteId, index, checked) {
+        if (checked === undefined) checked = true
+        editorTaskToggleRequested(noteId, index)
+        if (!_taskHandled) Store.setTaskChecked(noteId, index, checked)
+        _taskHandled = false
+        taskChecked(noteId, index, checked)
+    }
+    property bool _taskHandled: false
+    function claimTask() { _taskHandled = true }
 
     function convertToRich(id) {
         const n = Store.note(id)
@@ -296,11 +335,12 @@ QtObject {
 
     property Connections _store: Connections {
         target: Store
-        function onNotesChanged() { state.refreshCounts(); state.refreshLists(); state.refreshTags() }
+        function onNotesChanged() { state.refreshCounts(); state.refreshLists(); state.refreshTags(); state._tasksLater.restart() }
+        function onLockStateChanged() { state.lockTick++; state.refreshTasks() }
         function onNoteChanged(id) { if (id === state.selectedNoteId) { state.currentNote = Store.note(id); state.currentTags = Store.tagsForNote(id) } }
         function onListsChanged() { state.refreshLists() }
         function onTagsChanged() { state.refreshTags() }
-        function onTodosChanged() { state.refreshCounts(); state.refreshTodoLists() }
+        function onTodosChanged() { state.refreshCounts(); state.refreshTodoLists(); state._tasksLater.restart() }
     }
     property Connections _files: Connections {
         target: Files

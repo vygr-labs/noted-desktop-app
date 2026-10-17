@@ -56,7 +56,8 @@ Popup {
                 font.pixelSize: Theme.fontMd
                 wrapMode: Text.Wrap
                 Layout.fillWidth: true
-                lineHeight: 1.3
+                lineHeightMode: Text.FixedHeight
+                lineHeight: Math.round((Theme.fontXl) * 1.3)
             }
         }
         ColumnLayout {

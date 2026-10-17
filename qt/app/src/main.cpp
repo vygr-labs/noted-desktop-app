@@ -62,17 +62,15 @@ QString repoRoot()
 
 void registerFonts()
 {
-    for (const char* f : {":/fonts/IBMPlexSans-Variable.ttf", ":/fonts/IBMPlexSans-Italic-Variable.ttf", ":/fonts/IBMPlexMono-Regular.ttf",
-                         ":/fonts/IBMPlexMono-Italic.ttf", ":/fonts/IBMPlexMono-Medium.ttf", ":/fonts/IBMPlexMono-SemiBold.ttf",
-                         ":/fonts/lucide.ttf"}) {
+    for (const char* f : {":/fonts/Geist-Variable.ttf", ":/fonts/GeistMono-Variable.ttf", ":/fonts/lucide.ttf"}) {
         const int id = QFontDatabase::addApplicationFont(QString::fromLatin1(f));
         if (id < 0) qWarning() << "failed to load font" << f;
         else qDebug() << "font" << f << QFontDatabase::applicationFontFamilies(id);
     }
     QFont ui;
-    ui.setFamilies({QStringLiteral("IBM Plex Sans"), QStringLiteral("Segoe UI Variable Text"), QStringLiteral("Segoe UI"),
+    ui.setFamilies({QStringLiteral("Geist"), QStringLiteral("Segoe UI Variable Text"), QStringLiteral("Segoe UI"),
                     QStringLiteral(".AppleSystemUIFont"), QStringLiteral("Cantarell")});
-    ui.setPixelSize(13);
+    ui.setPixelSize(14);
     ui.setHintingPreference(QFont::PreferNoHinting);
     QGuiApplication::setFont(ui);
 }

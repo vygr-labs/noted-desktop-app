@@ -25,5 +25,4 @@ QtObject {
     }
 
     function openNote(id) { show("note:" + id, { mode: "note", noteId: id }) }
-    function openTodos(listId) { show("todos:" + (listId || ""), { mode: "todos", todoListId: listId || "" }) }
 }

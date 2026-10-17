@@ -1,599 +1,528 @@
 import QtQuick
 import QtQuick.Controls.Basic
-import QtQuick.Effects
 import QtQuick.Layouts
 import Noted
+import "../Fmt.js" as Fmt
 
-// Left navigation: brand, search, views, lists, tags, and a footer with
-// trash and app actions. Collapses to an icon rail.
+// Left navigation: wordmark, Find, Today and To-dos, then Pinned, the Lists
+// tree (each list opens to its notes) and open Files, with New note and
+// Settings at the bottom. Right-click a row for its menu.
 Rectangle {
     id: side
 
-    readonly property bool collapsed: AppState.sidebarCollapsed
-    signal exportAllRequested(string format)
+    signal openFileRequested()
+    signal popoutRequested(string noteId)
 
-    width: collapsed ? 56 : 228
+    width: 256
     color: Theme.c.sidebar
-    clip: true
-    Behavior on width { NumberAnimation { duration: 200; easing.type: Easing.OutCubic } }
 
     Rectangle {
         anchors.right: parent.right
         width: 1
         height: parent.height
-        color: Theme.c.divider
+        color: Theme.c.line
+        z: 2
     }
 
     PopupMenu { id: menu }
 
-    component MonoLabel: Text {
-        color: Theme.c.subtle
-        font.pixelSize: 12
-        font.weight: Font.Medium
+    // The notes shown under each open list, refreshed with the store.
+    property var pinned: []
+    property var listNotes: ({})
+    function reload() {
+        pinned = Store.pinnedNotes()
+        const m = {}
+        for (const id in AppState.expandedLists)
+            if (AppState.expandedLists[id]) m[id] = Store.notesInList(id, "updated_at")
+        listNotes = m
     }
+    Component.onCompleted: reload()
+    Connections {
+        target: Store
+        function onNotesChanged() { reloadLater.restart() }
+        function onListsChanged() { reloadLater.restart() }
+        function onLockStateChanged() { side.reload() }
+    }
+    Connections {
+        target: AppState
+        function onExpandedListsChanged() { side.reload() }
+        function onNewListRequested() { newListDialog.openFor() }
+    }
+    Timer { id: reloadLater; interval: 150; onTriggered: side.reload() }
 
-    // ── one navigation row ─────────────────────────────────────────────
-    component NavItem: Rectangle {
-        id: nav
+    // ── one row ──────────────────────────────────────────────────────
+    component Row_: Rectangle {
+        id: row
         property string icon: ""
+        property color iconColor: Theme.c.muted
+        property real iconSize: 16
         property string label: ""
         property string countText: ""
-        property bool accentCount: false
         property bool active: false
-        property string swatch: ""      // list colour: a small square instead of an icon
-        property bool muted: false
-        property bool quietCount: false  // lists and tags: count only on hover
+        property bool locked: false
+        property bool nested: false
+        property real leftPad: 10
+        property string tooltip: ""
+        readonly property bool ringed: menu.opened && menu.owner === row
         signal clicked()
         signal contextRequested(real x, real y)
 
         Layout.fillWidth: true
-        Layout.preferredHeight: side.collapsed ? 38 : 32
-        radius: Theme.radius
-        color: active ? Theme.c.navActive : (navArea.containsMouse ? Theme.c.hover : "transparent")
+        Layout.preferredHeight: nested ? 30 : 32
+        radius: 6
+        color: active ? Theme.c.selected : (area.containsMouse ? Qt.alpha(Theme.c.pressed, 0.6) : "transparent")
+        border.width: ringed ? 1.5 : 0
+        border.color: Theme.c.accent
 
         RowLayout {
             anchors.fill: parent
-            anchors.leftMargin: side.collapsed ? 0 : 10
-            anchors.rightMargin: side.collapsed ? 0 : 10
+            anchors.leftMargin: row.leftPad
+            anchors.rightMargin: 10
             spacing: 10
-            Item {
-                visible: side.collapsed || nav.swatch !== ""
-                Layout.preferredWidth: side.collapsed ? parent.width : 8
-                Layout.preferredHeight: 16
-                Icon {
-                    visible: nav.swatch === "" || side.collapsed && nav.icon !== ""
-                    anchors.centerIn: parent
-                    name: nav.icon
-                    size: 17
-                    color: nav.active ? Theme.c.text : Theme.c.muted
-                    opacity: nav.muted ? 0.6 : 1
-                }
-                // Lists: a colour square, or a lettered tile in the icon rail.
-                Rectangle {
-                    readonly property bool tile: side.collapsed && nav.icon === ""
-                    visible: nav.swatch !== "" && !(side.collapsed && nav.icon !== "")
-                    anchors.centerIn: parent
-                    width: tile ? 22 : 8
-                    height: tile ? 22 : 8
-                    radius: tile ? 6 : 2
-                    color: tile ? Qt.alpha(Theme.swatch(nav.swatch), nav.active ? 0.3 : 0.16) : Theme.swatch(nav.swatch)
-                    opacity: nav.muted ? 0.5 : 1
-                    Text {
-                        visible: parent.tile
-                        anchors.centerIn: parent
-                        text: nav.label.charAt(0).toUpperCase()
-                        color: Theme.dark ? Qt.lighter(Theme.swatch(nav.swatch), 1.4) : Qt.darker(Theme.swatch(nav.swatch), 1.35)
-                        font.pixelSize: 12
-                        font.weight: Font.DemiBold
-                    }
-                }
+            Icon {
+                visible: row.icon !== ""
+                name: row.icon
+                size: row.iconSize
+                color: row.iconColor
             }
             Text {
-                visible: !side.collapsed
-                Layout.fillWidth: true
-                text: nav.label
-                color: nav.active ? Theme.c.text : (nav.muted ? Theme.c.subtle : Theme.c.body)
-                font.pixelSize: 14
-                font.weight: nav.active ? Font.DemiBold : Font.Normal
+                Layout.fillWidth: !row.locked
+                Layout.maximumWidth: row.locked ? row.width - row.leftPad - 40 : -1
+                text: row.label
+                color: row.active ? Theme.c.ink : Theme.c.text
+                font.pointSize: Theme.pt(row.nested ? 13.5 : 14)
+                font.weight: row.active ? Font.Medium : Font.Normal
                 elide: Text.ElideRight
             }
+            Icon {
+                visible: row.locked
+                name: "lock"
+                size: 11
+                color: Theme.c.muted
+            }
+            Item { visible: row.locked; Layout.fillWidth: true }
             Text {
-                visible: !side.collapsed && nav.countText !== "" && (!nav.quietCount || nav.active || navArea.containsMouse)
-                text: nav.countText
-                color: Theme.c.subtle
-                font.pixelSize: 12
+                visible: row.countText !== ""
+                text: row.countText
+                color: Theme.c.muted
+                font.pointSize: Theme.pt(12.5)
                 font.features: { "tnum": 1 }
             }
         }
-        Rectangle {
-            visible: side.collapsed && nav.accentCount && nav.countText !== "" && nav.countText !== "0"
-            width: 6
-            height: 6
-            radius: 3
-            color: Theme.c.accent
-            anchors.right: parent.right
-            anchors.top: parent.top
-            anchors.rightMargin: 9
-            anchors.topMargin: 8
-        }
-
         MouseArea {
-            id: navArea
+            id: area
             anchors.fill: parent
             hoverEnabled: true
             acceptedButtons: Qt.LeftButton | Qt.RightButton
             cursorShape: Qt.PointingHandCursor
-            onClicked: (e) => e.button === Qt.RightButton ? nav.contextRequested(e.x, e.y) : nav.clicked()
+            onClicked: (e) => e.button === Qt.RightButton ? row.contextRequested(e.x, e.y) : row.clicked()
         }
-        Tip {
-            visible: side.collapsed && navArea.containsMouse
-            text: nav.label + (nav.countText !== "" ? "  ·  " + nav.countText : "")
-        }
+        Tip { visible: row.tooltip !== "" && area.containsMouse; text: row.tooltip }
     }
 
-    component SectionHeader: Item {
-        id: sh
+    component GroupLabel: RowLayout {
+        id: gl
         property string label: ""
-        property bool canAdd: false
-        property bool collapsible: false
-        property bool open: true
+        property string addTip: ""
         signal addClicked()
-        signal toggled()
-        visible: !side.collapsed
         Layout.fillWidth: true
-        Layout.preferredHeight: 30
-        Layout.topMargin: 16
-
-        Row {
-            anchors.left: parent.left
-            anchors.leftMargin: 10
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 6
-            spacing: 4
-            MonoLabel { text: sh.label }
-            Icon {
-                visible: sh.collapsible
-                name: "chevron-right"
-                size: 11
-                color: Theme.c.subtle
-                rotation: sh.open ? 90 : 0
-                anchors.verticalCenter: parent.verticalCenter
-                Behavior on rotation { NumberAnimation { duration: Theme.fast } }
-            }
-        }
-        MouseArea {
-            anchors.fill: parent
-            enabled: sh.collapsible
-            cursorShape: Qt.PointingHandCursor
-            onClicked: sh.toggled()
+        Layout.topMargin: 20
+        Layout.bottomMargin: 6
+        Layout.leftMargin: 10
+        Layout.rightMargin: 4
+        Layout.preferredHeight: 24
+        spacing: 0
+        Text {
+            Layout.fillWidth: true
+            text: gl.label
+            color: Theme.c.tertiary
+            font.pixelSize: 12
+            font.weight: Font.Medium
         }
         IconButton {
-            visible: sh.canAdd
-            anchors.right: parent.right
-            anchors.bottom: parent.bottom
-            anchors.bottomMargin: 1
-            icon: "plus"
+            visible: gl.addTip !== ""
             size: 24
             iconSize: 14
-            tooltip: "New list"
-            onClicked: sh.addClicked()
+            icon: "plus"
+            iconColor: Theme.c.tertiary
+            tooltip: gl.addTip
+            onClicked: gl.addClicked()
         }
     }
 
     ColumnLayout {
         anchors.fill: parent
-        anchors.leftMargin: 10
-        anchors.rightMargin: 10
-        anchors.bottomMargin: 8
-        spacing: 2
+        anchors.rightMargin: 1
+        spacing: 0
 
-        // ── brand row (drags the window) ────────────────────────────────
+        // ── wordmark row (drags the window) ──────────────────────────────
         Item {
             Layout.fillWidth: true
-            Layout.preferredHeight: 50
+            Layout.preferredHeight: 44
             DragArea { anchors.fill: parent }
-            Image {
-                visible: !side.collapsed
-                anchors.left: parent.left
-                anchors.leftMargin: 8
+            Text {
+                x: 18
                 anchors.verticalCenter: parent.verticalCenter
-                source: "qrc:/brand/noted-logo.svg"
-                sourceSize.height: 19
-                height: 19
-                fillMode: Image.PreserveAspectFit
-                smooth: true
-                // The wordmark is dark red; lift it on dark surfaces.
-                layer.enabled: Theme.dark
-                layer.effect: MultiEffect { colorization: 1; colorizationColor: Theme.c.accentText }
+                text: "noted"
+                color: Theme.c.ink
+                font.pixelSize: 15
+                font.weight: 650
+                font.letterSpacing: -0.15
             }
             IconButton {
                 anchors.right: parent.right
-                anchors.rightMargin: side.collapsed ? (parent.width - width) / 2 : 0
+                anchors.rightMargin: 10
                 anchors.verticalCenter: parent.verticalCenter
-                icon: side.collapsed ? "panel-left-open" : "panel-left-close"
-                size: 28
-                iconSize: 16
-                dim: true
-                tooltip: side.collapsed ? "Expand sidebar" : "Collapse sidebar"
+                size: 30
+                iconSize: 17
+                icon: "panel-left"
+                tooltip: "Hide sidebar"
                 shortcut: "Ctrl+\\"
-                onClicked: AppState.setSidebarCollapsed(!side.collapsed)
+                onClicked: AppState.setSidebarCollapsed(true)
             }
         }
 
-        // ── search ────────────────────────────────────────────────────
+        // ── find ─────────────────────────────────────────────────────────
         Rectangle {
             Layout.fillWidth: true
-            Layout.preferredHeight: 34
+            Layout.leftMargin: 10
+            Layout.rightMargin: 10
+            Layout.topMargin: 4
             Layout.bottomMargin: 10
-            radius: Theme.radiusLg
-            color: Theme.c.raised
-            border.color: searchArea.containsMouse ? Theme.c.faint : Theme.c.border
+            Layout.preferredHeight: 34
+            radius: 7
+            color: findArea.containsMouse ? Theme.mix(Theme.c.field, Theme.c.pressed, 0.4) : Theme.c.field
+            border.color: Theme.c.lineStrong
             RowLayout {
                 anchors.fill: parent
-                anchors.leftMargin: side.collapsed ? 0 : 10
+                anchors.leftMargin: 10
                 anchors.rightMargin: 10
                 spacing: 8
-                Icon {
-                    visible: side.collapsed
-                    name: "search"
-                    size: 15
-                    color: Theme.c.subtle
-                    Layout.preferredWidth: parent.width
-                }
-                Text {
-                    visible: !side.collapsed
-                    text: "Search"
-                    color: Theme.c.subtle
-                    font.pixelSize: 14
-                    Layout.fillWidth: true
-                }
-                Text {
-                    visible: !side.collapsed
-                    text: "Ctrl P"
-                    color: Theme.c.faint
-                    font.pixelSize: 12
-                }
+                Icon { name: "search"; size: 15; color: Theme.c.muted }
+                Text { Layout.fillWidth: true; text: "Find a note"; color: Theme.c.muted; font.pointSize: Theme.pt(13.5) }
+                Text { text: "Ctrl K"; color: Theme.c.muted; font.pixelSize: 12 }
             }
             MouseArea {
-                id: searchArea
+                id: findArea
                 anchors.fill: parent
                 hoverEnabled: true
                 cursorShape: Qt.PointingHandCursor
                 onClicked: AppState.paletteOpen = true
             }
-            Tip { visible: side.collapsed && searchArea.containsMouse; text: "Search"; shortcut: "Ctrl+P" }
         }
 
-        NavItem {
-            icon: "calendar"
-            label: "Today"
-            countText: Qt.formatDate(new Date(AppState.todayIso + "T12:00:00"), "ddd d")
-            active: AppState.view === "today"
-            onClicked: AppState.setView("today")
-        }
-        NavItem {
-            icon: "file-text"
-            label: "All Notes"
-            active: AppState.view === "all"
-            countText: String(AppState.counts.all || 0)
-            onClicked: AppState.setView("all")
-        }
-        NavItem {
-            icon: "square-check"
-            label: "To-dos"
-            active: AppState.view === "todos"
-            countText: (AppState.counts.todosOpen || 0) > 0 ? String(AppState.counts.todosOpen) : ""
-            accentCount: true
-            onClicked: AppState.setView("todos")
-        }
-        NavItem {
-            visible: (AppState.counts.synced || 0) > 0
-            icon: "share-2"
-            label: "Synced"
-            active: AppState.view === "synced"
-            countText: String(AppState.counts.synced || 0)
-            onClicked: AppState.setView("synced")
-        }
-
-        Rectangle {
-            visible: side.collapsed
+        ColumnLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 1
-            Layout.topMargin: 8
-            Layout.bottomMargin: 8
-            color: Theme.c.divider
-        }
-
-        // Files opened from disk (edited in place).
-        SectionHeader {
-            visible: !side.collapsed && Files.files.length > 0
-            label: "Files"
-        }
-        Repeater {
-            model: Files.files
-            delegate: NavItem {
-                required property var modelData
-                icon: "file-text"
-                label: modelData.name
-                active: AppState.selectedNoteId === modelData.id
-                onClicked: AppState.selectNote(modelData.id)
-                onContextRequested: (x, y) => menu.openAt(this, x, y, [
-                    { text: "Show in folder", icon: "folder-open", action: () => App.revealFile(modelData.path) },
-                    { text: "Copy into notes", icon: "copy", action: () => AppState.copyFileToNotes(modelData.id) },
-                    { separator: true },
-                    { text: "Close file", icon: "x", action: () => AppState.closeFile(modelData.id) }
-                ])
+            Layout.leftMargin: 10
+            Layout.rightMargin: 10
+            spacing: 1
+            Row_ {
+                icon: "calendar"
+                iconColor: active ? Theme.c.ink : Theme.c.secondary
+                label: "Today"
+                active: AppState.view === "desk"
+                onClicked: AppState.go("desk")
+            }
+            Row_ {
+                icon: "circle-check"
+                iconColor: active ? Theme.c.ink : Theme.c.secondary
+                label: "To-dos"
+                countText: AppState.openTaskCount > 0 ? String(AppState.openTaskCount) : ""
+                active: AppState.view === "todos"
+                onClicked: AppState.go("todos")
             }
         }
 
-        SectionHeader {
-            label: "Lists"
-            canAdd: true
-            onAddClicked: { newListField.visible = true; newListField.forceActiveFocus() }
-        }
-
+        // ── pinned, lists, files ─────────────────────────────────────────
         Flickable {
             id: scroller
             Layout.fillWidth: true
             Layout.fillHeight: true
-            contentHeight: listColumn.implicitHeight
+            contentHeight: tree.implicitHeight + 30
             clip: true
             boundsBehavior: Flickable.StopAtBounds
             ScrollBar.vertical: ScrollBarThin {}
 
             ColumnLayout {
-                id: listColumn
-                width: scroller.width
+                id: tree
+                x: 10
+                y: 18
+                width: scroller.width - 20
                 spacing: 1
 
-                Field {
-                    id: newListField
-                    visible: false
-                    Layout.fillWidth: true
-                    placeholderText: "List name…"
-                    onAccepted: commit()
-                    onActiveFocusChanged: if (!activeFocus && visible) commitTimer.start()
-                    Keys.onEscapePressed: { text = ""; visible = false }
-                    function commit() {
-                        const name = text.trim()
-                        if (name !== "") {
-                            const l = Store.createList(name, "folder", "gray")
-                            AppState.setView("list", l.id)
-                        }
-                        text = ""
-                        visible = false
+                Text {
+                    visible: side.pinned.length > 0
+                    Layout.leftMargin: 10
+                    Layout.bottomMargin: 6
+                    text: "Pinned"
+                    color: Theme.c.tertiary
+                    font.pixelSize: 12
+                    font.weight: Font.Medium
+                }
+                Repeater {
+                    model: side.pinned
+                    delegate: Row_ {
+                        required property var modelData
+                        icon: "pin"
+                        iconSize: 15
+                        label: modelData.title || "Untitled"
+                        locked: AppState.isLocked(modelData)
+                        active: AppState.view === "note" && AppState.selectedNoteId === modelData.id
+                        onClicked: AppState.openNote(modelData.id)
+                        onContextRequested: (x, y) => side.noteMenu(this, x, y, modelData)
                     }
-                    Timer { id: commitTimer; interval: 100; onTriggered: newListField.commit() }
                 }
 
+                GroupLabel {
+                    Layout.topMargin: side.pinned.length > 0 ? 20 : 0
+                    label: "Lists"
+                    addTip: "New list"
+                    onAddClicked: newListDialog.openFor()
+                }
+                Text {
+                    visible: AppState.lists.length === 0
+                    Layout.leftMargin: 10
+                    Layout.topMargin: 2
+                    text: "No lists yet"
+                    color: Theme.c.muted
+                    font.pointSize: Theme.pt(13.5)
+                }
                 Repeater {
                     model: AppState.lists
-                    delegate: NavItem {
+                    delegate: ColumnLayout {
+                        id: listItem
                         required property var modelData
-                        label: modelData.name
-                        swatch: modelData.color || "gray"
-                        quietCount: true
-                        countText: String(modelData.note_count || 0)
-                        active: AppState.view === "list" && AppState.viewId === modelData.id
-                        onClicked: AppState.setView("list", modelData.id)
-                        onContextRequested: (x, y) => side.listMenu(this, x, y, modelData, false)
+                        readonly property bool expanded: !!AppState.expandedLists[modelData.id]
+                        Layout.fillWidth: true
+                        spacing: 1
+
+                        Row_ {
+                            id: listRow
+                            leftPad: 28
+                            icon: "folder"
+                            iconColor: Theme.swatch(listItem.modelData.color)
+                            label: listItem.modelData.name
+                            countText: String(listItem.modelData.note_count || 0)
+                            active: AppState.view === "list" && AppState.viewId === listItem.modelData.id
+                            onClicked: AppState.go("list", listItem.modelData.id)
+                            onContextRequested: (x, y) => side.listMenu(this, x, y, listItem.modelData, listItem.expanded)
+
+                            // Chevron: open/close the list in the tree.
+                            Item {
+                                x: 2
+                                width: 24
+                                height: parent.height
+                                Icon {
+                                    anchors.centerIn: parent
+                                    name: "chevron-right"
+                                    size: 13
+                                    color: Theme.c.muted
+                                    rotation: listItem.expanded ? 90 : 0
+                                    Behavior on rotation { NumberAnimation { duration: Theme.fast } }
+                                }
+                                MouseArea {
+                                    anchors.fill: parent
+                                    cursorShape: Qt.PointingHandCursor
+                                    onClicked: AppState.setListExpanded(listItem.modelData.id, !listItem.expanded)
+                                }
+                            }
+                        }
+                        ColumnLayout {
+                            visible: listItem.expanded
+                            Layout.fillWidth: true
+                            Layout.topMargin: 1
+                            Layout.bottomMargin: 4
+                            spacing: 1
+                            Repeater {
+                                model: listItem.expanded ? (side.listNotes[listItem.modelData.id] || []) : []
+                                delegate: Row_ {
+                                    required property var modelData
+                                    nested: true
+                                    leftPad: 50
+                                    label: modelData.title || "Untitled"
+                                    locked: AppState.isLocked(modelData)
+                                    active: AppState.view === "note" && AppState.selectedNoteId === modelData.id
+                                    onClicked: AppState.openNote(modelData.id)
+                                    onContextRequested: (x, y) => side.noteMenu(this, x, y, modelData)
+                                }
+                            }
+                        }
                     }
                 }
 
-                // Hidden lists fold into one row.
-                Rectangle {
-                    visible: !side.collapsed && AppState.hiddenLists.length > 0
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: 30
-                    radius: Theme.radius
-                    color: hiddenArea.containsMouse ? Theme.c.hover : "transparent"
-                    Row {
-                        anchors.left: parent.left
-                        anchors.leftMargin: 10
-                        anchors.verticalCenter: parent.verticalCenter
-                        spacing: 6
-                        Icon {
-                            name: "chevron-right"
-                            size: 12
-                            color: Theme.c.subtle
-                            rotation: hiddenColumn.visible ? 90 : 0
-                            anchors.verticalCenter: parent.verticalCenter
-                            Behavior on rotation { NumberAnimation { duration: Theme.fast } }
-                        }
-                        Text {
-                            text: AppState.hiddenLists.length + " hidden"
-                            color: Theme.c.subtle
-                            font.pixelSize: 13
-                        }
-                    }
-                    MouseArea {
-                        id: hiddenArea
-                        anchors.fill: parent
-                        hoverEnabled: true
-                        cursorShape: Qt.PointingHandCursor
-                        onClicked: hiddenColumn.visible = !hiddenColumn.visible
-                    }
+                // Hidden lists fold into one quiet row.
+                Row_ {
+                    visible: AppState.hiddenLists.length > 0
+                    leftPad: 28
+                    label: Fmt.plural(AppState.hiddenLists.length, "hidden list")
+                    onClicked: hiddenColumn.visible = !hiddenColumn.visible
                 }
                 ColumnLayout {
                     id: hiddenColumn
                     visible: false
-                    spacing: 1
                     Layout.fillWidth: true
+                    spacing: 1
                     Repeater {
                         model: AppState.hiddenLists
-                        delegate: NavItem {
+                        delegate: Row_ {
                             required property var modelData
-                            muted: true
-                            swatch: modelData.color || "gray"
+                            leftPad: 28
+                            icon: "folder"
+                            iconColor: Qt.alpha(Theme.swatch(modelData.color), 0.6)
                             label: modelData.name
-                            quietCount: true
                             countText: String(modelData.note_count || 0)
                             active: AppState.view === "list" && AppState.viewId === modelData.id
-                            onClicked: AppState.setView("list", modelData.id)
-                            onContextRequested: (x, y) => side.listMenu(this, x, y, modelData, true)
+                            onClicked: AppState.go("list", modelData.id)
+                            onContextRequested: (x, y) => side.listMenu(this, x, y, modelData, false, true)
                         }
                     }
                 }
 
-                SectionHeader {
-                    visible: !side.collapsed && AppState.tags.length > 0
-                    label: "Tags"
-                    collapsible: true
-                    open: tagsColumn.visible
-                    onToggled: { tagsColumn.visible = !tagsColumn.visible; AppState.save("qt.tagsOpen", tagsColumn.visible) }
+                // Files opened from disk; only while one is open.
+                GroupLabel {
+                    visible: Files.files.length > 0
+                    label: "Files"
+                    addTip: "Open a file"
+                    onAddClicked: side.openFileRequested()
                 }
-                ColumnLayout {
-                    id: tagsColumn
-                    spacing: 1
-                    Layout.fillWidth: true
-                    visible: !side.collapsed && Store.setting("qt.tagsOpen", "false") === "true"
-                    Repeater {
-                        model: AppState.tags
-                        delegate: NavItem {
-                            required property var modelData
-                            icon: "hash"
-                            label: modelData.name
-                            quietCount: true
-                            countText: String(modelData.note_count || 0)
-                            active: AppState.view === "tag" && AppState.viewId === modelData.id
-                            onClicked: AppState.setView("tag", modelData.id)
-                            onContextRequested: (x, y) => menu.openAt(this, x, y, [
-                                { text: "Delete tag", icon: "trash-2", danger: true, action: () => Store.deleteTag(modelData.id) }
-                            ])
+                Repeater {
+                    model: Files.files
+                    delegate: Row_ {
+                        required property var modelData
+                        required property int index
+                        icon: "file"
+                        iconSize: 15
+                        // Two open files with one name get their folder added.
+                        label: {
+                            const same = Files.files.filter(f => f.name === modelData.name).length > 1
+                            if (!same) return modelData.name
+                            const parts = modelData.path.split(/[\\/]/)
+                            return modelData.name + "  ·  " + (parts[parts.length - 2] || "")
                         }
+                        tooltip: modelData.path
+                        active: AppState.view === "note" && AppState.selectedNoteId === modelData.id
+                        onClicked: AppState.openNote(modelData.id)
+                        onContextRequested: (x, y) => menu.openAt(this, x, y, [
+                            { text: "Open", action: () => AppState.openNote(modelData.id) },
+                            { text: "Show in folder", action: () => App.revealFile(modelData.path) },
+                            { text: "Copy into notes", action: () => AppState.copyFileToNotes(modelData.id) },
+                            { separator: true },
+                            { text: "Close file", action: () => AppState.closeFile(modelData.id) }
+                        ])
                     }
                 }
             }
         }
 
-        // ── dev-data badge ──────────────────────────────────────────────
-        Rectangle {
-            visible: App.devData && !side.collapsed
-            Layout.fillWidth: true
-            Layout.preferredHeight: 24
-            Layout.topMargin: 6
-            radius: Theme.radius
-            color: Qt.alpha(Theme.c.warning, 0.14)
-            Text {
-                anchors.centerIn: parent
-                text: "Dev copy of your notes"
-                color: Theme.c.warning
-                font.pixelSize: 12
-                font.weight: Font.Medium
-            }
+        // ── dev-data note ────────────────────────────────────────────────
+        Text {
+            visible: App.devData
+            Layout.leftMargin: 20
+            Layout.bottomMargin: 6
+            text: "Dev copy of your notes"
+            color: Theme.c.muted
+            font.pixelSize: 12
             MouseArea { id: devArea; anchors.fill: parent; hoverEnabled: true }
             Tip { visible: devArea.containsMouse; text: "This build is using " + App.dataPath }
         }
 
-        // ── footer ──────────────────────────────────────────────────────
-        Rectangle {
+        // ── footer ───────────────────────────────────────────────────────
+        Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.c.line }
+        RowLayout {
             Layout.fillWidth: true
-            Layout.preferredHeight: 1
-            Layout.topMargin: 6
-            Layout.bottomMargin: 4
-            color: Theme.c.divider
-        }
-        GridLayout {
-            Layout.fillWidth: true
-            columns: side.collapsed ? 1 : 5
-            rowSpacing: 2
-            columnSpacing: 0
-
-            // Trash (text + count when expanded)
+            Layout.margins: 10
+            spacing: 4
             Rectangle {
-                Layout.fillWidth: !side.collapsed
-                Layout.preferredWidth: side.collapsed ? 32 : -1
-                Layout.preferredHeight: 32
-                Layout.alignment: Qt.AlignHCenter
-                radius: Theme.radius
-                color: AppState.view === "trash" ? Theme.c.navActive : (trashArea.containsMouse ? Theme.c.hover : "transparent")
-                Row {
-                    anchors.left: parent.left
-                    anchors.leftMargin: side.collapsed ? (parent.width - 16) / 2 : 8
-                    anchors.verticalCenter: parent.verticalCenter
-                    spacing: 8
-                    Icon { name: "trash-2"; size: 16; color: Theme.c.muted; anchors.verticalCenter: parent.verticalCenter }
-                    Text {
-                        visible: !side.collapsed
-                        text: "Trash"
-                        color: AppState.view === "trash" ? Theme.c.text : Theme.c.muted
-                        font.pixelSize: 13
-                        font.weight: AppState.view === "trash" ? Font.DemiBold : Font.Normal
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
-                    Text {
-                        visible: !side.collapsed && (AppState.counts.trash || 0) > 0
-                        text: AppState.counts.trash || 0
-                        color: Theme.c.subtle
-                        font.pixelSize: 12
-                        font.features: { "tnum": 1 }
-                        anchors.verticalCenter: parent.verticalCenter
-                    }
+                Layout.fillWidth: true
+                Layout.preferredHeight: 34
+                radius: 6
+                color: newArea.pressed ? Theme.c.pressed : (newArea.containsMouse ? Qt.alpha(Theme.c.pressed, 0.6) : "transparent")
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 10
+                    spacing: 10
+                    Icon { name: "plus"; size: 16; color: Theme.c.text }
+                    Text { Layout.fillWidth: true; text: "New note"; color: Theme.c.text; font.pixelSize: 14 }
                 }
                 MouseArea {
-                    id: trashArea
+                    id: newArea
                     anchors.fill: parent
                     hoverEnabled: true
                     cursorShape: Qt.PointingHandCursor
-                    onClicked: AppState.setView("trash")
+                    onClicked: AppState.newNote()
                 }
-                Tip { visible: side.collapsed && trashArea.containsMouse; text: "Trash" }
+                Tip { visible: newArea.containsMouse; text: "New note"; shortcut: "Ctrl+N" }
             }
             IconButton {
-                icon: "square-pen"
-                size: 30
-                dim: true
-                tooltip: "New note"
-                shortcut: "Ctrl+N"
-                Layout.alignment: Qt.AlignHCenter
-                onClicked: AppState.newNote()
-            }
-            IconButton {
-                id: exportButton
-                icon: "download"
-                size: 30
-                dim: true
-                tooltip: "Export all notes"
-                Layout.alignment: Qt.AlignHCenter
-                onClicked: menu.openAt(exportButton, side.collapsed ? exportButton.width + 6 : 0, side.collapsed ? 0 : -150, [
-                    { header: "Export everything" },
-                    { text: "JSON file", icon: "file-text", action: () => side.exportAllRequested("json") },
-                    { text: "SQL file", icon: "file-down", action: () => side.exportAllRequested("sql") },
-                    { text: "ZIP of markdown", icon: "archive", action: () => side.exportAllRequested("zip") }
-                ])
-            }
-            IconButton {
-                icon: Theme.resolved === "dark" ? "moon" : Theme.resolved === "warm" ? "coffee" : Theme.resolved === "slate" ? "cloudy" : "sun"
-                size: 30
-                dim: true
-                tooltip: "Theme: " + Theme.resolved
-                Layout.alignment: Qt.AlignHCenter
-                onClicked: AppState.cycleTheme()
-            }
-            IconButton {
-                icon: "settings"
-                size: 30
-                dim: true
+                size: 34
+                iconSize: 17
+                icon: "sliders-horizontal"
+                checked: AppState.view === "settings"
                 tooltip: "Settings"
                 shortcut: "Ctrl+,"
-                Layout.alignment: Qt.AlignHCenter
-                onClicked: AppState.settingsOpen = true
+                onClicked: AppState.openSettings()
             }
         }
     }
 
-    function listMenu(item, x, y, list, hidden) {
-        const colors = Theme.swatchNames.map(c => ({
-            text: c.charAt(0).toUpperCase() + c.slice(1), color: c, checked: list.color === c,
-            action: () => Store.updateList(list.id, { color: c })
+    // ── menus ────────────────────────────────────────────────────────
+    function moveTargets(note) {
+        return AppState.lists.map(l => ({
+            text: l.name, color: l.color || "gray", checked: note.list_id === l.id,
+            action: () => { Store.moveToList(note.id, l.id); AppState.refreshCurrent() }
         }))
+    }
+    function noteMenu(item, x, y, note) {
+        const locked = AppState.isLocked(note)
         menu.openAt(item, x, y, [
-            { text: "Rename…", icon: "pencil", action: () => renameDialog.openFor(list) },
-            { text: "Color", icon: "circle-dot", children: colors },
-            { text: hidden ? "Show list" : "Hide list", icon: hidden ? "eye" : "eye-off", action: () => Store.setListHidden(list.id, !hidden) },
+            { text: "Open", action: () => AppState.openNote(note.id) },
+            { text: "Open in new window", action: () => side.popoutRequested(note.id) },
+            { text: note.is_pinned ? "Unpin" : "Pin", action: () => Store.setPinned(note.id, !note.is_pinned) },
+            { text: "Move to", children: moveTargets(note) },
+            { text: "Copy as Markdown", disabled: locked, action: () => { if (App.copyAsMarkdown(note.id)) AppState.toast("Copied as Markdown") } },
+            { text: "Duplicate", disabled: locked, action: () => AppState.duplicate(note.id) },
             { separator: true },
-            { text: "Delete list", icon: "trash-2", danger: true, action: () => deleteDialog.openFor(list) }
+            { text: "Move to trash", danger: true, action: () => AppState.trashNote(note.id) }
         ])
+    }
+    function listMenu(item, x, y, list, expanded, hidden) {
+        const colours = Theme.pickerSwatches.concat(
+            Theme.pickerSwatches.some(s => s.name === list.color) ? [] : [{ name: list.color, label: list.color.charAt(0).toUpperCase() + list.color.slice(1) }])
+        menu.openAt(item, x, y, [
+            { text: "New note in " + list.name, action: () => AppState.newNote({ listId: list.id }) },
+            hidden ? { text: "Show in sidebar", action: () => Store.setListHidden(list.id, false) }
+                   : { text: expanded ? "Collapse" : "Expand", action: () => AppState.setListExpanded(list.id, !expanded) },
+            { text: "Rename…", action: () => renameDialog.openFor(list) },
+            { text: "Change colour", children: colours.map(s => ({
+                text: s.label, color: s.name, checked: list.color === s.name,
+                action: () => Store.updateList(list.id, { color: s.name })
+            })) },
+            { separator: true },
+            { text: "Delete list…", danger: true, action: () => deleteDialog.openFor(list) }
+        ])
+    }
+
+    ModalDialog {
+        id: newListDialog
+        title: "New list"
+        function openFor() { newListField.text = ""; open(); newListField.forceActiveFocus() }
+        Field {
+            id: newListField
+            Layout.fillWidth: true
+            placeholderText: "Work, Church, Reading…"
+            onAccepted: newListDialog.commit()
+        }
+        function commit() {
+            const name = newListField.text.trim()
+            close()
+            if (name === "") return
+            const l = Store.createList(name, "folder", Theme.pickerSwatches[AppState.lists.length % 7].name)
+            AppState.go("list", l.id)
+        }
+        footer: [
+            TextButton { text: "Cancel"; onClicked: newListDialog.close() },
+            TextButton { text: "Make list"; onClicked: newListDialog.commit() }
+        ]
     }
 
     ModalDialog {
@@ -612,25 +541,25 @@ Rectangle {
         }
         footer: [
             TextButton { text: "Cancel"; onClicked: renameDialog.close() },
-            TextButton { text: "Rename"; variant: "primary"; onClicked: renameDialog.commit() }
+            TextButton { text: "Rename"; onClicked: renameDialog.commit() }
         ]
     }
 
     ModalDialog {
         id: deleteDialog
         property var list: ({})
-        title: "Delete list?"
-        description: "“" + (list.name || "") + "” and all its notes will be moved to trash."
+        title: "Delete “" + (list.name || "") + "”?"
+        description: "Its notes move to the trash. You can restore them from there."
         function openFor(l) { list = l; open() }
         footer: [
             TextButton { text: "Cancel"; onClicked: deleteDialog.close() },
             TextButton {
-                text: "Delete"
-                variant: "danger"
+                text: "Delete list"
+                variant: "destructive"
                 onClicked: {
                     const id = deleteDialog.list.id
                     deleteDialog.close()
-                    if (AppState.view === "list" && AppState.viewId === id) AppState.setView("all")
+                    if (AppState.view === "list" && AppState.viewId === id) AppState.go("desk")
                     Store.deleteList(id)
                 }
             }

@@ -1,34 +1,39 @@
 import QtQuick
 import Noted
 
-// Text (+ optional icon) button. variant: primary | ghost | subtle | danger
-Rectangle {
+// Text button.
+//   variant: secondary (default) — 32px, `field` fill, `lineStrong` border
+//            destructive — the same with `red` text
+//            primary — `ink` fill, `bg` text, 38px (lock screen only)
+//            link — underlined `secondary` text, no box
+// Legacy names: ghost/subtle → secondary, danger → destructive.
+Item {
     id: root
 
     property string text: ""
     property string icon: ""
-    property string variant: "ghost"
+    property string variant: "secondary"
     property bool compact: false
+    property real fontSize: variant === "link" ? 12.5 : 13.5
     readonly property bool hovered: area.containsMouse
+    readonly property string kind: variant === "danger" ? "destructive"
+                                 : (variant === "ghost" || variant === "subtle") ? "secondary" : variant
 
     signal clicked()
 
-    implicitWidth: row.implicitWidth + (compact ? 16 : 24)
-    implicitHeight: compact ? 28 : 34
-    radius: Theme.radiusLg
+    implicitWidth: kind === "link" ? label.implicitWidth : row.implicitWidth + 24
+    implicitHeight: kind === "link" ? label.implicitHeight : (kind === "primary" ? 38 : (compact ? 28 : 32))
     opacity: enabled ? 1 : 0.45
 
-    readonly property color fg: variant === "primary" || variant === "danger" ? Theme.c.onAccent
-                              : variant === "subtle" ? Theme.c.text : Theme.c.muted
-    color: {
-        if (variant === "primary") return area.pressed ? Qt.darker(Theme.c.accent, 1.1) : (area.containsMouse ? Theme.c.accentHover : Theme.c.accent)
-        if (variant === "danger") return area.pressed ? Qt.darker(Theme.c.danger, 1.1) : (area.containsMouse ? Qt.darker(Theme.c.danger, 1.05) : Theme.c.danger)
-        if (variant === "subtle") return area.pressed ? Theme.c.press : (area.containsMouse ? Theme.c.hover : Theme.c.sunken)
-        return area.pressed ? Theme.c.press : (area.containsMouse ? Theme.c.hover : "transparent")
+    Rectangle {
+        visible: root.kind !== "link"
+        anchors.fill: parent
+        radius: 7
+        color: root.kind === "primary" ? (area.pressed ? Qt.lighter(Theme.c.ink, 1.2) : Theme.c.ink)
+             : (area.pressed ? Theme.c.pressed : (area.containsMouse ? Theme.mix(Theme.c.field, Theme.c.pressed, 0.6) : Theme.c.field))
+        border.width: root.kind === "primary" ? 0 : 1
+        border.color: Theme.c.lineStrong
     }
-    border.width: variant === "ghost" ? 1 : 0
-    border.color: Theme.c.border
-    Behavior on color { ColorAnimation { duration: Theme.fast } }
 
     Row {
         id: row
@@ -38,21 +43,32 @@ Rectangle {
             visible: root.icon !== ""
             name: root.icon
             size: 14
-            color: root.fg
+            color: label.color
             anchors.verticalCenter: parent.verticalCenter
         }
         Text {
+            id: label
             text: root.text
-            color: root.fg
-            font.pixelSize: root.compact ? Theme.fontSm : Theme.fontMd
-            font.weight: Font.Medium
+            color: root.kind === "primary" ? Theme.c.bg : root.kind === "destructive" ? Theme.c.red
+                 : root.kind === "link" ? (area.containsMouse ? Theme.c.ink : Theme.c.secondary) : Theme.c.ink
+            font.pointSize: Theme.pt(root.fontSize)
+            font.weight: root.kind === "primary" ? Font.Medium : Font.Normal
             anchors.verticalCenter: parent.verticalCenter
+            // Link style: underline in `underline`, offset 3px.
+            Rectangle {
+                visible: root.kind === "link"
+                y: parent.baselineOffset + 3
+                width: parent.width
+                height: 1
+                color: area.containsMouse ? Theme.c.secondary : Theme.c.underline
+            }
         }
     }
 
     MouseArea {
         id: area
         anchors.fill: parent
+        anchors.margins: root.kind === "link" ? -3 : 0
         hoverEnabled: true
         cursorShape: Qt.PointingHandCursor
         onClicked: root.clicked()

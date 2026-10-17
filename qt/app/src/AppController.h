@@ -42,6 +42,9 @@ public:
     Q_INVOKABLE QString exportNote(const QString& noteId, const QString& format, const QUrl& target);
     // format: json | sql | zip
     Q_INVOKABLE QString exportAll(const QString& format, const QUrl& target);
+    // Puts the note on the clipboard as Markdown (its title as a # heading).
+    // Locked notes are refused.
+    Q_INVOKABLE bool copyAsMarkdown(const QString& noteId);
     Q_INVOKABLE QString suggestedFileName(const QString& noteId, const QString& format);
 
     // Copies a .md/.markdown/.txt file into a new note; returns its id.

@@ -2,104 +2,132 @@ pragma Singleton
 
 import QtQuick
 
-// Design tokens (direction 2a: warm neutrals, one red accent, IBM Plex).
-// Four palettes; "system" follows the OS between light and dark.
+// Design tokens. The names match the prototype and qt/DESIGN.md, with the
+// kebab-case names written in camelCase (ink-2 → ink2, line-strong →
+// lineStrong), so the two stay greppable against each other.
 QtObject {
     id: theme
 
-    // light | warm | slate | dark | system
+    // light | dark | system ("Match Windows")
     property string mode: "system"
     readonly property bool dark: mode === "dark" || (mode === "system" && Qt.styleHints.colorScheme === Qt.ColorScheme.Dark)
-    readonly property string resolved: dark ? "dark" : (mode === "system" ? "light" : mode)
+    readonly property string resolved: dark ? "dark" : "light"
 
-    // Editor text size — adjustable with Ctrl +/-.
+    // Body text size in notes (Settings → Text size, Ctrl +/-).
     property real textScale: 1.0
 
-    // Keys:
-    //   window/sidebar/list/raised/sunken   surfaces
-    //   border, divider                     1px lines
-    //   hover, press, navActive             interaction fills
-    //   text (UI), body (editor prose), muted, subtle, faint
-    //   accent*, cardActive/cardActiveText  selected note card
-    //   chip                                filter chips, tags, meta pills
-    //   codeBg/codeText, inlineCode/inlineCodeText, checkedText
-    readonly property var palettes: ({
-        light: {
-            window: "#fbfaf8", sidebar: "#f5f3ef", list: "#fbfaf8", raised: "#ffffff", sunken: "#efebe5",
-            border: "#e6e1d9", divider: "#ece8e2", hover: "#0f1f1d1a", press: "#1a1f1d1a", navActive: "#eae5dd",
-            text: "#1f1d1a", body: "#2e2b27", muted: "#6e6961", subtle: "#a9a399", faint: "#c9c3b9",
-            accent: "#c4381f", accentHover: "#b0321b", accentText: "#a5341e", accentSubtle: "#f7eeea", accentSoft: "#f0dfd8",
-            accentLine: "#e3b3a6", onAccent: "#ffffff", cardActive: "#f3e9e4", cardActiveText: "#8e2a17",
-            chip: "#efebe5", chipText: "#55514b", chipActive: "#1f1d1a", chipActiveText: "#ffffff",
-            danger: "#d0443a", dangerText: "#b3261e", success: "#2f8a5b", successText: "#23704a", warning: "#b7791f",
-            codeBg: "#1f1d1a", codeText: "#e8e3db", inlineCode: "#f4efe9", inlineCodeText: "#a5341e",
-            checkedText: "#a9a399", highlight: "#80ffd96b", selection: "#40c4381f",
-            shadow: "#33281e14", scrim: "#59201a14"
-        },
-        warm: {
-            window: "#f7f4ee", sidebar: "#f1ede4", list: "#f7f4ee", raised: "#fffdf9", sunken: "#ece7dc",
-            border: "#e2dbcd", divider: "#e7e1d6", hover: "#12302a1a", press: "#1f302a1a", navActive: "#e9e4d8",
-            text: "#22211d", body: "#33312b", muted: "#6f695d", subtle: "#9a9486", faint: "#c3bcae",
-            accent: "#c4381f", accentHover: "#b0321b", accentText: "#a5341e", accentSubtle: "#f4e9e1", accentSoft: "#eed9cd",
-            accentLine: "#e0ae9c", onAccent: "#ffffff", cardActive: "#efe3d8", cardActiveText: "#8e2a17",
-            chip: "#ece7dc", chipText: "#55514b", chipActive: "#22211d", chipActiveText: "#ffffff",
-            danger: "#d0443a", dangerText: "#b3261e", success: "#2f7a55", successText: "#23704a", warning: "#a8701c",
-            codeBg: "#22211d", codeText: "#ece7dc", inlineCode: "#efe8dc", inlineCodeText: "#a5341e",
-            checkedText: "#9a9486", highlight: "#80ffd463", selection: "#40c4381f",
-            shadow: "#33302a1a", scrim: "#59201a10"
-        },
-        slate: {
-            window: "#f7f8fa", sidebar: "#eff1f4", list: "#f7f8fa", raised: "#ffffff", sunken: "#e7eaef",
-            border: "#dfe3e9", divider: "#e5e8ed", hover: "#0f171a21", press: "#1a171a21", navActive: "#e3e7ed",
-            text: "#171a21", body: "#2b303b", muted: "#555b6b", subtle: "#8a90a0", faint: "#bcc1cc",
-            accent: "#c4381f", accentHover: "#b0321b", accentText: "#a5341e", accentSubtle: "#f6ecea", accentSoft: "#efdcd8",
-            accentLine: "#e3b3a6", onAccent: "#ffffff", cardActive: "#f1e6e3", cardActiveText: "#8e2a17",
-            chip: "#e7eaef", chipText: "#555b6b", chipActive: "#171a21", chipActiveText: "#ffffff",
-            danger: "#d0443a", dangerText: "#b3261e", success: "#2f8a5b", successText: "#23704a", warning: "#b7791f",
-            codeBg: "#171a21", codeText: "#e6e8ee", inlineCode: "#eef0f4", inlineCodeText: "#a5341e",
-            checkedText: "#8a90a0", highlight: "#80ffd96b", selection: "#40c4381f",
-            shadow: "#33141a28", scrim: "#59101420"
-        },
-        dark: {
-            window: "#161513", sidebar: "#1b1a17", list: "#161513", raised: "#23211e", sunken: "#262420",
-            border: "#2e2b27", divider: "#2a2825", hover: "#0fede9e3", press: "#1aede9e3", navActive: "#2a2824",
-            text: "#ede9e3", body: "#d6d0c3", muted: "#9a948b", subtle: "#77726a", faint: "#4f4b45",
-            accent: "#d2472c", accentHover: "#e0573b", accentText: "#e8876f", accentSubtle: "#2a1c17", accentSoft: "#3a2219",
-            accentLine: "#6e2c1e", onAccent: "#ffffff", cardActive: "#2c1f1a", cardActiveText: "#f0a48f",
-            chip: "#262420", chipText: "#b5afa5", chipActive: "#ede9e3", chipActiveText: "#161513",
-            danger: "#e5534b", dangerText: "#ff9a92", success: "#4e9e75", successText: "#6fbf94", warning: "#e0a84a",
-            codeBg: "#0f0e0d", codeText: "#e8e3db", inlineCode: "#2a2622", inlineCodeText: "#ec8a72",
-            checkedText: "#6b665e", highlight: "#59c9a227", selection: "#55d2472c",
-            shadow: "#80000000", scrim: "#a6000000"
-        }
+    readonly property var light: ({
+        bg: "#FFFFFF", sidebar: "#F5F4F1", selected: "#E8E6E0", pressed: "#ECEAE5",
+        raised: "#FFFFFF", card: "#FFFFFF", field: "#FFFFFF", folder: "#FAFAF8",
+        codeBg: "#F7F6F3", inlineCode: "#F1EFEA", hl: "#FBEFB8",
+        ink: "#1B1B1A", ink2: "#22221F", text: "#2A2926", text2: "#3A3936", secondary: "#4A4945",
+        tertiary: "#5F5E59", muted: "#6E6D68", placeholder: "#767570", faint: "#8F8D87", faintest: "#B9B7B0",
+        underline: "#C9C6BF", linkLine: "#A9A7A0", quote: "#D6D3CC",
+        line: "#E7E5E0", lineStrong: "#E2E0DA", lineSoft: "#ECEAE5", lineFaint: "#F0EEE9",
+        cardLine: "#E5E3DE", menuLine: "#EDEBE6",
+        red: "#B4432F", scrim: "#291B1B1A",
+        segTrack: "#EFEDE8", segOn: "#FFFFFF", switchOff: "#D6D3CC", knob: "#FFFFFF"
     })
-    readonly property var c: palettes[resolved]
+    // Warm near-black. The sidebar sits darker than the page, menus lift
+    // lighter, and depth comes from a faint light ring instead of shadow.
+    readonly property var darkTokens: ({
+        bg: "#1C1C1B", sidebar: "#161615", selected: "#2B2B29", pressed: "#2E2E2B",
+        raised: "#262624", card: "#222221", field: "#222221", folder: "#212120",
+        codeBg: "#252523", inlineCode: "#2D2D2A", hl: "#4D4220",
+        ink: "#EDECE9", ink2: "#E4E3DF", text: "#D9D8D3", text2: "#CAC9C3", secondary: "#B5B4AE",
+        tertiary: "#9E9D97", muted: "#8F8E88", placeholder: "#86857F", faint: "#6F6E69", faintest: "#55544F",
+        underline: "#55544F", linkLine: "#77766F", quote: "#46453F",
+        line: "#2B2B29", lineStrong: "#353532", lineSoft: "#2A2A28", lineFaint: "#262625",
+        cardLine: "#2F2F2D", menuLine: "#363633",
+        red: "#E2765F", scrim: "#80000000",
+        segTrack: "#2A2A28", segOn: "#3B3B38", switchOff: "#46453F", knob: "#F2F1EE"
+    })
 
-    // Named colours for lists and tags — muted, so twenty of them in a
-    // sidebar still read as one palette.
+    // ── shadows (see Shadow.qml) ─────────────────────────────────────
+    readonly property var shadowPop: dark ? { y: 10, blur: 28, color: "#73000000", ring: "#12FFFFFF" }
+                                          : { y: 8, blur: 24, color: "#1F000000", ring: "#14000000" }
+    readonly property var shadowModal: dark ? { y: 24, blur: 60, color: "#8C000000", ring: "#14FFFFFF" }
+                                            : { y: 24, blur: 60, color: "#29000000", ring: "#12000000" }
+
+    // ── accent ───────────────────────────────────────────────────────
+    // One user setting (qt.accent). In the dark it's lifted 22% towards
+    // white so it holds on the darker ground; Ink turns to paper.
+    readonly property var accents: [
+        { name: "Blue", hex: "#2F5AC8" }, { name: "Green", hex: "#1F7A5C" },
+        { name: "Rust", hex: "#9A4A1F" }, { name: "Ink", hex: "#1B1B1A" }
+    ]
+    property string accentChoice: "#2F5AC8"
+    readonly property bool inkAccent: accentChoice.toUpperCase() === "#1B1B1A"
+    readonly property color accent: !dark ? accentChoice : (inkAccent ? darkTokens.ink : mix(accentChoice, "#FFFFFF", 0.22))
+    readonly property color accentInk: dark && inkAccent ? darkTokens.bg : "#FFFFFF"
+    readonly property color selection: Qt.alpha(accent, dark ? 0.34 : 0.2)
+
+    function mix(a, b, t) {
+        const x = Qt.color(a), y = Qt.color(b)
+        return Qt.rgba(x.r + (y.r - x.r) * t, x.g + (y.g - x.g) * t, x.b + (y.b - x.b) * t, 1)
+    }
+
+    // ── list colours ─────────────────────────────────────────────────
+    // The database stores names; these are their tones. The colour picker
+    // offers the first seven, the rest still render for older lists.
     readonly property var swatches: ({
-        gray: "#a39d92", red: "#c4381f", orange: "#cf6f2e", yellow: "#c48a1f", green: "#2f8a5b",
-        blue: "#3e7bc4", indigo: "#5566c4", purple: "#7a5bc4", pink: "#c24f86", teal: "#2a8a84", cyan: "#2d8db0"
+        blue: "#4A6FA5", teal: "#3E8A8A", green: "#5E8C61", yellow: "#B07D2B", orange: "#B4543A",
+        purple: "#8A5A83", gray: "#6E6D68", red: "#A8483B", indigo: "#5B62A8", pink: "#A85A78", cyan: "#3D7F9E"
     })
-    readonly property var swatchNames: ["gray", "red", "orange", "yellow", "green", "blue", "indigo", "purple", "pink", "teal", "cyan"]
-    function swatch(name) { return swatches[name] !== undefined ? swatches[name] : swatches.gray }
+    readonly property var swatchNames: ["blue", "teal", "green", "yellow", "orange", "purple", "gray", "red", "indigo", "pink", "cyan"]
+    readonly property var pickerSwatches: [
+        { name: "blue", label: "Blue" }, { name: "teal", label: "Teal" }, { name: "green", label: "Green" },
+        { name: "yellow", label: "Ochre" }, { name: "orange", label: "Rust" }, { name: "purple", label: "Plum" },
+        { name: "gray", label: "Grey" }
+    ]
+    function swatch(name) {
+        const base = swatches[name] !== undefined ? swatches[name] : swatches.gray
+        return dark ? mix(base, "#FFFFFF", 0.2) : Qt.color(base)
+    }
 
-    // Type
-    readonly property string fontFamily: "IBM Plex Sans"
-    readonly property string monoFamily: "IBM Plex Mono"
+    // ── colours in use ───────────────────────────────────────────────
+    readonly property var c: {
+        const t = Object.assign({}, dark ? darkTokens : light)
+        t.accent = accent
+        t.onAccent = accentInk
+        t.selection = selection
+        // Legacy names, for the screens not rebuilt on the new tokens yet.
+        // Remove each one when nothing reads it any more.
+        Object.assign(t, {
+            window: t.bg, list: t.bg, sunken: t.codeBg, border: t.lineStrong, divider: t.line,
+            hover: Qt.alpha(t.pressed, 0.6), press: t.pressed, navActive: t.selected,
+            body: t.text, subtle: t.faint,
+            accentHover: Qt.darker(accent, 1.08), accentText: accent, accentSubtle: Qt.alpha(accent, 0.08),
+            accentSoft: Qt.alpha(accent, 0.14), accentLine: Qt.alpha(accent, 0.5),
+            cardActive: t.selected, cardActiveText: t.ink,
+            chip: t.codeBg, chipText: t.secondary, chipActive: t.ink, chipActiveText: t.bg,
+            danger: t.red, dangerText: t.red, success: accent, successText: accent, warning: swatch("yellow"),
+            codeText: t.text, inlineCodeText: t.ink, checkedText: t.muted, highlight: t.hl,
+            shadow: shadowPop.color
+        })
+        return t
+    }
+
+    // ── type ─────────────────────────────────────────────────────────
+    readonly property string fontFamily: "Geist"
+    readonly property string monoFamily: "Geist Mono"
+    // font.pixelSize only takes whole pixels; the type scale has halves
+    // (12.5, 13.5, 14.5), so those sizes go in as points (96 dpi logical).
+    function pt(px) { return px * 0.75 }
+    // Legacy sizes; new code uses the pixel sizes from DESIGN.md directly.
     readonly property int fontXs: 11
     readonly property int fontSm: 12
     readonly property int fontMd: 13
     readonly property int fontLg: 14
     readonly property int fontXl: 16
 
-    // Shape
+    // ── shape ────────────────────────────────────────────────────────
     readonly property int radiusSm: 4
     readonly property int radius: 6
     readonly property int radiusLg: 8
     readonly property int radiusXl: 12
 
-    // Motion
+    // ── motion ───────────────────────────────────────────────────────
     readonly property int fast: 120
     readonly property int normal: 200
 
@@ -107,24 +135,24 @@ QtObject {
     readonly property var editorPalette: ({
         bodyFamily: fontFamily,
         monoFamily: monoFamily,
-        basePx: Math.round(16 * textScale),
-        lineHeight: 160,
-        text: c.body,
+        basePx: 16 * textScale,
+        lineHeight: 170,
+        text: c.text,
         muted: c.muted,
-        subtle: c.subtle,
-        accent: c.accent,
-        accentText: c.accentText,
-        link: c.accent,
+        subtle: c.faint,
+        accent: accent,
+        accentText: accent,
+        link: c.ink,
         inlineCodeBg: c.inlineCode,
-        inlineCodeText: c.inlineCodeText,
+        inlineCodeText: c.ink,
         codeBlockBg: c.codeBg,
-        codeBlockText: c.codeText,
-        highlightBg: c.highlight,
-        quoteText: c.muted,
-        checkedText: c.checkedText,
-        rule: c.border,
-        tableBorder: c.border,
-        tableHeaderBg: c.sunken,
-        checkbox: c.accent
+        codeBlockText: c.text,
+        highlightBg: c.hl,
+        quoteText: c.secondary,
+        checkedText: c.muted,
+        rule: c.line,
+        tableBorder: c.lineFaint,
+        tableHeaderBg: c.bg,
+        checkbox: accent
     })
 }

@@ -3,23 +3,25 @@ import QtQuick.Controls.Basic
 import QtQuick.Layouts
 import QtQuick.Dialogs
 import Noted
+import "../Fmt.js" as Fmt
 
-// Right column: note chrome + editor. Loads note content only when the
-// selected note changes (or an external write lands while idle), never in
-// response to its own saves.
-Rectangle {
+// The note page: title and meta row, the body in a centred column with equal
+// gutters, "On this page" in a column of its own once there are two headings,
+// and a 30px footer. Loads note content only when the open note changes (or
+// an external write lands while idle), never in response to its own saves.
+Item {
     id: pane
-    color: Theme.c.window
 
+    property bool active: false
     readonly property var note: AppState.currentNote
-    readonly property bool hasNote: !!note.id
+    readonly property bool hasNote: active && !!note.id
     readonly property bool isPlain: note.note_type === "plain"
     readonly property bool inTrash: !!note.is_trashed
     // A file opened from disk: no title, tags, pin or lock — just its text.
     readonly property bool isFile: !!note.is_file
-    readonly property bool locked: hasNote && !!note.is_locked && !unlockedTick && !Store.isUnlocked(note.id)
-    property bool unlockedTick: false
+    readonly property bool locked: hasNote && AppState.isLocked(note)
     property string loadedId: ""
+    readonly property string liveTitle: titleMerged ? rich.controller.leadingHeading : header.liveTitle
     // The note opens with an H1 that repeats its title: show it once (the
     // heading), and keep the title following that heading while it's edited.
     property bool titleMerged: false
@@ -44,21 +46,17 @@ Rectangle {
     readonly property var taskDecos: pane.isPlain ? [] : rich.controller.decorations.filter(d => d.k === "task")
     readonly property int taskTotal: taskDecos.length
     readonly property int taskDone: taskDecos.filter(d => d.checked).length
-    // Room left for the floating window buttons (see Main.qml).
-    property real chromeRight: 138
-    // Minimum gap between the text and the pane's edges.
-    readonly property real textInset: 56
-    // The text column, centred unless "Full width" is on. It grows with the
-    // pane (about 62% of it) so a wide monitor isn't mostly margin, but stays
-    // between ~75 and ~105 characters so lines remain easy to follow.
+    readonly property var outline: isPlain || locked ? [] : rich.controller.outline
+    readonly property bool showOutline: outline.length >= 2 && scroller.width >= 900
+
+    // ── grid ─────────────────────────────────────────────────────────
+    // normal: minmax(48px,1fr) | clamp(680px, 62%, 960px) − 96px | minmax(48px,1fr) | outline
+    // wide:   64px | 1fr | 64px | outline
+    readonly property real outlineW: showOutline ? 200 : 0
     readonly property real columnWidth: AppState.fullWidth
-        ? scroller.width - 2 * textInset
-        : Math.min(scroller.width - 2 * textInset,
-                   Math.max(680 * Theme.textScale, Math.min(960 * Theme.textScale, Math.round(scroller.width * 0.62))))
-    // Left edge of the text (and of the toolbar and status line).
-    readonly property real columnX: Math.max(textInset, Math.round((scroller.width - columnWidth) / 2))
-    readonly property string tbPos: AppState.toolbarPosition
-    readonly property bool showToolbar: hasNote && !isPlain && !inTrash && !locked && tbPos !== "hidden"
+        ? scroller.width - outlineW - 128
+        : Math.min(scroller.width - outlineW - 96, Math.max(680, Math.min(960, scroller.width * 0.62)) - 96)
+    readonly property real columnX: Math.round((scroller.width - outlineW - columnWidth) / 2)
 
     function flush() {
         rich.controller.flush()
@@ -68,7 +66,7 @@ Rectangle {
 
     function loadCurrent(force) {
         if (!hasNote) {
-            if (loadedId !== "") { flush(); rich.controller.unload(); loadedId = "" }
+            if (loadedId !== "") { flush(); rich.controller.unload(); plain.load("", ""); loadedId = "" }
             return
         }
         if (!force && loadedId === note.id) return
@@ -78,6 +76,7 @@ Rectangle {
             rich.controller.unload()
             plain.load("", "")
             loadedId = ""
+            Qt.callLater(lockPanel.focusPin)
             return
         }
         if (n.note_type === "plain") {
@@ -95,14 +94,16 @@ Rectangle {
         if (!reloaded) scroller.contentY = 0
     }
 
+    onHasNoteChanged: loadCurrent(false)
     Connections {
         target: AppState
-        function onSelectedNoteIdChanged() { pane.unlockedTick = false; pane.loadCurrent(false) }
-        function onFocusTitleRequested(selectAll) { Qt.callLater(() => header.focusTitle(selectAll)) }
+        function onSelectedNoteIdChanged() { pane.loadCurrent(false) }
+        function onFocusTitleRequested(selectAll) { if (pane.active) Qt.callLater(() => header.focusTitle(selectAll)) }
         function onFocusEditorRequested() { pane.focusBody() }
-        function onEditorTaskToggleRequested(index) {
+        function onEditorTaskToggleRequested(noteId, index) {
+            if (!pane.hasNote || noteId !== pane.loadedId || pane.isPlain) return
             const t = pane.taskDecos
-            if (index >= 0 && index < t.length && !t[index].checked) rich.controller.toggleTask(t[index].block)
+            if (index >= 0 && index < t.length) { rich.controller.toggleTask(t[index].block); AppState.claimTask() }
         }
     }
     Connections {
@@ -147,8 +148,16 @@ Rectangle {
         else if (top + r.height > scroller.contentY + scroller.height - margin)
             scroller.contentY = Math.min(scroller.contentHeight - scroller.height, top + r.height - scroller.height + margin)
     }
+    function scrollToBlock(block) {
+        const g = rich.controller.blockGeometry(block, rich.controller.layoutTick)
+        const r = rich.textEdit.positionToRectangle(g.start || 0)
+        const top = rich.textEdit.mapToItem(scroller.contentItem, 0, r.y).y
+        scroller.contentY = Math.max(0, Math.min(scroller.contentHeight - scroller.height, top - 24))
+    }
 
     PopupMenu { id: menu }
+    PopoutManager { id: popouts }
+    function popOut(id) { popouts.openNote(id) }
 
     FileDialog {
         id: exportDialog
@@ -162,546 +171,290 @@ Rectangle {
     }
     function exportAs(fmt) {
         const filters = { pdf: "PDF (*.pdf)", doc: "Word document (*.doc)", html: "HTML (*.html)", md: "Markdown (*.md)", txt: "Text (*.txt)" }
+        flush()
         exportDialog.format = fmt
         exportDialog.nameFilters = [filters[fmt]]
         exportDialog.selectedFile = App.suggestedFileName(note.id, fmt)
         exportDialog.open()
     }
 
-    DragArea {
-        visible: !pane.hasNote
-        width: parent.width
-        height: 52
+    // The header's More button.
+    function openMore(button) {
+        flush()
+        const n = note
+        const wide = { text: "Full width", checked: AppState.fullWidth, action: () => AppState.setFullWidth(!AppState.fullWidth) }
+        let items
+        if (isFile) items = [
+            wide,
+            { separator: true },
+            { text: "Show in folder", action: () => App.revealFile(n.file_path) },
+            { text: "Copy into notes", action: () => AppState.copyFileToNotes(n.id) },
+            { separator: true },
+            { text: "Close file", action: () => AppState.closeFile(n.id) }
+        ]
+        else if (inTrash) items = [
+            { text: "Restore", action: () => AppState.restoreNote(n.id) },
+            { separator: true },
+            { text: "Delete forever", danger: true, action: () => AppState.deleteForever(n.id) }
+        ]
+        else items = [
+            wide,
+            { text: "Move to list…", action: () => header.openMove() },
+            { text: "Copy as Markdown", disabled: locked, action: () => { if (App.copyAsMarkdown(n.id)) AppState.toast("Copied as Markdown") } },
+            { text: "Export…", disabled: locked, children: [
+                { text: "Markdown", action: () => exportAs("md") },
+                { text: "PDF", action: () => exportAs("pdf") },
+                { text: "Word document", action: () => exportAs("doc") },
+                { text: "HTML", action: () => exportAs("html") },
+                { text: "Plain text", action: () => exportAs("txt") }
+            ] },
+            n.is_locked ? (locked ? { text: "Locked with PIN", disabled: true } : { text: "Lock again", action: () => AppState.lockAgain(n.id) })
+                        : { text: "Lock with PIN…", action: () => AppState.toggleLock(n.id) },
+            ...(isPlain ? [{ text: "Turn into rich text", action: () => { flush(); AppState.convertToRich(n.id) } }] : []),
+            { separator: true },
+            { text: "Move to trash", danger: true, action: () => AppState.trashNote(n.id) }
+        ]
+        menu.openBelowRight(button, items)
     }
 
-    // ── empty state ──────────────────────────────────────────────────
-    ColumnLayout {
-        visible: !pane.hasNote
-        anchors.centerIn: parent
-        spacing: 10
-        Rectangle {
-            Layout.alignment: Qt.AlignHCenter
-            width: 64
-            height: 64
-            radius: Theme.radiusXl
-            color: Theme.c.hover
-            Icon { anchors.centerIn: parent; name: "pen-line"; size: 26; color: Theme.c.subtle }
-        }
-        Text {
-            Layout.alignment: Qt.AlignHCenter
-            text: "No note selected"
-            color: Theme.c.text
-            font.pixelSize: Theme.fontXl
-            font.weight: Font.DemiBold
-        }
-        Text {
-            Layout.alignment: Qt.AlignHCenter
-            text: "Pick a note from the list, or start a new one."
-            color: Theme.c.muted
-            font.pixelSize: Theme.fontMd
-        }
-        RowLayout {
-            Layout.alignment: Qt.AlignHCenter
-            Layout.topMargin: 6
-            spacing: 8
-            TextButton { text: "New note"; icon: "plus"; variant: "primary"; onClicked: AppState.newNote() }
-            TextButton { text: "Search"; icon: "search"; onClicked: AppState.paletteOpen = true }
-        }
-        Row {
-            Layout.alignment: Qt.AlignHCenter
-            Layout.topMargin: 10
-            spacing: 14
-            Repeater {
-                model: [["Ctrl N", "new note"], ["Ctrl P", "search"], ["Ctrl .", "today"]]
-                delegate: Row {
-                    required property var modelData
-                    spacing: 6
-                    Kbd { text: parent.modelData[0] }
-                    Text { text: parent.modelData[1]; color: Theme.c.subtle; font.pixelSize: Theme.fontSm; anchors.verticalCenter: parent.verticalCenter }
-                }
-            }
-        }
-    }
-
-    IconButton {
-        visible: !pane.hasNote && AppState.noteListCollapsed
+    // ── page ─────────────────────────────────────────────────────────
+    Flickable {
+        id: scroller
+        anchors.top: findBar.visible ? findBar.bottom : parent.top
         anchors.left: parent.left
-        anchors.top: parent.top
-        anchors.margins: 10
-        icon: "chevrons-right"
-        tooltip: "Show note list"
-        onClicked: AppState.noteListCollapsed = false
-    }
+        anchors.right: parent.right
+        anchors.bottom: footer.top
+        contentWidth: width
+        contentHeight: body.y + body.implicitHeight + 96
+        clip: true
+        boundsBehavior: Flickable.StopAtBounds
+        flickDeceleration: 4000
+        maximumFlickVelocity: 5000
+        ScrollBar.vertical: ScrollBarThin {}
+        onContentHeightChanged: pane.applyPendingScroll()
 
-    // ── note ─────────────────────────────────────────────────────────
-    ColumnLayout {
-        anchors.fill: parent
-        spacing: 0
-        visible: pane.hasNote
-
-        // Header: history, breadcrumb (list / title), note actions. Drags
-        // the window; the window buttons float over its right end.
-        Item {
-            Layout.fillWidth: true
-            Layout.preferredHeight: 52
-            z: 2
-            DragArea { anchors.fill: parent }
-            Rectangle {
-                anchors.bottom: parent.bottom
-                width: parent.width
-                height: 1
-                color: Theme.c.divider
-                opacity: scroller.contentY > 2 && !(pane.showToolbar && pane.tbPos === "top") ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: 150 } }
-            }
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: 14
-                anchors.rightMargin: pane.chromeRight + 8
-                spacing: 2
-
-                IconButton {
-                    visible: AppState.noteListCollapsed || AppState.focusMode
-                    icon: "chevrons-right"
-                    size: 28
-                    tooltip: AppState.focusMode ? "Exit focus mode" : "Show note list"
-                    shortcut: AppState.focusMode ? "F11" : "Ctrl+["
-                    dim: true
-                    onClicked: { AppState.focusMode = false; AppState.noteListCollapsed = false }
-                }
-                IconButton {
-                    icon: "arrow-left"
-                    size: 28
-                    iconSize: 15
-                    dim: true
-                    tooltip: "Back"
-                    shortcut: "Alt+Left"
-                    enabled: AppState.historyIndex > 0
-                    onClicked: AppState.goBack()
-                }
-                IconButton {
-                    icon: "arrow-right"
-                    size: 28
-                    iconSize: 15
-                    dim: true
-                    tooltip: "Forward"
-                    shortcut: "Alt+Right"
-                    enabled: AppState.historyIndex < AppState.history.length - 1
-                    onClicked: AppState.goForward()
-                }
-                Item { Layout.preferredWidth: 8 }
-
-                // Breadcrumb
-                RowLayout {
-                    id: crumbs
-                    Layout.fillWidth: true
-                    spacing: 6
-                    readonly property var list: {
-                        const id = pane.note.list_id
-                        if (!id) return null
-                        for (const l of AppState.lists.concat(AppState.hiddenLists)) if (l.id === id) return l
-                        return null
-                    }
-                    // The title is already on the page; repeat it here only once it scrolls off.
-                    // A file has no title on the page, so its name always shows.
-                    readonly property bool showTitle: pane.isFile || scroller.contentY > 90
-                    // A file's folder, e.g. "Documents".
-                    readonly property string folder: pane.isFile ? (pane.note.file_path || "").split(/[\\/]/).slice(-2, -1)[0] || "" : ""
-                    readonly property string root: pane.isFile ? crumbs.folder : pane.inTrash ? "Trash" : pane.note.is_daily ? "Daily notes" : crumbs.list ? crumbs.list.name : "All Notes"
-                    Rectangle {
-                        visible: crumbs.list !== null && !pane.inTrash && !pane.note.is_daily
-                        width: 7
-                        height: 7
-                        radius: 2
-                        color: Theme.swatch(crumbs.list ? crumbs.list.color : "gray")
-                    }
-                    Text {
-                        text: crumbs.root
-                        color: rootArea.containsMouse ? Theme.c.text : Theme.c.muted
-                        font.pixelSize: 13
-                        elide: Text.ElideRight
-                        Layout.maximumWidth: 200
-                        MouseArea {
-                            id: rootArea
-                            anchors.fill: parent
-                            hoverEnabled: true
-                            cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (pane.isFile) App.revealFile(pane.note.file_path)
-                                else if (pane.inTrash) AppState.setView("trash")
-                                else if (pane.note.is_daily) AppState.setView("today")
-                                else if (crumbs.list) AppState.setView("list", crumbs.list.id)
-                                else AppState.setView("all")
-                            }
-                        }
-                    }
-                    Text { visible: crumbs.showTitle; text: "/"; color: Theme.c.faint; font.pixelSize: 13 }
-                    Text {
-                        opacity: crumbs.showTitle ? 1 : 0
-                        Behavior on opacity { NumberAnimation { duration: 150 } }
-                        text: (pane.titleMerged ? rich.controller.leadingHeading : header.liveTitle) || "Untitled"
-                        color: Theme.c.text
-                        font.pixelSize: 13
-                        elide: Text.ElideRight
-                        Layout.fillWidth: true
-                    }
-                }
-
-                IconButton {
-                    visible: !pane.inTrash && !pane.isFile
-                    icon: pane.note.is_pinned ? "pin-off" : "pin"
-                    checked: !!pane.note.is_pinned
-                    size: 30
-                    dim: true
-                    tooltip: pane.note.is_pinned ? "Unpin" : "Pin to top"
-                    onClicked: Store.setPinned(pane.note.id, !pane.note.is_pinned)
-                }
-                IconButton {
-                    visible: !pane.inTrash && !pane.isFile
-                    icon: pane.note.is_locked ? "lock" : "lock-open"
-                    checked: !!pane.note.is_locked
-                    size: 30
-                    dim: true
-                    tooltip: pane.note.is_locked ? "Unlock note" : "Lock note"
-                    onClicked: AppState.toggleLock(pane.note.id)
-                }
-                IconButton {
-                    visible: pane.isPlain && !pane.inTrash && !pane.isFile
-                    icon: "type"
-                    size: 30
-                    dim: true
-                    tooltip: "Convert to rich text"
-                    onClicked: { pane.flush(); AppState.convertToRich(pane.note.id) }
-                }
-                IconButton {
-                    id: exportButton
-                    visible: !pane.locked && !pane.isFile
-                    icon: "download"
-                    size: 30
-                    dim: true
-                    tooltip: "Export"
-                    onClicked: {
-                        pane.flush()
-                        menu.openBelow(exportButton, [
-                            { header: "Export as" },
-                            { text: "PDF document", icon: "file-text", action: () => pane.exportAs("pdf") },
-                            { text: "Word document", icon: "file-text", action: () => pane.exportAs("doc") },
-                            { text: "HTML file", icon: "code-xml", action: () => pane.exportAs("html") },
-                            { text: "Markdown", icon: "hash", action: () => pane.exportAs("md") },
-                            { text: "Plain text", icon: "type", action: () => pane.exportAs("txt") }
-                        ])
-                    }
-                }
-                IconButton {
-                    id: moreButton
-                    icon: "ellipsis"
-                    size: 30
-                    dim: true
-                    tooltip: "More"
-                    onClicked: {
-                        const pos = ["top", "right", "bottom", "left", "hidden"]
-                        const tb = pos.map(p => ({ text: p === "hidden" ? "Hidden" : p.charAt(0).toUpperCase() + p.slice(1),
-                                                    checked: pane.tbPos === p, action: () => AppState.setToolbarPosition(p) }))
-                        const view = [
-                            { text: "Toolbar position", icon: "panel-top", children: tb },
-                            { text: "Full width", icon: "columns-2", checked: AppState.fullWidth, action: () => AppState.setFullWidth(!AppState.fullWidth) },
-                            { text: AppState.focusMode ? "Exit focus mode" : "Focus mode", icon: AppState.focusMode ? "minimize-2" : "maximize-2", shortcut: "F11", action: () => AppState.focusMode = !AppState.focusMode }
-                        ]
-                        const find = [
-                            { text: "Find in note", icon: "search", shortcut: "Ctrl+F", action: () => { AppState.replaceOpen = false; AppState.findOpen = true } },
-                            { text: "Find & replace", icon: "pencil", shortcut: "Ctrl+H", action: () => { AppState.replaceOpen = true; AppState.findOpen = true } },
-                            ...(pane.isPlain ? [] : [{ text: "Clean & format", icon: "sparkles", action: () => pane.cleanAndFormat() }])
-                        ]
-                        const items = pane.isFile ? [
-                            ...find,
-                            { separator: true },
-                            ...view,
-                            { separator: true },
-                            { text: "Show in folder", icon: "folder-open", action: () => App.revealFile(pane.note.file_path) },
-                            { text: "Copy into notes", icon: "copy", action: () => { pane.flush(); AppState.copyFileToNotes(pane.note.id) } },
-                            { text: "Close file", icon: "x", action: () => AppState.closeFile(pane.note.id) }
-                        ] : pane.inTrash ? [
-                            { text: "Restore", icon: "rotate-ccw", action: () => AppState.restoreNote(pane.note.id) },
-                            { text: "Delete permanently", icon: "trash-2", danger: true, action: () => AppState.deleteForever(pane.note.id) }
-                        ] : [
-                            ...find,
-                            { separator: true },
-                            ...view,
-                            { text: "Pop out", icon: "external-link", action: () => popouts.openNote(pane.note.id) },
-                            { separator: true },
-                            { text: "Duplicate", icon: "copy", action: () => AppState.duplicate(pane.note.id) },
-                            { text: "Delete", icon: "trash-2", danger: true, action: () => AppState.trashNote(pane.note.id) }
-                        ]
-                        menu.openBelow(moreButton, items)
-                    }
-                }
-                Rectangle { width: 1; height: 16; color: Theme.c.divider; Layout.leftMargin: 6 }
-            }
-        }
-
-        // Toolbar (top position): a centred pill.
-        Item {
-            visible: pane.showToolbar && pane.tbPos === "top"
-            Layout.fillWidth: true
-            Layout.preferredHeight: 44
-            Rectangle {
-                anchors.bottom: parent.bottom
-                width: parent.width
-                height: 1
-                color: Theme.c.divider
-                opacity: scroller.contentY > 2 ? 1 : 0
-                Behavior on opacity { NumberAnimation { duration: 150 } }
-            }
-            Flickable {
-                anchors.fill: parent
-                anchors.leftMargin: 16
-                anchors.rightMargin: 16
-                anchors.bottomMargin: 6
-                contentWidth: Math.max(width, topToolbar.implicitWidth)
-                clip: true
-                interactive: topToolbar.implicitWidth > width
-                boundsBehavior: Flickable.StopAtBounds
-                EditorToolbar {
-                    id: topToolbar
-                    editor: rich.controller
-                    x: Math.max(0, pane.columnX - 26)
-                    width: implicitWidth
-                    height: 38
-                    onLinkRequested: rich.openLinkDialog()
-                }
-            }
-        }
-
-        FindBar {
-            id: findBar
-            visible: AppState.findOpen && !pane.isPlain && !pane.locked
-            Layout.fillWidth: true
-            editor: rich.controller
-            onClosed: { AppState.findOpen = false; rich.controller.findQuery = ""; rich.textEdit.forceActiveFocus() }
-            onVisibleChanged: if (visible) Qt.callLater(focusFind)
-        }
-
-        RowLayout {
-            Layout.fillWidth: true
-            Layout.fillHeight: true
+        Column {
+            id: body
+            width: pane.columnWidth
+            x: pane.columnX
+            y: 40
             spacing: 0
 
-            EditorToolbar {
-                visible: pane.showToolbar && pane.tbPos === "left"
-                vertical: true
-                editor: rich.controller
-                Layout.topMargin: 4
-                Layout.bottomMargin: 12
-                Layout.leftMargin: 10
-                Layout.alignment: Qt.AlignTop
-                Layout.fillHeight: false
-                onLinkRequested: rich.openLinkDialog()
+            // A file shows exactly as it is: no separate title.
+            Flow {
+                visible: pane.isFile
+                width: parent.width
+                spacing: 16
+                bottomPadding: 28
+                Row {
+                    height: 20
+                    spacing: 6
+                    Icon { name: "file"; size: 14; color: Theme.c.muted; anchors.verticalCenter: parent.verticalCenter }
+                    Text {
+                        text: (/\.(md|markdown)$/i.test(pane.note.file_path || "") ? "Markdown" : "Plain text") + " file"
+                        color: Theme.c.text
+                        font.pixelSize: 13
+                        anchors.verticalCenter: parent.verticalCenter
+                    }
+                }
+                Text {
+                    width: Math.min(implicitWidth, 340)
+                    height: 20
+                    verticalAlignment: Text.AlignVCenter
+                    text: pane.note.file_path || ""
+                    color: Theme.c.muted
+                    font.pixelSize: 13
+                    elide: Text.ElideMiddle
+                    MouseArea { id: pathArea; anchors.fill: parent; hoverEnabled: true }
+                    Tip { visible: pathArea.containsMouse; text: pane.note.file_path || "" }
+                }
+                Text {
+                    height: 20
+                    verticalAlignment: Text.AlignVCenter
+                    text: "Saved " + Fmt.edited(pane.note.updated_at).toLowerCase().replace(/^yesterday$/, "yesterday")
+                    color: Theme.c.muted
+                    font.pixelSize: 13
+                }
+                TextButton { height: 20; variant: "link"; fontSize: 13; text: "Copy into notes"; onClicked: { pane.flush(); AppState.copyFileToNotes(pane.note.id) } }
             }
+
+            NoteHeader {
+                id: header
+                visible: !pane.isFile
+                width: parent.width
+                note: pane.note
+                readOnly: pane.inTrash
+                tags: AppState.currentTags
+                locked: pane.locked
+                showTitle: !pane.titleMerged
+                tasksDone: pane.taskDone
+                tasksTotal: pane.taskTotal
+                onEnterPressed: pane.focusBody()
+            }
+            Item { visible: !pane.isFile; width: 1; height: 30 }
+
+            // In the trash: say so, and offer the way back.
+            Rectangle {
+                visible: pane.inTrash
+                width: parent.width
+                height: 52
+                radius: 8
+                color: Theme.c.folder
+                border.color: Theme.c.lineStrong
+                RowLayout {
+                    anchors.fill: parent
+                    anchors.leftMargin: 14
+                    anchors.rightMargin: 12
+                    spacing: 12
+                    Icon { name: "trash-2"; size: 16; color: Theme.c.muted }
+                    Text { Layout.fillWidth: true; text: "This note is in the trash."; color: Theme.c.ink; font.pixelSize: 14 }
+                    TextButton { text: "Restore"; onClicked: AppState.restoreNote(pane.note.id) }
+                }
+            }
+            Item { visible: pane.inTrash; width: 1; height: 30 }
 
             Item {
-                Layout.fillWidth: true
-                Layout.fillHeight: true
-
-                Flickable {
-                    id: scroller
-                    anchors.fill: parent
-                    contentWidth: width
-                    contentHeight: body.implicitHeight + 160
-                    clip: true
-                    boundsBehavior: Flickable.StopAtBounds
-                    flickDeceleration: 4000
-                    maximumFlickVelocity: 5000
-                    ScrollBar.vertical: ScrollBarThin {}
-                    visible: !pane.locked
-                    onContentHeightChanged: pane.applyPendingScroll()
-
-                    ColumnLayout {
-                        id: body
-                        width: pane.columnWidth
-                        x: pane.columnX
-                        y: pane.showToolbar && pane.tbPos === "top" ? 24 : 12
-                        spacing: 14
-
-                        Rectangle {
-                            visible: pane.inTrash
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 40
-                            radius: Theme.radiusLg
-                            color: Qt.alpha(Theme.c.danger, 0.08)
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 6
-                                Icon { name: "trash-2"; size: 14; color: Theme.c.dangerText }
-                                Text { text: "This note is in the trash."; color: Theme.c.dangerText; font.pixelSize: Theme.fontMd; Layout.fillWidth: true }
-                                TextButton { text: "Restore"; compact: true; onClicked: AppState.restoreNote(pane.note.id) }
-                            }
-                        }
-
-                        Rectangle {
-                            visible: !!pane.note.is_shared && !pane.inTrash
-                            Layout.fillWidth: true
-                            Layout.preferredHeight: 36
-                            radius: Theme.radiusLg
-                            color: Theme.c.accentSubtle
-                            RowLayout {
-                                anchors.fill: parent
-                                anchors.leftMargin: 12
-                                anchors.rightMargin: 12
-                                Icon { name: "share-2"; size: 14; color: Theme.c.accentText }
-                                Text {
-                                    text: "Shared note — live sync isn't in the Qt build yet, so edits here stay on this device."
-                                    color: Theme.c.accentText
-                                    font.pixelSize: Theme.fontSm
-                                    elide: Text.ElideRight
-                                    Layout.fillWidth: true
-                                }
-                            }
-                        }
-
-                        NoteHeader {
-                            id: header
-                            visible: !pane.isFile
-                            Layout.fillWidth: true
-                            note: pane.note
-                            readOnly: pane.inTrash
-                            tags: AppState.currentTags
-                            showTitle: !pane.titleMerged
-                            onEnterPressed: pane.focusBody()
-                        }
-                        Item { visible: !pane.isFile; Layout.preferredHeight: 8 }
-
-                        RichEditor {
-                            id: rich
-                            visible: !pane.isPlain
-                            readOnly: pane.inTrash
-                            Layout.fillWidth: true
-                            onCaretMoved: (r) => { if (textEdit.activeFocus) pane.ensureVisible(r, textEdit) }
-                        }
-                        PlainEditor {
-                            id: plain
-                            visible: pane.isPlain
-                            Layout.fillWidth: true
-                            onCaretMoved: (r) => { if (textEdit.activeFocus) pane.ensureVisible(r, textEdit) }
-                        }
-                    }
-
-                    // Clicking the empty space below the text focuses the end.
-                    MouseArea {
-                        y: body.y + body.implicitHeight
-                        width: parent.width
-                        height: Math.max(0, scroller.contentHeight - y)
-                        cursorShape: Qt.IBeamCursor
-                        onClicked: pane.isPlain ? plain.focusEnd() : rich.focusEnd()
-                    }
-                }
-
-                LockOverlay {
-                    anchors.fill: parent
-                    visible: pane.locked
+                visible: pane.locked
+                width: parent.width
+                height: lockPanel.height + 64
+                LockPanel {
+                    id: lockPanel
+                    y: 64 - 30
+                    anchors.horizontalCenter: parent.horizontalCenter
+                    width: Math.min(340, parent.width)
                     noteId: pane.note.id || ""
-                    onUnlocked: pane.unlockedTick = true
+                    onUnlocked: pane.loadCurrent(true)
                 }
             }
 
-            EditorToolbar {
-                visible: pane.showToolbar && pane.tbPos === "right"
-                vertical: true
-                editor: rich.controller
-                Layout.topMargin: 4
-                Layout.bottomMargin: 12
-                Layout.rightMargin: 10
-                Layout.alignment: Qt.AlignTop
-                Layout.fillHeight: false
-                onLinkRequested: rich.openLinkDialog()
+            RichEditor {
+                id: rich
+                visible: !pane.isPlain && !pane.locked
+                readOnly: pane.inTrash
+                width: parent.width
+                minHeight: 120
+                onCaretMoved: (r) => { if (textEdit.activeFocus) pane.ensureVisible(r, textEdit) }
+            }
+            PlainEditor {
+                id: plain
+                visible: pane.isPlain && !pane.locked
+                width: parent.width
+                onCaretMoved: (r) => { if (textEdit.activeFocus) pane.ensureVisible(r, textEdit) }
             }
         }
 
-        Item {
-            visible: pane.showToolbar && pane.tbPos === "bottom"
-            Layout.fillWidth: true
-            Layout.preferredHeight: 48
-            Flickable {
-                anchors.fill: parent
-                anchors.leftMargin: 16
-                anchors.rightMargin: 16
-                anchors.topMargin: 5
-                contentWidth: Math.max(width, bottomToolbar.implicitWidth)
-                clip: true
-                interactive: bottomToolbar.implicitWidth > width
-                EditorToolbar {
-                    id: bottomToolbar
-                    editor: rich.controller
-                    x: Math.max(0, pane.columnX - 26)
-                    width: implicitWidth
-                    height: 38
-                    onLinkRequested: rich.openLinkDialog()
-                }
-            }
-        }
-
-        // Status line: checklist progress, length, save state.
-        Rectangle {
+        // Clicking the empty space below the text focuses the end.
+        MouseArea {
             visible: !pane.locked
-            Layout.fillWidth: true
-            Layout.preferredHeight: 30
-            color: pane.color
-            Rectangle { width: parent.width; height: 1; color: Theme.c.divider }
-            RowLayout {
-                anchors.fill: parent
-                anchors.leftMargin: pane.columnX
-                anchors.rightMargin: Math.max(20, parent.width - pane.columnX - pane.columnWidth)
-                spacing: 16
-                Text {
-                    visible: pane.taskTotal > 0
-                    text: pane.taskDone + " / " + pane.taskTotal + " done"
-                    color: pane.taskDone === pane.taskTotal ? Theme.c.successText : Theme.c.subtle
-                    font.pixelSize: 12
-                    font.features: { "tnum": 1 }
-                }
-                Text {
-                    readonly property int words: pane.isPlain ? plain.wordCount : rich.controller.wordCount
-                    text: words.toLocaleString(Qt.locale("en_US"), "f", 0) + (words === 1 ? " word" : " words")
-                          + (words > 200 ? "  \u00b7  " + Math.max(1, Math.round(words / 230)) + " min read" : "")
-                    color: Theme.c.subtle
-                    font.pixelSize: 12
-                    font.features: { "tnum": 1 }
-                }
-                Text {
-                    visible: pane.isPlain
-                    text: "Plain text"
-                    color: Theme.c.subtle
-                    font.pixelSize: 12
-                    font.features: { "tnum": 1 }
-                }
-                Item { Layout.fillWidth: true }
-                Text {
-                    text: {
-                        const n = pane.note
-                        const edited = "Edited " + Dates.relative(n.updated_at || "")
-                        return n.is_daily ? edited : "Created " + Dates.shortDate(n.created_at || "") + "  ·  " + edited
+            y: body.y + body.implicitHeight
+            width: parent.width
+            height: Math.max(0, scroller.contentHeight - y)
+            cursorShape: Qt.IBeamCursor
+            onClicked: pane.isPlain ? plain.focusEnd() : rich.focusEnd()
+        }
+
+        // On this page: sticky in its own column.
+        Column {
+            visible: pane.showOutline
+            x: scroller.width - pane.outlineW
+            y: Math.max(46, scroller.contentY + 24)
+            width: pane.outlineW - 24
+            Text {
+                bottomPadding: 8
+                text: "On this page"
+                color: Theme.c.tertiary
+                font.pixelSize: 12
+                font.weight: Font.Medium
+            }
+            Repeater {
+                model: pane.outline
+                delegate: Text {
+                    required property var modelData
+                    width: parent.width
+                    leftPadding: modelData.level === 3 ? 12 : 0
+                    topPadding: 4
+                    bottomPadding: 4
+                    text: modelData.text
+                    color: outArea.containsMouse ? Theme.c.ink : Theme.c.secondary
+                    font.pixelSize: 13
+                    elide: Text.ElideRight
+                    MouseArea {
+                        id: outArea
+                        anchors.fill: parent
+                        hoverEnabled: true
+                        cursorShape: Qt.PointingHandCursor
+                        onClicked: pane.scrollToBlock(parent.modelData.block)
                     }
-                    color: Theme.c.subtle
-                    font.pixelSize: 12
-                    font.features: { "tnum": 1 }
-                    MouseArea { id: datesArea; anchors.fill: parent; hoverEnabled: true }
-                    Tip {
-                        visible: datesArea.containsMouse
-                        text: "Created " + Dates.full(pane.note.created_at || "") + "
-Edited " + Dates.full(pane.note.updated_at || "")
-                    }
-                }
-                Text {
-                    text: pane.inTrash ? "In trash" : (rich.controller.dirty || plain.dirty ? "Saving\u2026" : "Saved")
-                    color: Theme.c.subtle
-                    font.pixelSize: 12
-                    font.features: { "tnum": 1 }
                 }
             }
         }
     }
 
-    PopoutManager { id: popouts }
+    FindBar {
+        id: findBar
+        visible: pane.hasNote && AppState.findOpen && !pane.isPlain && !pane.locked
+        anchors.top: parent.top
+        width: parent.width
+        editor: rich.controller
+        onClosed: { AppState.findOpen = false; rich.controller.findQuery = ""; rich.textEdit.forceActiveFocus() }
+        onVisibleChanged: if (visible) Qt.callLater(focusFind)
+    }
+
+    // Selection toolbar, 10px above the selection.
+    SelectionToolbar {
+        id: selBar
+        editor: rich.controller
+        readonly property var edit: rich.textEdit
+        readonly property bool hasSelection: edit.selectionStart !== edit.selectionEnd
+        readonly property rect a: { scroller.contentY; edit.width; return edit.positionToRectangle(edit.selectionStart) }
+        readonly property rect b: { scroller.contentY; edit.width; return edit.positionToRectangle(edit.selectionEnd) }
+        readonly property point selTop: { scroller.contentY; return edit.mapToItem(pane, a.x, a.y) }
+        readonly property point selBottom: { scroller.contentY; return edit.mapToItem(pane, b.x, b.y + b.height) }
+        visible: pane.hasNote && !pane.isPlain && !pane.locked && !pane.inTrash && hasSelection
+                 && (edit.activeFocus || turnMenuOpen) && selTop.y > scroller.y - 20 && selTop.y < footer.y
+        property bool turnMenuOpen: false
+        x: Math.max(8, Math.min(pane.width - width - 8, (a.y === b.y ? (selTop.x + edit.mapToItem(pane, b.x, 0).x) / 2 : edit.mapToItem(pane, edit.width / 2, 0).x) - width / 2))
+        y: selTop.y - height - 10 < scroller.y + 4 ? selBottom.y + 10 : selTop.y - height - 10
+        z: 5
+        onLinkRequested: rich.openLinkDialog()
+    }
+
+    // ── footer ───────────────────────────────────────────────────────
+    Rectangle {
+        id: footer
+        visible: pane.hasNote
+        anchors.bottom: parent.bottom
+        width: parent.width
+        height: visible ? 30 : 0
+        color: Theme.c.bg
+        Rectangle { width: parent.width; height: 1; color: Theme.c.lineFaint }
+        Row {
+            anchors.right: parent.right
+            anchors.rightMargin: 16
+            anchors.verticalCenter: parent.verticalCenter
+            spacing: 18
+            Text {
+                visible: !pane.locked
+                readonly property int words: pane.isPlain ? plain.wordCount : rich.controller.wordCount
+                text: words.toLocaleString(Qt.locale("en_US"), "f", 0) + (words === 1 ? " word" : " words")
+                color: Theme.c.muted
+                font.pixelSize: 12
+                font.features: { "tnum": 1 }
+            }
+            Text {
+                text: {
+                    if (pane.inTrash) return "In the trash"
+                    if (rich.controller.dirty || plain.dirty) return "Saving…"
+                    if (pane.isFile) return "Saved to disk"
+                    // Live sync isn't in the Qt build yet: shared notes save here only.
+                    if (pane.note.is_shared) return "Saved on this computer · sync isn’t in this build yet"
+                    return "Saved"
+                }
+                color: Theme.c.muted
+                font.pixelSize: 12
+            }
+        }
+    }
 
     Shortcut {
         sequences: ["Ctrl+F"]

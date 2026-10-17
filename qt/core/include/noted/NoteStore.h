@@ -38,6 +38,14 @@ public:
     Q_INVOKABLE void moveToList(const QString& id, const QString& listId);  // "" = no list
     Q_INVOKABLE QVariantMap counts();  // all, synced, trash, todosOpen, todosToday
     Q_INVOKABLE QVariantList recentNotes(int limit = 8);
+    // Note rows for lists and cards: id, title, note_type, list_id, is_pinned,
+    // is_locked, is_shared, is_daily, daily_date, created_at, updated_at,
+    // preview (first 400 chars of plain text, "" while locked), tags [names].
+    // sort: updated_at | title. Pinned notes come first.
+    Q_INVOKABLE QVariantList notesInList(const QString& listId, const QString& sort = QStringLiteral("updated_at"));
+    Q_INVOKABLE QVariantList pinnedNotes();
+    Q_INVOKABLE QVariantList notesWithTag(const QString& name);
+    Q_INVOKABLE QVariantList recentEdited(int limit = 4, bool includeDaily = false);
 
     // ── daily ────────────────────────────────────────────────────────
     Q_INVOKABLE QVariantMap dailyNote(const QString& isoDate);  // get or create
@@ -47,6 +55,12 @@ public:
     // FTS5 prefix search. Snippets mark hits with \u0001 … \u0002 so QML
     // can style them without HTML-escaping user text.
     Q_INVOKABLE QVariantList search(const QString& query, int limit = 50);
+    // The search page and quick find: notes whose title or text match, ranked
+    // title matches first, then by mentions, then newest. [{id, title,
+    // list_id, is_locked, is_daily, daily_date, updated_at, tags, snippet,
+    // in_title, hits}]. A locked note matches by title only and its snippet
+    // is empty.
+    Q_INVOKABLE QVariantList searchNotes(const QString& query, int limit = 200);
 
     // ── lists ────────────────────────────────────────────────────────
     Q_INVOKABLE QVariantList lists();
@@ -87,7 +101,8 @@ public:
     Q_INVOKABLE bool toggleNoteLock(const QString& id);  // returns new state
     // Session unlocks (memory only, like the Electron build).
     Q_INVOKABLE bool isUnlocked(const QString& id) const { return m_unlocked.contains(id); }
-    Q_INVOKABLE void markUnlocked(const QString& id) { m_unlocked.insert(id); }
+    Q_INVOKABLE void markUnlocked(const QString& id) { m_unlocked.insert(id); emit lockStateChanged(); }
+    Q_INVOKABLE void relock(const QString& id) { m_unlocked.remove(id); emit lockStateChanged(); }
 
     // ── settings (key/value table) ───────────────────────────────────
     Q_INVOKABLE QString setting(const QString& key, const QString& fallback = {});
@@ -101,6 +116,22 @@ public:
     // Flips the index-th task item of a note in place (a byte-level edit of
     // the stored JSON, so nothing else in the note is rewritten).
     Q_INVOKABLE bool setTaskChecked(const QString& noteId, int index, bool checked);
+    // Every checklist item in rich notes outside hidden lists, flat and in
+    // note order (most recently edited note first): [{noteId, title, listId,
+    // isDaily, dailyDate, updatedAt, index, text, checked, due}]. `due` is the
+    // item's ISO due date or "". Locked notes are left out until unlocked
+    // this session. Done items only with includeDone.
+    Q_INVOKABLE QVariantList allTasks(bool includeDone = false);
+    // Sets or clears ("") a task item's due date, as a byte-level edit like
+    // setTaskChecked.
+    Q_INVOKABLE bool setTaskDue(const QString& noteId, int index, const QString& isoDate);
+    // Adds an unticked to-do at the end of a rich note (joining a to-do list
+    // that ends the note). Returns its task index, or -1.
+    Q_INVOKABLE int appendTask(const QString& noteId, const QString& text);
+    // The first `max` blocks of a note, simplified for small renders (list
+    // sheets): [{t: p|h1|h2|h3|li|ol|task|quote|code|hr|table, text, checked}].
+    // Empty for a locked note.
+    Q_INVOKABLE QVariantList previewBlocks(const QString& noteId, int max = 9);
     // ISO dates ("2026-09-04") in the given month ("2026-09") that have a
     // non-empty daily note.
     Q_INVOKABLE QStringList dailyDates(const QString& yearMonth);
@@ -117,10 +148,12 @@ signals:
     void tagsChanged();
     void todosChanged();
     void lockPinChanged();
+    void lockStateChanged();  // a note was unlocked or locked again this session
     void settingChanged(const QString& key, const QString& value);
     void externalChange();
 
 private:
+    QVariantList noteRows(const QString& where, const QVariantList& args, const QString& order, int limit);
     void ftsReplace(const QString& id, const QString& title, const QString& plain);
     void ftsDelete(const QString& id);
     QVariantMap todo(const QString& id);

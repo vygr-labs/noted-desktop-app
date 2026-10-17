@@ -9,6 +9,11 @@ QtObject {
 
     readonly property var map: ({
         "calendar": "\ue063",
+        "sliders-horizontal": "\ue29a",
+        "users": "\ue1a4",
+        "file": "\ue0c0",
+        "layout-grid": "\ue0ff",
+        "grid-2x2": "\ue4ff",
         "file-text": "\ue0cc",
         "share-2": "\ue156",
         "square-check": "\ue559",

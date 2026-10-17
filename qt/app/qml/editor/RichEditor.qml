@@ -11,9 +11,12 @@ Item {
     property alias controller: ctl
     property alias textEdit: edit
     property bool readOnly: false
+    property real minHeight: 200
+    property string placeholder: "Start writing, or type / for headings, lists and to-dos"
     signal caretMoved(rect r)
 
-    implicitHeight: Math.max(edit.implicitHeight, 200)
+    implicitHeight: Math.max(edit.implicitHeight, minHeight)
+    height: implicitHeight
 
     function load(id, json) { ctl.load(id, json) }
     function focusEnd() { edit.forceActiveFocus(); edit.cursorPosition = edit.length }
@@ -47,7 +50,7 @@ Item {
         selectionColor: Theme.c.selection
         selectedTextColor: Theme.c.text
         font.family: Theme.fontFamily
-        font.pixelSize: Math.round(15 * Theme.textScale)
+        font.pixelSize: Math.round(16 * Theme.textScale)
         textMargin: 0
         focus: true
         onCursorRectangleChanged: root.caretMoved(cursorRectangle)
@@ -55,8 +58,10 @@ Item {
         // Placeholder
         Text {
             visible: ctl.empty && !edit.activeFocus || (ctl.empty && edit.length <= 1)
-            text: "Start writing…  (type # for a heading, - for a list, [ ] for a task)"
-            color: Theme.c.faint
+            text: root.placeholder
+            color: Theme.c.placeholder
+            width: edit.width
+            wrapMode: Text.Wrap
             font: edit.font
         }
 

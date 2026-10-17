@@ -63,6 +63,8 @@ class EditorController : public QObject
     // Text of the first block when it is a top-level H1 (many notes repeat
     // their title there); "" otherwise.
     Q_PROPERTY(QString leadingHeading READ leadingHeading NOTIFY statsChanged)
+    // Level 2 and 3 headings, for "On this page": [{text, level, block}].
+    Q_PROPERTY(QVariantList outline READ outline NOTIFY statsChanged)
 
     // Overlay decorations drawn by QML over the TextEdit: task checkboxes and
     // blockquote bars. [{k: "task"|"quote", block, endBlock, checked}] —
@@ -112,6 +114,7 @@ public:
     bool dirty() const { return m_dirty; }
     bool empty() const { return m_empty; }
     QString leadingHeading() const { return m_leadingHeading; }
+    QVariantList outline() const { return m_outline; }
     QString findQuery() const { return m_findQuery; }
     void setFindQuery(const QString& q);
     QVariantList findMatches() const { return m_findMatches; }
@@ -248,6 +251,7 @@ private:
     int m_words = 0;
     bool m_empty = true;
     QString m_leadingHeading;
+    QVariantList m_outline;
     bool m_dirty = false;
     bool m_loading = false;
     bool m_restyling = false;

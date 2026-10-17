@@ -2,45 +2,38 @@ import QtQuick
 import QtQuick.Controls.Basic
 import Noted
 
-// Single-line text input.
+// Single-line text input: `field` fill, 1px `lineStrong`, radius 7. Focus
+// turns the border to the accent.
 TextField {
     id: field
     property bool mono: false
     property string leadingIcon: ""
+    property bool error: false
+    property bool bare: false   // no box: the field sits inside its own surface (pickers, quick find)
 
     implicitHeight: 34
-    leftPadding: leadingIcon !== "" ? 32 : 10
-    rightPadding: 10
-    font.pixelSize: Theme.fontMd
+    leftPadding: leadingIcon !== "" ? 34 : (bare ? 0 : 11)
+    rightPadding: bare ? 0 : 11
+    font.pixelSize: 14
     font.family: mono ? Theme.monoFamily : Theme.fontFamily
-    color: Theme.c.text
-    placeholderTextColor: Theme.c.subtle
+    color: Theme.c.ink
+    placeholderTextColor: Theme.c.placeholder
     selectionColor: Theme.c.selection
-    selectedTextColor: Theme.c.text
+    selectedTextColor: Theme.c.ink
     selectByMouse: true
 
     background: Rectangle {
-        radius: Theme.radiusLg
-        color: Theme.c.window
-        border.width: 1
-        border.color: field.activeFocus ? Theme.c.accentLine : Theme.c.border
-        Behavior on border.color { ColorAnimation { duration: Theme.fast } }
-        Rectangle {
-            anchors.fill: parent
-            anchors.margins: -3
-            radius: Theme.radiusLg + 3
-            color: "transparent"
-            border.width: 3
-            border.color: Theme.c.accentSubtle
-            visible: field.activeFocus
-        }
+        radius: 7
+        color: field.bare ? "transparent" : Theme.c.field
+        border.width: field.bare ? 0 : (field.activeFocus || field.error ? 1.5 : 1)
+        border.color: field.error ? Theme.c.red : (field.activeFocus ? Theme.c.accent : Theme.c.lineStrong)
         Icon {
             visible: field.leadingIcon !== ""
             name: field.leadingIcon
             size: 15
-            color: Theme.c.subtle
+            color: Theme.c.muted
             anchors.left: parent.left
-            anchors.leftMargin: 10
+            anchors.leftMargin: field.bare ? 0 : 11
             anchors.verticalCenter: parent.verticalCenter
         }
     }
