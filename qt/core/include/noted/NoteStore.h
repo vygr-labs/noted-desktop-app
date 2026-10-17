@@ -147,6 +147,10 @@ public:
 
     Database& database() { return m_db; }
 
+    // Someone else wrote to the database on our connection (sync): tell
+    // everything bound to it, as for a write from noted-cli.
+    void notifyExternal(const QStringList& noteIds = {});
+
 signals:
     void notesChanged();
     void noteChanged(const QString& id);  // content/metadata of one note changed

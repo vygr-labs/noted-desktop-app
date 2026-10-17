@@ -20,6 +20,12 @@ add_library(noted-core STATIC
     src/doc/Export.cpp
     src/doc/Styler.cpp
 
+    src/sync/Crypto.cpp
+    src/sync/Merge.cpp
+    src/sync/Ledger.cpp
+    src/sync/SyncEngine.cpp
+    src/third_party/monocypher/monocypher.c
+
     include/noted/Database.h
     include/noted/NoteStore.h
     include/noted/NotesModel.h
@@ -29,6 +35,10 @@ add_library(noted-core STATIC
     include/noted/doc/TipTap.h
     include/noted/doc/Export.h
     include/noted/doc/Styler.h
+    include/noted/sync/Crypto.h
+    include/noted/sync/Merge.h
+    include/noted/sync/Ledger.h
+    include/noted/sync/SyncEngine.h
 )
 
 target_include_directories(noted-core
@@ -53,9 +63,9 @@ target_compile_definitions(noted-core
 )
 
 if(MSVC)
-    set_source_files_properties(src/third_party/sqlite3.c PROPERTIES COMPILE_OPTIONS "/W0")
+    set_source_files_properties(src/third_party/sqlite3.c src/third_party/monocypher/monocypher.c PROPERTIES COMPILE_OPTIONS "/W0")
 else()
-    set_source_files_properties(src/third_party/sqlite3.c PROPERTIES COMPILE_OPTIONS "-w")
+    set_source_files_properties(src/third_party/sqlite3.c src/third_party/monocypher/monocypher.c PROPERTIES COMPILE_OPTIONS "-w")
 endif()
 
 add_library(Noted::Core ALIAS noted-core)

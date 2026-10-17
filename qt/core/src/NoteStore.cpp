@@ -46,6 +46,16 @@ NoteStore::NoteStore(Database& db, QObject* parent)
     });
 }
 
+void NoteStore::notifyExternal(const QStringList& noteIds)
+{
+    for (const QString& id : noteIds) emit noteChanged(id);
+    emit externalChange();
+    emit notesChanged();
+    emit listsChanged();
+    emit tagsChanged();
+    emit todosChanged();
+}
+
 // ── notes ─────────────────────────────────────────────────────────────────
 
 QVariantMap NoteStore::note(const QString& id)

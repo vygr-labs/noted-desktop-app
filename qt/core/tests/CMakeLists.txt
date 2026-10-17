@@ -10,6 +10,7 @@ endfunction()
 
 noted_test(test_tiptap)
 noted_test(test_store)
+noted_test(test_sync)
 
 # Round-trips every rich note in a real database through the editor model.
 # Point NOTED_TEST_DB at a database snapshot to run it; skipped otherwise.
