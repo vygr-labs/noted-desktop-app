@@ -7,6 +7,11 @@ import "../Fmt.js" as Fmt
 // Every to-do in your notes: Upcoming (by when it's due), By list, Done. The
 // field adds one to today's note. Anything ticked here stays in place,
 // struck through, until you leave, so a mis-tap is easy to undo.
+//
+// The standalone to-dos (made in the older To-dos lists, not in a note) are
+// edited right here: click one to change it, right-click for its date,
+// description, list or to delete it. By list shows each of those lists with
+// a field to add to it.
 Flickable {
     id: page
 
@@ -45,14 +50,79 @@ Flickable {
             const owners = [{ id: "", name: "Daily notes", color: "" }].concat(AppState.lists)
             out = owners.map(o => ({ key: o.id, label: o.name, color: o.color || "", folder: true,
                                      items: shown.filter(t => t.kind !== "todo" && (o.id === "" ? (t.isDaily || !t.listId) : t.listId === o.id)) }))
-            // The older standalone to-do lists, under their own names.
-            const names = []
-            for (const t of shown) if (t.kind === "todo" && names.indexOf(t.title) < 0) names.push(t.title)
-            out = out.concat(names.map(n => ({ key: "todo:" + n, label: n, items: shown.filter(t => t.kind === "todo" && t.title === n) })))
+            // The standalone to-do lists, empty ones too (so they can be
+            // added to), then any standalone to-dos in no list.
+            out = out.concat(AppState.todoLists.map(l => ({
+                key: "todo:" + l.id, label: l.name, todoList: l,
+                items: shown.filter(t => t.kind === "todo" && t.todoListId === l.id)
+            })))
+            const loose = shown.filter(t => t.kind === "todo" && !t.todoListId)
+            if (loose.length) out.push({ key: "todo:", label: "To-dos", todoList: { id: "", name: "To-dos" }, items: loose })
         } else {
             out = [{ key: "done", label: "Completed", items: done.slice(0, 200) }]
         }
-        return out.filter(g => g.items.length > 0)
+        return out.filter(g => g.items.length > 0 || g.todoList)
+    }
+
+    // ── editing standalone to-dos ────────────────────────────────────
+    PopupMenu { id: menu }
+    DuePicker {
+        id: duePicker
+        property string todoId: ""
+        onPicked: (iso) => Store.updateTodo(todoId, { due_date: iso })
+    }
+    function rowMenu(item, x, y, t, row) {
+        if (t.kind !== "todo") {
+            menu.openAt(item, x, y, [{ text: "Open note", action: () => AppState.openTask(t) }])
+            return
+        }
+        menu.openAt(item, x, y, [
+            { text: "Edit", action: () => row.startEdit() },
+            { text: t.due ? "Change date…" : "Add a date…", action: () => { duePicker.todoId = t.todoId; duePicker.openUnder(row.dueAnchor, -200, t.due) } },
+            { text: t.description ? "Edit description" : "Add a description", action: () => row.startDescription() },
+            { text: "Move to", disabled: AppState.todoLists.length === 0, children: AppState.todoLists.map(l => ({
+                text: l.name, checked: l.id === t.todoListId, action: () => Store.updateTodo(t.todoId, { todo_list_id: l.id })
+            })) },
+            { separator: true },
+            { text: "Delete", danger: true, action: () => Store.deleteTodo(t.todoId) }
+        ])
+    }
+    function listMenu(item, l) {
+        menu.openBelowRight(item, [
+            { text: "Rename…", action: () => listDialog.openFor(l) },
+            { separator: true },
+            { text: "Delete list…", danger: true, action: () => deleteListDialog.openFor(l) }
+        ])
+    }
+    ModalDialog {
+        id: listDialog
+        property var list: null   // null: a new list
+        title: list ? "Rename to-do list" : "New to-do list"
+        function openFor(l) { list = l || null; listName.text = l ? l.name : ""; open(); listName.forceActiveFocus(); listName.selectAll() }
+        function commit() {
+            const n = listName.text.trim()
+            if (n === "") return
+            if (list) Store.updateTodoList(list.id, { name: n })
+            else Store.createTodoList(n)
+            close()
+        }
+        Field { id: listName; Layout.fillWidth: true; placeholderText: "Groceries, Errands, House…"; onAccepted: listDialog.commit() }
+        footer: [
+            TextButton { text: "Cancel"; onClicked: listDialog.close() },
+            TextButton { text: listDialog.list ? "Rename" : "Create"; variant: "primary"; onClicked: listDialog.commit() }
+        ]
+    }
+    ModalDialog {
+        id: deleteListDialog
+        property var list: ({})
+        readonly property int count: list.id ? AppState.tasks.filter(t => t.kind === "todo" && t.todoListId === list.id).length : 0
+        title: "Delete " + (list.name || "this list") + "?"
+        description: count ? "Its " + Fmt.plural(count, "to-do") + " stay, under To-dos." : "It has no to-dos."
+        function openFor(l) { list = l; open() }
+        footer: [
+            TextButton { text: "Cancel"; onClicked: deleteListDialog.close() },
+            TextButton { text: "Delete list"; variant: "danger"; onClicked: { Store.deleteTodoList(deleteListDialog.list.id); deleteListDialog.close() } }
+        ]
     }
 
     Column {
@@ -148,6 +218,13 @@ Flickable {
                             }
                         }
                         Icon {
+                            visible: !!group.modelData.todoList
+                            name: "list-checks"
+                            size: 14
+                            color: Theme.c.faint
+                            anchors.verticalCenter: parent.verticalCenter
+                        }
+                        Icon {
                             visible: !!group.modelData.folder
                             name: "folder"
                             size: 14
@@ -178,7 +255,21 @@ Flickable {
                         cursorShape: Qt.PointingHandCursor
                         onClicked: AppState.setTodoGroupFolded(group.foldKey, !group.folded)
                     }
+                    // A standalone list's menu, at the end of its heading line.
+                    IconButton {
+                        id: listButton
+                        visible: !!group.modelData.todoList && !!group.modelData.todoList.id
+                        x: group.width + 22 - width + 6
+                        anchors.verticalCenter: groupHead.verticalCenter
+                        anchors.verticalCenterOffset: -2
+                        size: 26
+                        iconSize: 14
+                        icon: "ellipsis"
+                        tooltip: "List options"
+                        onClicked: page.listMenu(listButton, group.modelData.todoList)
+                    }
                 }
+
                 Repeater {
                     model: group.folded ? [] : group.modelData.items.slice(0, group.limit)
                     delegate: Item {
@@ -188,29 +279,103 @@ Flickable {
                         readonly property var list: AppState.listById(modelData.listId)
                         readonly property bool todays: modelData.isDaily && modelData.dailyDate === AppState.todayIso
                         readonly property string dueKey: Fmt.dueGroup(modelData.due, AppState.todayIso)
+                        readonly property bool standalone: modelData.kind === "todo"
+                        readonly property alias dueAnchor: dueText
+                        property bool editing: false
+                        property bool describing: false
                         width: group.width
-                        height: Math.max(taskText.implicitHeight, 22) + 16
+                        height: body.implicitHeight + 16
+
+                        function startEdit() { if (!standalone) return; editing = true; editor.text = modelData.text; editor.forceActiveFocus(); editor.selectAll() }
+                        function finishEdit() {
+                            if (!editing) return
+                            editing = false
+                            const t = editor.text.trim()
+                            if (t !== "" && t !== modelData.text) Store.updateTodo(modelData.todoId, { text: t })
+                        }
+                        function startDescription() { describing = true; descEditor.text = modelData.description; descEditor.forceActiveFocus() }
+                        function finishDescription() {
+                            if (!describing) return
+                            describing = false
+                            const d = descEditor.text.trim()
+                            if (d !== modelData.description) Store.updateTodo(modelData.todoId, { description: d })
+                        }
+
+                        MouseArea {
+                            anchors.fill: parent
+                            acceptedButtons: Qt.RightButton
+                            onClicked: (e) => page.rowMenu(row, e.x, e.y, row.modelData, row)
+                        }
                         Checkbox {
                             y: 10
                             checked: row.done
                             onToggled: page.flip(row.modelData)
                         }
-                        Text {
-                            textFormat: Text.PlainText
-                            id: taskText
+                        Column {
+                            id: body
                             x: 30
                             y: 8
-                            width: row.width - x - 12 - source.width - 12 - 52
-                            text: row.modelData.text
-                            color: row.done ? Theme.c.muted : Theme.c.ink2
-                            font.pixelSize: 15
-                            font.strikeout: row.done
-                            lineHeightMode: Text.FixedHeight
-                            lineHeight: 22
-                            wrapMode: Text.Wrap
+                            width: row.width - x - 12 - (source.visible ? source.width + 12 : 0) - 52
+                            spacing: 2
+                            Text {
+                                textFormat: Text.PlainText
+                                id: taskText
+                                visible: !row.editing
+                                width: parent.width
+                                text: row.modelData.text
+                                color: row.done ? Theme.c.muted : Theme.c.ink2
+                                font.pixelSize: 15
+                                font.strikeout: row.done
+                                lineHeightMode: Text.FixedHeight
+                                lineHeight: 22
+                                wrapMode: Text.Wrap
+                                MouseArea {
+                                    anchors.fill: parent
+                                    enabled: row.standalone
+                                    cursorShape: Qt.IBeamCursor
+                                    onClicked: row.startEdit()
+                                }
+                            }
+                            Field {
+                                id: editor
+                                visible: row.editing
+                                x: -11
+                                width: parent.width + 11
+                                implicitHeight: 30
+                                font.pixelSize: 15
+                                onAccepted: row.finishEdit()
+                                onActiveFocusChanged: if (!activeFocus) row.finishEdit()
+                                Keys.onEscapePressed: { row.editing = false }
+                            }
+                            Text {
+                                textFormat: Text.PlainText
+                                visible: !row.describing && row.modelData.description !== undefined && row.modelData.description !== ""
+                                width: parent.width
+                                text: row.modelData.description || ""
+                                color: Theme.c.muted
+                                font.pixelSize: 13
+                                lineHeightMode: Text.FixedHeight
+                                lineHeight: 19
+                                wrapMode: Text.Wrap
+                                MouseArea { anchors.fill: parent; cursorShape: Qt.IBeamCursor; onClicked: row.startDescription() }
+                            }
+                            Field {
+                                id: descEditor
+                                visible: row.describing
+                                x: -11
+                                width: parent.width + 11
+                                implicitHeight: 28
+                                font.pixelSize: 13
+                                placeholderText: "Description"
+                                onAccepted: row.finishDescription()
+                                onActiveFocusChanged: if (!activeFocus) row.finishDescription()
+                                Keys.onEscapePressed: { row.describing = false }
+                            }
                         }
                         Row {
                             id: source
+                            // Under its own list's heading, a standalone to-do doesn't repeat it.
+                            visible: !(row.standalone && page.tab === "lists")
                             x: row.width - 52 - 12 - width
                             y: 10
                             spacing: 7
@@ -241,6 +406,7 @@ Flickable {
                             onClicked: AppState.openTask(row.modelData)
                         }
                         Text {
+                            id: dueText
                             textFormat: Text.PlainText
                             x: row.width - 52
                             y: 10
@@ -248,9 +414,17 @@ Flickable {
                             horizontalAlignment: Text.AlignRight
                             text: row.done && page.tab !== "done" ? "Done"
                                 : (page.tab === "upcoming" && row.dueKey === "today") ? "" : Fmt.dueLabel(row.modelData.due, AppState.todayIso)
-                            color: row.dueKey === "over" && !row.done ? Theme.c.red : Theme.c.muted
+                            color: row.dueKey === "over" && !row.done ? Theme.c.red : (dueArea.containsMouse ? Theme.c.ink : Theme.c.muted)
                             font.pixelSize: 13
                             font.features: { "tnum": 1 }
+                            MouseArea {
+                                id: dueArea
+                                anchors.fill: parent
+                                enabled: row.standalone && !row.done
+                                hoverEnabled: true
+                                cursorShape: Qt.PointingHandCursor
+                                onClicked: { duePicker.todoId = row.modelData.todoId; duePicker.openUnder(dueText, -200, row.modelData.due) }
+                            }
                         }
                     }
                 }
@@ -262,7 +436,37 @@ Flickable {
                     text: "Show " + Math.min(rest, 100) + " more of " + rest
                     onClicked: group.limit += 100
                 }
+                // Add to this standalone list.
+                Item {
+                    visible: !group.folded && !!group.modelData.todoList
+                    width: group.width
+                    height: 36
+                    Icon { x: 1; anchors.verticalCenter: parent.verticalCenter; name: "plus"; size: 15; color: Theme.c.faint }
+                    Field {
+                        id: addHere
+                        x: 30
+                        width: parent.width - 30
+                        anchors.verticalCenter: parent.verticalCenter
+                        bare: true
+                        font.pixelSize: 15
+                        placeholderText: "Add a to-do"
+                        onAccepted: {
+                            const t = text.trim()
+                            if (t === "") return
+                            Store.createTodo({ text: t, todo_list_id: group.modelData.todoList.id })
+                            text = ""
+                        }
+                    }
+                }
             }
+        }
+
+        Item { visible: page.tab === "lists"; width: 1; height: 26 }
+        TextButton {
+            visible: page.tab === "lists"
+            icon: "plus"
+            text: "New to-do list"
+            onClicked: listDialog.openFor(null)
         }
 
         Text {

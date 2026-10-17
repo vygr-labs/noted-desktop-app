@@ -187,6 +187,7 @@ QtObject {
         const standalone = Store.todos("").map(t => ({
             kind: "todo", todoId: t.id, noteId: "", index: -1, text: t.text, checked: !!t.is_completed,
             due: (t.due_date || "").slice(0, 10), title: owners[t.todo_list_id] ? owners[t.todo_list_id].name : "To-dos",
+            todoListId: owners[t.todo_list_id] ? t.todo_list_id : "", description: t.description || "",
             listId: "", isDaily: false, dailyDate: "", updatedAt: t.updated_at
         }))
         tasks = Store.allTasks(true).concat(standalone)
