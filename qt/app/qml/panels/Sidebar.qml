@@ -240,7 +240,7 @@ Rectangle {
                 x: 18
                 anchors.verticalCenter: parent.verticalCenter
                 textFormat: Text.StyledText
-                text: "noted<font color=\"" + Theme.accent + "\">.</font>"
+                text: "noted<font color=\"" + Theme.brand + "\">.</font>"
                 color: Theme.c.ink
                 font.pixelSize: 15
                 font.weight: 650
