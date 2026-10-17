@@ -21,6 +21,10 @@ qt_add_executable(noted WIN32 MACOSX_BUNDLE
 
 if(WIN32)
     target_sources(noted PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/../packaging/noted.rc)
+    # The resource compiler doesn't report the icon it embeds, so a new icon
+    # wouldn't rebuild the .exe's without this.
+    set_source_files_properties(${CMAKE_CURRENT_SOURCE_DIR}/../packaging/noted.rc PROPERTIES
+        OBJECT_DEPENDS ${CMAKE_CURRENT_SOURCE_DIR}/../packaging/noted.ico)
 endif()
 
 set_source_files_properties(
