@@ -70,6 +70,33 @@ std::optional<QByteArray> open(const QByteArray& key, const QByteArray& sealed, 
     return plain;
 }
 
+SigningKeys signingKeys(const QByteArray& seedIn)
+{
+    QByteArray seed = seedIn;  // crypto_eddsa_key_pair wipes it
+    seed.resize(32);
+    SigningKeys k{QByteArray(64, Qt::Uninitialized), QByteArray(32, Qt::Uninitialized)};
+    crypto_eddsa_key_pair(reinterpret_cast<uint8_t*>(k.secret.data()), reinterpret_cast<uint8_t*>(k.pub.data()),
+                          reinterpret_cast<uint8_t*>(seed.data()));
+    return k;
+}
+
+QByteArray sign(const QByteArray& secret, const QByteArray& message)
+{
+    if (secret.size() != 64) return {};
+    QByteArray sig(64, Qt::Uninitialized);
+    crypto_eddsa_sign(reinterpret_cast<uint8_t*>(sig.data()), reinterpret_cast<const uint8_t*>(secret.constData()),
+                      reinterpret_cast<const uint8_t*>(message.constData()), size_t(message.size()));
+    return sig;
+}
+
+bool verify(const QByteArray& pub, const QByteArray& message, const QByteArray& signature)
+{
+    if (pub.size() != 32 || signature.size() != 64) return false;
+    return crypto_eddsa_check(reinterpret_cast<const uint8_t*>(signature.constData()),
+                              reinterpret_cast<const uint8_t*>(pub.constData()),
+                              reinterpret_cast<const uint8_t*>(message.constData()), size_t(message.size())) == 0;
+}
+
 QString keyToCode(const QByteArray& key)
 {
     QString out;

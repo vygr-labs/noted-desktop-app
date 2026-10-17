@@ -24,6 +24,7 @@
 #include "EditorController.h"
 #include "OpenFiles.h"
 #include "SpellChecker.h"
+#include "Updater.h"
 #include "DevDriver.h"
 #include "WindowChrome.h"
 #include "noted/Database.h"
@@ -134,6 +135,15 @@ int main(int argc, char* argv[])
 
     registerFonts();
 
+    // The first time this version opens the real notes (Electron's until
+    // now), keep a copy of them as they were: databases/backups/.
+    if (!devData && cli.value(dbOpt).isEmpty() && QFileInfo::exists(dbPath)) {
+        const QString backup = QFileInfo(dbPath).absolutePath() + QStringLiteral("/backups/app-before-%1.sqlite")
+                                   .arg(QStringLiteral(NOTED_VERSION_STRING));
+        QDir().mkpath(QFileInfo(backup).absolutePath());
+        if (noted::Database::snapshot(dbPath, backup)) qInfo() << "backed up the notes to" << backup;
+    }
+
     std::unique_ptr<noted::Database> database;
     try {
         database = std::make_unique<noted::Database>(dbPath);
@@ -176,6 +186,8 @@ int main(int argc, char* argv[])
     qmlRegisterSingletonInstance("Noted", 1, 0, "Sync", &sync);
     SpellChecker spell;
     qmlRegisterSingletonInstance("Noted", 1, 0, "Spell", &spell);
+    Updater updates(store, devData || takeShot);
+    qmlRegisterSingletonInstance("Noted", 1, 0, "Updates", &updates);
     engine.rootContext()->setContextProperty(QStringLiteral("startupState"), cli.value(stateOpt));
     engine.rootContext()->setContextProperty(QStringLiteral("startupFiles"), cli.positionalArguments());
     engine.rootContext()->setContextProperty(QStringLiteral("startupQuickCapture"), cli.isSet(quickOpt));

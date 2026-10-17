@@ -405,6 +405,30 @@ Flickable {
             Item { width: 1; height: 16 }
             Text { textFormat: Text.StyledText; text: "noted<font color=\"" + Theme.brand + "\">.</font>"; color: Theme.c.ink; font.pixelSize: 22; font.weight: 650; font.letterSpacing: -0.22 }
             Text { textFormat: Text.PlainText; topPadding: 4; text: "Version " + App.version; color: Theme.c.muted; font.pixelSize: 14; font.features: { "tnum": 1 } }
+            Item { width: 1; height: 22 }
+            SettingRow {
+                first: true
+                visible: Updates.supported
+                label: "Updates"
+                description: {
+                    switch (Updates.state) {
+                    case "checking": return "Checking…"
+                    case "downloading": return "Downloading " + Updates.latest + "… " + Math.round(Updates.progress * 100) + "%"
+                    case "ready": return "Version " + Updates.latest + " is ready. It installs when noted restarts."
+                    case "current": return "You have the latest version."
+                    case "failed": return Updates.error
+                    default: return Updates.automatic ? "noted checks for new versions and downloads them for you." : "Automatic updates are off."
+                    }
+                }
+                TextButton { visible: Updates.state === "ready"; text: "Restart to update"; variant: "primary"; onClicked: AppState.restartToUpdate() }
+                TextButton { visible: Updates.state !== "ready"; text: "Check now"; enabled: Updates.state !== "checking" && Updates.state !== "downloading"; onClicked: Updates.check() }
+            }
+            SettingRow {
+                visible: Updates.supported
+                label: "Update automatically"
+                description: "Check every few hours and download new versions in the background."
+                Toggle { checked: Updates.automatic; onToggled: (v) => Updates.automatic = v }
+            }
             Text {
                 textFormat: Text.PlainText
                 topPadding: 18

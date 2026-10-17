@@ -528,6 +528,30 @@ Rectangle {
             Tip { visible: devArea.containsMouse; text: "This build is using " + App.dataPath }
         }
 
+        // A new version, downloaded: one quiet line until noted restarts.
+        Item {
+            visible: Updates.state === "ready"
+            Layout.fillWidth: true
+            Layout.preferredHeight: 40
+            Rectangle { width: parent.width; height: 1; color: Theme.c.line }
+            Row {
+                x: 20
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 8
+                Icon { name: "download"; size: 14; color: Theme.c.muted; anchors.verticalCenter: parent.verticalCenter }
+                Text { textFormat: Text.PlainText; text: "Version " + Updates.latest + " is ready"; color: Theme.c.text; font.pixelSize: 13; anchors.verticalCenter: parent.verticalCenter }
+            }
+            TextButton {
+                anchors.right: parent.right
+                anchors.rightMargin: 14
+                anchors.verticalCenter: parent.verticalCenter
+                variant: "link"
+                fontSize: 13
+                text: "Restart"
+                onClicked: AppState.restartToUpdate()
+            }
+        }
+
         // ── footer ───────────────────────────────────────────────────────
         Rectangle { Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.c.line }
         RowLayout {

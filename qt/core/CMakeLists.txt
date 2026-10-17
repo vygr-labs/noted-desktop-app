@@ -69,3 +69,7 @@ else()
 endif()
 
 add_library(Noted::Core ALIAS noted-core)
+
+# Signs update manifests (see tools/release_tool.cpp and scripts/release.ps1).
+qt_add_executable(noted-release tools/release_tool.cpp)
+target_link_libraries(noted-release PRIVATE noted-core)

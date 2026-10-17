@@ -314,7 +314,8 @@ Sections are on the left; the section name is the page title.
 | | Export (JSON or SQL) | — |
 | | Command line: noted-cli installed / Install | — |
 | | Trash: count + Empty trash (red) | — |
-| About | Wordmark, version, one-line credit | — |
+| About | Icon, wordmark, version, one-line credit | — |
+| | Updates: status, Check now / Restart to update; Update automatically (switch) | `qt.autoUpdate` |
 
 Rows are a label (14.5/500) with a description (13.5 `muted`) on the left and the control on the
 right, 16px padding, and `line-faint` between rows.

@@ -430,6 +430,14 @@ QtObject {
     function openSettings(section) { go("settings", section || "appearance") }
     function openSearch(query) { go("search", query || "") }
 
+    // Save everything, start the installer, and get out of its way.
+    signal flushRequested()
+    function restartToUpdate() {
+        flushRequested()
+        if (Updates.install()) Qt.quit()
+        else toast("Couldn’t start the update")
+    }
+
     function newNote(opts) {
         const data = {
             title: (opts && opts.title) || "Untitled",

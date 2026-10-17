@@ -220,6 +220,7 @@ ApplicationWindow {
         function onSyncSetupRequested() { syncSetup.openDialog() }
         function onShareListRequested(list) { shareList.openFor(list) }
         function onJoinListRequested() { joinList.openDialog() }
+        function onFlushRequested() { notePage.flush(); deskPage.flush() }
     }
     Connections {
         target: Sync

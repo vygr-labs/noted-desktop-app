@@ -44,6 +44,8 @@ qt_add_qml_module(noted
         src/OpenFiles.h
         src/SpellChecker.cpp
         src/SpellChecker.h
+        src/Updater.cpp
+        src/Updater.h
     QML_FILES
         qml/Main.qml
         qml/Theme.qml

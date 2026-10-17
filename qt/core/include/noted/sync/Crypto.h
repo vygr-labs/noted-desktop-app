@@ -24,6 +24,17 @@ QByteArray deriveKey(const QString& passphrase, const QByteArray& salt);
 QByteArray seal(const QByteArray& key, const QByteArray& plain, const QByteArray& ad = {});
 std::optional<QByteArray> open(const QByteArray& key, const QByteArray& sealed, const QByteArray& ad = {});
 
+// Signatures (EdDSA, curve25519 + BLAKE2b): updates are signed with a key
+// kept off this repo, and the app checks them against the public half.
+struct SigningKeys
+{
+    QByteArray secret;  // 64 bytes
+    QByteArray pub;     // 32 bytes
+};
+SigningKeys signingKeys(const QByteArray& seed);  // seed: 32 random bytes
+QByteArray sign(const QByteArray& secret, const QByteArray& message);
+bool verify(const QByteArray& pub, const QByteArray& message, const QByteArray& signature);
+
 // A key as something a person can paste: groups of four, Crockford base32.
 QString keyToCode(const QByteArray& key);
 std::optional<QByteArray> codeToKey(const QString& code);
