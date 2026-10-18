@@ -45,20 +45,27 @@ Compression=lzma2/max
 SolidCompression=yes
 WizardStyle=modern
 CloseApplications=force
+; Tells Windows to refresh icons and file types: noted.exe now lives where
+; Electron's did, and Explorer would otherwise keep showing the old icon.
+ChangesAssociations=yes
 RestartApplications=no
 
 [Messages]
-WelcomeLabel2=This installs noted [name/ver] on your computer.%n%nIf you have the older version of noted, it's replaced. Your notes stay exactly where they are.
+WelcomeLabel2=This installs [name/ver] on your computer.%n%nIf you have the older version of noted, it's replaced. Your notes stay exactly where they are.
 
 [Tasks]
 Name: "desktopicon"; Description: "Put noted on the desktop"; GroupDescription: "Shortcuts:"
 
 [Files]
 Source: "{#Source}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+; The shortcuts' icon as its own file: Windows caches icons by path, and
+; noted.exe sits where Electron's noted.exe did, so pointing at the exe would
+; keep showing the old logo.
+Source: "noted.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
-Name: "{autoprograms}\noted"; Filename: "{app}\noted.exe"
-Name: "{autodesktop}\noted"; Filename: "{app}\noted.exe"; Tasks: desktopicon
+Name: "{autoprograms}\noted"; Filename: "{app}\noted.exe"; IconFilename: "{app}\noted.ico"
+Name: "{autodesktop}\noted"; Filename: "{app}\noted.exe"; IconFilename: "{app}\noted.ico"; Tasks: desktopicon
 
 [Registry]
 ; "Open with" for markdown and text files (Windows' default-apps settings pick it up).

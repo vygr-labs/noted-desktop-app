@@ -44,8 +44,22 @@ $app = Join-Path $dist 'noted'
 if (Test-Path $app) { Remove-Item $app -Recurse -Force }
 New-Item -ItemType Directory -Force $app | Out-Null
 Copy-Item (Join-Path $qt 'build\noted.exe') $app
-& windeployqt --release --qmldir (Join-Path $qt 'app\qml') --no-translations --compiler-runtime (Join-Path $app 'noted.exe') | Out-Null
+& windeployqt --release --qmldir (Join-Path $qt 'app\qml') --no-translations --no-compiler-runtime (Join-Path $app 'noted.exe') | Out-Null
 if ($LASTEXITCODE -ne 0) { throw 'windeployqt failed' }
+# The C++ runtime goes next to noted.exe (Microsoft's app-local deployment).
+# windeployqt would ship vc_redist.x64.exe instead, which needs an admin to
+# run, and this installer is per-user on purpose; without the DLLs a clean
+# PC can't start noted at all (MSVCP140.dll was not found).
+if (-not $env:VCToolsRedistDir) {
+    $env:VCToolsRedistDir = (Get-ChildItem "${env:ProgramFiles}\Microsoft Visual Studio\*\*\VC\Redist\MSVC\*" -Directory |
+        Where-Object { $_.Name -match '^\d' } | Sort-Object Name -Descending | Select-Object -First 1).FullName
+}
+$crt = Get-ChildItem (Join-Path $env:VCToolsRedistDir 'x64') -Directory -Filter 'Microsoft.VC14*.CRT' | Select-Object -First 1
+if (-not $crt) { throw "No C++ runtime under $env:VCToolsRedistDir" }
+Copy-Item (Join-Path $crt.FullName '*.dll') $app
+foreach ($dll in 'msvcp140.dll', 'vcruntime140.dll', 'vcruntime140_1.dll') {
+    if (-not (Test-Path (Join-Path $app $dll))) { throw "$dll didn't make it into the app folder" }
+}
 
 # 3. The installer.
 & $iscc /Q "/DVersion=$version" "/DSource=$app" (Join-Path $qt 'packaging\noted.iss')
