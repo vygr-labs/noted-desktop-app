@@ -255,7 +255,7 @@ Flickable {
                     if (!Sync.enabled) return "Off."
                     const where = "Through " + Fmt.shortPath(Sync.folder) + ". "
                     if (Sync.status === "unreachable" || Sync.status === "error") return where + Sync.error
-                    return where + (Sync.lastSynced && !isNaN(Sync.lastSynced) ? Fmt.editedPhrase(Sync.lastSynced).replace(/^Edited/, "Synced") + "." : "")
+                    return where + (Sync.lastSynced && !isNaN(Sync.lastSynced) ? Fmt.editedPhrase(Sync.lastSynced, AppState.now).replace(/^Edited/, "Synced") + "." : "")
                 }
                 TextButton { visible: !Sync.enabled; text: "Set up…"; onClicked: AppState.syncSetupRequested() }
                 TextButton { visible: Sync.enabled; text: "Sync now"; onClicked: Sync.syncNow() }
@@ -265,7 +265,7 @@ Flickable {
                 visible: Sync.enabled
                 label: "Computers"
                 description: Sync.devices.map(d => d.me ? d.name + " (this one)"
-                                                        : d.name + (d.seen && !isNaN(d.seen) ? ", " + Fmt.editedPhrase(d.seen).replace(/^Edited/, "last synced") : "")).join("
+                                                        : d.name + (d.seen && !isNaN(d.seen) ? ", " + Fmt.editedPhrase(d.seen, AppState.now).replace(/^Edited/, "last synced") : "")).join("
 ")
             }
 

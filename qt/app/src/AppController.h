@@ -7,6 +7,7 @@
 
 #include <QObject>
 #include <QQmlEngine>
+#include <QQuickTextDocument>
 #include <QStringList>
 
 class QLocalServer;
@@ -56,6 +57,9 @@ public:
     Q_INVOKABLE void registerQuickCaptureHotkey();
     // Plain text -> TipTap JSON (one paragraph per line), for "Convert to rich text".
     Q_INVOKABLE QString plainToRich(const QString& text) const;
+    // Replaces each [{start, length}] range of a TextEdit's text with `with`,
+    // as one undo step. Ranges must not overlap.
+    Q_INVOKABLE void replaceRanges(QQuickTextDocument* document, const QVariantList& ranges, const QString& with) const;
 
 signals:
     void quickCaptureRequested();

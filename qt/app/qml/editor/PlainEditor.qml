@@ -77,11 +77,9 @@ Item {
         }
         function replaceCurrent(text) {
             if (findIndex < 0 || findIndex >= findMatches.length) return
-            const m = findMatches[findIndex]
             const at = findIndex
             root.replacing = true
-            edit.remove(m.start, m.start + m.length)
-            edit.insert(m.start, text)
+            App.replaceRanges(edit.textDocument, [findMatches[findIndex]], text)
             root.replacing = false
             root.rebuildFind()
             if (findMatches.length > 0) {
@@ -92,10 +90,7 @@ Item {
         function replaceAll(text) {
             const all = findMatches
             root.replacing = true
-            for (let i = all.length - 1; i >= 0; --i) {
-                edit.remove(all[i].start, all[i].start + all[i].length)
-                edit.insert(all[i].start, text)
-            }
+            App.replaceRanges(edit.textDocument, all, text)
             root.replacing = false
             root.rebuildFind()
             return all.length
@@ -103,15 +98,19 @@ Item {
     }
     property bool replacing: false
     function rebuildFind() {
-        const q = search.findQuery.toLowerCase()
+        rebuildLater.stop()
+        const q = search.findQuery
         const out = []
         let at = -1
         if (q !== "") {
-            const t = edit.text.toLowerCase()
+            // Case-insensitive on the text itself: lowercasing it first can
+            // change its length ("İ" is two characters lowered) and shift every
+            // later match.
+            const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\\/]/g, "\\$&"), "gi")
             const from = Math.min(edit.selectionStart, edit.cursorPosition)
-            for (let p = t.indexOf(q); p >= 0 && out.length <= 5000; p = t.indexOf(q, p + q.length)) {
-                if (at < 0 && p >= from) at = out.length
-                out.push({ start: p, length: q.length })
+            for (let m = re.exec(edit.text); m && out.length <= 5000; m = re.exec(edit.text)) {
+                if (at < 0 && m.index >= from) at = out.length
+                out.push({ start: m.index, length: m[0].length })
             }
             if (at < 0 && out.length > 0) at = 0
         }
@@ -144,7 +143,7 @@ Item {
             if (text === lastText) return
             lastText = text
             if (root.loading) return
-            if (search.findQuery !== "" && !root.replacing) root.rebuildFind()
+            if (search.findQuery !== "" && !root.replacing) rebuildLater.restart()
             root.dirty = true
             saveTimer.restart()
             Notes.patch(root.noteId, root.noteId === AppState.currentNote.id ? (AppState.currentNote.title || "") : "", text.substring(0, 240))
@@ -155,8 +154,10 @@ Item {
             delegate: Rectangle {
                 required property var modelData
                 required property int index
-                readonly property rect a: { edit.width; edit.contentHeight; return edit.positionToRectangle(modelData.start) }
-                readonly property rect b: { edit.width; edit.contentHeight; return edit.positionToRectangle(modelData.start + modelData.length) }
+                readonly property bool fits: modelData.start + modelData.length <= edit.length
+                readonly property rect a: { edit.width; edit.contentHeight; return fits ? edit.positionToRectangle(modelData.start) : Qt.rect(0, 0, 0, 0) }
+                readonly property rect b: { edit.width; edit.contentHeight; return fits ? edit.positionToRectangle(modelData.start + modelData.length) : Qt.rect(0, 0, 0, 0) }
+                visible: fits
                 z: -1
                 x: a.x - 1
                 y: a.y
@@ -175,6 +176,11 @@ Item {
         }
     }
 
+    Timer {
+        id: rebuildLater
+        interval: 150
+        onTriggered: root.rebuildFind()
+    }
     Timer {
         id: saveTimer
         interval: 500

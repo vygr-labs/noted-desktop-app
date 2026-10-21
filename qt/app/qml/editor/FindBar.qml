@@ -6,7 +6,8 @@ import Noted
 Rectangle {
     id: bar
     property var editor            // EditorController, or PlainEditor.finder
-    property bool replaceMode: AppState.replaceOpen
+    property bool readOnly: false   // find only (a note in the trash)
+    property bool replaceMode: AppState.replaceOpen && !readOnly
     signal closed()
 
     implicitHeight: col.implicitHeight + 16
@@ -27,6 +28,7 @@ Rectangle {
         RowLayout {
             spacing: 6
             IconButton {
+                visible: !bar.readOnly
                 icon: "chevron-right"
                 size: 26
                 iconSize: 13

@@ -120,6 +120,8 @@ QVariantList OpenFiles::recent(int limit) const
                                        {"file_path", QDir::toNativeSeparators(path)},
                                        {"folder", info.dir().dirName()},
                                        {"updated_at", stamp(when)},
+                                       // Opened since it last changed: the desk says "Opened", not edited.
+                                       {"opened", when != info.lastModified()},
                                        {"preview", preview}}});
     }
     std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) { return a.first > b.first; });

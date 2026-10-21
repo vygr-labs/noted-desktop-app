@@ -17,19 +17,20 @@ PageColumns {
     property var recent: []
     property var listCards: []
     property var pastDays: []       // daily notes you wrote in, before today
+    property var openFiles: []      // Files.recent: read on showing the desk or when files change, not on every save
     // To-dos ticked here stay on the page, struck through, until you leave.
     property var ticked: ({})
 
     function reload() {
         // Notes and the files open from disk, together, latest first.
         const when = (n) => { const d = Fmt.parseTs(n.updated_at); return d ? d.getTime() : 0 }
-        recent = Store.recentEdited(6, false).concat(Files.recent(6)).sort((a, b) => when(b) - when(a)).slice(0, 6)
+        recent = Store.recentEdited(6, false).concat(openFiles).sort((a, b) => when(b) - when(a)).slice(0, 6)
         pastDays = Store.pastDailyNotes(AppState.todayIso, 4)
         const latest = {}
         for (const s of Store.listSummaries()) latest[s.list_id] = s
         listCards = AppState.lists.map(l => {
             const n = latest[l.id]
-            return { list: l, count: l.note_count || 0, latest: n ? n.title : "No notes yet", edited: n ? Fmt.editedPhrase(n.updated_at) : "" }
+            return { list: l, count: l.note_count || 0, latest: n ? n.title : "No notes yet", editedAt: n ? n.updated_at : "" }
         })
     }
     function loadDaily() {
@@ -37,13 +38,13 @@ PageColumns {
         if (editor.controller.noteId !== daily.id) editor.load(daily.id, daily.content || "")
     }
     onActiveChanged: {
-        if (active) { loadDaily(); reload(); contentY = 0 }
+        if (active) { openFiles = Files.recent(6); loadDaily(); reload(); contentY = 0 }
         else { editor.controller.flush(); editor.controller.unload(); ticked = ({}) }
     }
     // noted opens on the desk, so it's active from the start and the change
     // above never comes: without this, today's note showed empty and what was
     // typed into it had no note to be saved in.
-    Component.onCompleted: if (active) { loadDaily(); reload() }
+    Component.onCompleted: if (active) { openFiles = Files.recent(6); loadDaily(); reload() }
     Connections {
         target: Store
         function onNotesChanged() { if (desk.active) reloadLater.restart() }
@@ -57,7 +58,8 @@ PageColumns {
     }
     Connections {
         target: Files
-        function onFilesChanged() { if (desk.active) reloadLater.restart() }
+        function onFilesChanged() { if (desk.active) { desk.openFiles = Files.recent(6); reloadLater.restart() } }
+        function onExternallyChanged() { if (desk.active) { desk.openFiles = Files.recent(6); reloadLater.restart() } }
     }
     Connections {
         target: AppState
@@ -172,7 +174,7 @@ PageColumns {
                                 textFormat: Text.PlainText
                                 Layout.alignment: Qt.AlignTop
                                 Layout.topMargin: 2
-                                text: Fmt.edited(card.modelData.updated_at, AppState.now)
+                                text: (card.modelData.opened ? "Opened " : "") + Fmt.edited(card.modelData.updated_at, AppState.now)
                                 color: Theme.c.muted
                                 font.pointSize: Theme.pt(12.5)
                             }
@@ -244,7 +246,7 @@ PageColumns {
                     list: modelData.list
                     count: modelData.count
                     latest: modelData.latest
-                    edited: modelData.edited
+                    edited: modelData.editedAt ? Fmt.editedPhrase(modelData.editedAt, AppState.now) : ""
                     onClicked: (e) => AppState.goFrom(e, "list", modelData.list.id)
                 }
             }

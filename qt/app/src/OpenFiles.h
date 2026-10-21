@@ -42,7 +42,8 @@ public:
     Q_INVOKABLE void touch(const QString& id);
     // Open files, latest first by when they were last opened here or changed
     // on disk: note-shaped rows (id, title, updated_at, preview, folder,
-    // is_file) for the desk's Recently edited.
+    // is_file, opened = updated_at is when it was opened) for the desk's
+    // Recently edited.
     Q_INVOKABLE QVariantList recent(int limit) const;
     // A note-shaped map for the editor: id, title, note_type, content,
     // created_at, updated_at, is_file, file_path. Empty if unreadable.

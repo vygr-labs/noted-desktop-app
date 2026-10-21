@@ -89,6 +89,9 @@ void TestStore::savingUnchangedNoteKeepsItsTime()
     store.updateNote(id, {{"content", content}, {"content_plain", "worded differently"}, {"title", "Old note"}});
     QCOMPARE(store.note(id).value("updated_at").toString(), QStringLiteral("2026-01-02 03:04:05"));
     QCOMPARE(changed.count(), 0);
+    // A stale plain text is still brought up to date (search reads it).
+    QCOMPARE(store.note(id).value("content_plain").toString(), QStringLiteral("worded differently"));
+    QCOMPARE(store.search("worded").size(), 1);
 
     store.updateNote(id, {{"title", "New title"}});
     QVERIFY(store.note(id).value("updated_at").toString() != QStringLiteral("2026-01-02 03:04:05"));

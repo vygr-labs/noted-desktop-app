@@ -20,7 +20,10 @@
 #include <QPdfWriter>
 #include <QProcess>
 #include <QRegularExpression>
+#include <QTextCursor>
 #include <QTextDocument>
+
+#include <algorithm>
 #include <QUrl>
 
 #include "Zip.h"
@@ -341,6 +344,27 @@ QString AppController::importFile(const QString& path)
 QString AppController::plainToRich(const QString& text) const
 {
     return doc::stringify(doc::fromPlainText(text));
+}
+
+void AppController::replaceRanges(QQuickTextDocument* document, const QVariantList& ranges, const QString& with) const
+{
+    QTextDocument* d = document ? document->textDocument() : nullptr;
+    if (!d || ranges.isEmpty()) return;
+    QList<QPair<int, int>> spans;
+    for (const QVariant& v : ranges) {
+        const QVariantMap m = v.toMap();
+        spans.append({m.value(QStringLiteral("start")).toInt(), m.value(QStringLiteral("length")).toInt()});
+    }
+    // Back to front, so earlier positions stay valid.
+    std::sort(spans.begin(), spans.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+    QTextCursor c(d);
+    c.beginEditBlock();
+    for (const auto& [start, length] : spans) {
+        c.setPosition(start);
+        c.setPosition(start + length, QTextCursor::KeepAnchor);
+        c.insertText(with);
+    }
+    c.endEditBlock();
 }
 
 void AppController::registerQuickCaptureHotkey()

@@ -506,6 +506,7 @@ Item {
         anchors.top: parent.top
         width: parent.width
         editor: pane.finder
+        readOnly: pane.inTrash
         onClosed: { AppState.findOpen = false; pane.finder.findQuery = ""; pane.activeEdit.forceActiveFocus() }
         onVisibleChanged: if (visible) Qt.callLater(focusFind)
     }

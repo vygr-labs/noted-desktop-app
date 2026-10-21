@@ -428,6 +428,9 @@ Item {
 
     function openContextMenu(x, y) {
         const pos = edit.positionAt(x, y)
+        // Outside the selection, the caret moves to the click first, so Format
+        // and Turn into act on what was clicked.
+        if (pos < edit.selectionStart || pos > edit.selectionEnd) edit.cursorPosition = pos
         const hasSel = edit.selectionStart !== edit.selectionEnd
         const href = ctl.linkAt(pos) || ctl.linkAt(pos - 1)
         const items = []

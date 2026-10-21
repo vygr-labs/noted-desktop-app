@@ -79,7 +79,7 @@ QtObject {
     property string todayIso: Store.todayIso()
     property date now: new Date()
     property Timer _clock: Timer {
-        interval: 15000
+        interval: 30000
         running: true
         repeat: true
         onTriggered: {
