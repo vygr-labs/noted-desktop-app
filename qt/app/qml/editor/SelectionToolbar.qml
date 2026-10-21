@@ -3,11 +3,29 @@ import QtQuick.Layouts
 import Noted
 
 // Floats 10px above a text selection: Bold, Italic, Strike, Inline code,
-// Link, Highlight | Turn into ▾. Positioned by the note page.
+// Link, Highlight | Turn into ▾. Give it the RichEditor and put it in an item
+// that doesn't scroll (the page); it shows between that item's `topLimit` and
+// `bottomLimit`, flipping below the selection when there's no room above.
 Rectangle {
     id: bar
-    property var editor            // EditorController
-    signal linkRequested()
+    property var richEditor        // RichEditor
+    readonly property var editor: richEditor ? richEditor.controller : null
+    property bool allowed: true
+    property real topLimit: 0
+    property real bottomLimit: parent ? parent.height : 0
+    property real scrollY: 0       // the page's contentY, so the bar follows scrolling
+
+    readonly property var edit: richEditor ? richEditor.textEdit : null
+    readonly property bool hasSelection: !!edit && edit.selectionStart !== edit.selectionEnd
+    readonly property rect a: { scrollY; if (!edit) return Qt.rect(0, 0, 0, 0); edit.width; return edit.positionToRectangle(edit.selectionStart) }
+    readonly property rect b: { scrollY; if (!edit) return Qt.rect(0, 0, 0, 0); edit.width; return edit.positionToRectangle(edit.selectionEnd) }
+    readonly property point selTop: { scrollY; return edit ? edit.mapToItem(parent, a.x, a.y) : Qt.point(0, 0) }
+    readonly property point selBottom: { scrollY; return edit ? edit.mapToItem(parent, b.x, b.y + b.height) : Qt.point(0, 0) }
+    visible: allowed && !!edit && !richEditor.readOnly && hasSelection && (edit.activeFocus || menuOpen)
+             && selTop.y > topLimit - 20 && selTop.y < bottomLimit
+    x: !edit ? 0 : Math.max(8, Math.min(parent.width - width - 8, (a.y === b.y ? (selTop.x + edit.mapToItem(parent, b.x, 0).x) / 2 : edit.mapToItem(parent, edit.width / 2, 0).x) - width / 2))
+    y: selTop.y - height - 10 < topLimit + 4 ? selBottom.y + 10 : selTop.y - height - 10
+    z: 5
 
     width: row.implicitWidth + 8
     height: 36
@@ -38,18 +56,7 @@ Rectangle {
         Tip { visible: area.containsMouse && !area.pressed; text: b.tooltip; shortcut: b.shortcut }
     }
 
-    readonly property string blockLabel: {
-        const e = editor
-        if (!e) return "Text"
-        if (e.headingLevel === 1 || e.headingLevel === 2) return "Heading"
-        if (e.headingLevel === 3) return "Subheading"
-        if (e.listKind === 0) return "Bulleted list"
-        if (e.listKind === 1) return "Numbered list"
-        if (e.listKind === 2) return "To-do"
-        if (e.inQuote) return "Quote"
-        if (e.inCodeBlock) return "Code block"
-        return "Text"
-    }
+    readonly property string blockLabel: richEditor ? richEditor.blockLabel : "Text"
 
     Row {
         id: row
@@ -60,7 +67,7 @@ Rectangle {
         Btn { icon: "italic"; tooltip: "Italic"; shortcut: "Ctrl+I"; checked: !!bar.editor && bar.editor.italic; onClicked: bar.editor.toggleItalic() }
         Btn { icon: "strikethrough"; tooltip: "Strikethrough"; shortcut: "Ctrl+Shift+S"; checked: !!bar.editor && bar.editor.strike; onClicked: bar.editor.toggleStrike() }
         Btn { icon: "code"; tooltip: "Inline code"; shortcut: "Ctrl+E"; checked: !!bar.editor && bar.editor.code; onClicked: bar.editor.toggleCode() }
-        Btn { icon: "link"; tooltip: "Link"; shortcut: "Ctrl+K"; checked: !!bar.editor && bar.editor.linkHref !== ""; onClicked: bar.linkRequested() }
+        Btn { icon: "link"; tooltip: "Link"; shortcut: "Ctrl+K"; checked: !!bar.editor && bar.editor.linkHref !== ""; onClicked: bar.richEditor.openLinkDialog() }
         Btn { icon: "highlighter"; tooltip: "Highlight"; shortcut: "Ctrl+Shift+H"; checked: !!bar.editor && bar.editor.highlight; onClicked: bar.editor.toggleHighlight() }
         Rectangle { width: 1; height: 18; anchors.verticalCenter: parent.verticalCenter; color: Theme.c.menuLine }
         Rectangle {
@@ -88,24 +95,5 @@ Rectangle {
 
     PopupMenu { id: turnMenu; minWidth: 200 }
     readonly property bool menuOpen: turnMenu.opened
-    function openTurnInto() {
-        const e = editor
-        const plainBlock = () => {
-            if (e.headingLevel > 0) e.setHeading(0)
-            if (e.listKind >= 0) e.toggleList(e.listKind)
-            if (e.inQuote) e.toggleQuote()
-            if (e.inCodeBlock) e.toggleCodeBlock()
-        }
-        const list = (k) => () => { if (e.listKind !== k) { plainBlock(); e.toggleList(k) } }
-        turnMenu.openBelow(turnInto, [
-            { text: "Text", checked: blockLabel === "Text", action: plainBlock },
-            { text: "Heading", checked: blockLabel === "Heading", action: () => { plainBlock(); e.setHeading(2) } },
-            { text: "Subheading", checked: blockLabel === "Subheading", action: () => { plainBlock(); e.setHeading(3) } },
-            { text: "To-do", checked: blockLabel === "To-do", action: list(2) },
-            { text: "Bulleted list", checked: blockLabel === "Bulleted list", action: list(0) },
-            { text: "Numbered list", checked: blockLabel === "Numbered list", action: list(1) },
-            { text: "Quote", checked: blockLabel === "Quote", action: () => { if (!e.inQuote) { plainBlock(); e.toggleQuote() } } },
-            { text: "Code block", checked: blockLabel === "Code block", action: () => { if (!e.inCodeBlock) { plainBlock(); e.toggleCodeBlock() } } }
-        ])
-    }
+    function openTurnInto() { turnMenu.openBelow(turnInto, richEditor.turnIntoItems()) }
 }

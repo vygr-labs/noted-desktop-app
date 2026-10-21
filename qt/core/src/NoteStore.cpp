@@ -107,6 +107,7 @@ QVariantMap NoteStore::updateNote(const QString& id, const QVariantMap& data)
     auto& c = m_db.conn();
     QVariantMap cur = note(id);
     if (cur.isEmpty()) return {};
+    const QVariantMap before = cur;
 
     static const QStringList allowed = {QStringLiteral("title"),     QStringLiteral("content"),
                                         QStringLiteral("content_plain"), QStringLiteral("note_type"),
@@ -128,6 +129,14 @@ QVariantMap NoteStore::updateNote(const QString& id, const QVariantMap& data)
         cur.insert(QStringLiteral("content_plain"),
                    cur.value(QStringLiteral("note_type")).toString() == u"plain" ? content : plainFromContent(content));
     }
+    // Saving what's already there isn't an edit: the note keeps its time, so
+    // a note that was only opened doesn't jump to the top of Recently edited.
+    // (content_plain is derived from content, and each build words it a little
+    // differently, so it doesn't count.)
+    bool changed = false;
+    for (const QString& key : allowed)
+        if (key != u"content_plain" && cur.value(key).toString() != before.value(key).toString()) changed = true;
+    if (!changed) return before;
 
     Transaction tx(c);
     c.run(QStringLiteral("UPDATE notes SET title = ?, content = ?, content_plain = ?, note_type = ?, list_id = ?, "

@@ -9,6 +9,7 @@
 // markdown; anything else opens as plain text. A file's BOM and line endings
 // are kept. Changes made by other programs are picked up live.
 
+#include <QDateTime>
 #include <QFileSystemWatcher>
 #include <QHash>
 #include <QJsonObject>
@@ -37,6 +38,12 @@ public:
     // can't be read.
     Q_INVOKABLE QString open(const QString& pathOrUrl);
     Q_INVOKABLE void close(const QString& id);
+    // The file was looked at now: it counts as recent on the desk.
+    Q_INVOKABLE void touch(const QString& id);
+    // Open files, latest first by when they were last opened here or changed
+    // on disk: note-shaped rows (id, title, updated_at, preview, folder,
+    // is_file) for the desk's Recently edited.
+    Q_INVOKABLE QVariantList recent(int limit) const;
     // A note-shaped map for the editor: id, title, note_type, content,
     // created_at, updated_at, is_file, file_path. Empty if unreadable.
     Q_INVOKABLE QVariantMap note(const QString& id);
@@ -69,11 +76,13 @@ private:
     bool readFile(const QString& path, Format& out) const;
     bool write(const QString& path, const QString& text);
     void persist();
+    void persistOpened();
     QString originalPath(const QString& path) const;
     void onDiskChange(const QString& path);
 
     noted::NoteStore& m_store;
     QStringList m_paths;
     QHash<QString, Format> m_formats;  // path -> how it was stored
+    QHash<QString, QDateTime> m_opened; // path -> last opened in noted
     QFileSystemWatcher m_watcher;
 };

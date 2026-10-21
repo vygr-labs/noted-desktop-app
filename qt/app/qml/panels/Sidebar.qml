@@ -178,7 +178,7 @@ Rectangle {
         const top = scroller.contentY - tree.y
         for (let i = 0; i < listRepeater.count; ++i) {
             const it = listRepeater.itemAt(i)
-            if (!it || !it.expanded || it.y >= top) continue
+            if (!it || !it.visible || !it.expanded || it.y >= top) continue
             if (it.y + it.height > top + 32) {
                 stuck = it
                 stuckShift = Math.min(0, it.y + it.height - 4 - (top + 34))
@@ -195,25 +195,52 @@ Rectangle {
         AppState.setListExpanded(id, open)
     }
 
+    // A section's heading. Clicking it folds the section away (remembered).
     component GroupLabel: RowLayout {
         id: gl
         property string label: ""
         property string addTip: ""
+        property string foldKey: ""
+        readonly property bool folded: foldKey !== "" && !!AppState.sidebarFolded[foldKey]
         signal addClicked()
         Layout.fillWidth: true
         Layout.topMargin: 20
-        Layout.bottomMargin: 6
+        Layout.bottomMargin: folded ? 0 : 6
         Layout.leftMargin: 10
         Layout.rightMargin: 4
         Layout.preferredHeight: 24
         spacing: 0
-        Text {
-            textFormat: Text.PlainText
+        Item {
             Layout.fillWidth: true
-            text: gl.label
-            color: Theme.c.tertiary
-            font.pixelSize: 12
-            font.weight: Font.Medium
+            Layout.fillHeight: true
+            Row {
+                anchors.verticalCenter: parent.verticalCenter
+                spacing: 4
+                Text {
+                    textFormat: Text.PlainText
+                    anchors.verticalCenter: parent.verticalCenter
+                    text: gl.label
+                    color: foldArea.containsMouse ? Theme.c.text : Theme.c.tertiary
+                    font.pixelSize: 12
+                    font.weight: Font.Medium
+                }
+                Icon {
+                    visible: gl.folded || foldArea.containsMouse
+                    anchors.verticalCenter: parent.verticalCenter
+                    name: "chevron-right"
+                    size: 11
+                    color: Theme.c.muted
+                    rotation: gl.folded ? 0 : 90
+                }
+            }
+            MouseArea {
+                id: foldArea
+                anchors.fill: parent
+                enabled: gl.foldKey !== ""
+                hoverEnabled: true
+                cursorShape: Qt.PointingHandCursor
+                onClicked: AppState.setSidebarFolded(gl.foldKey, !gl.folded)
+            }
         }
         IconButton {
             visible: gl.addTip !== ""
@@ -351,20 +378,18 @@ Rectangle {
                 width: scroller.width - 20
                 spacing: 1
 
-                Text {
-                    textFormat: Text.PlainText
+                GroupLabel {
+                    id: pinnedLabel
                     visible: side.pinned.length > 0
-                    Layout.leftMargin: 10
-                    Layout.bottomMargin: 6
-                    text: "Pinned"
-                    color: Theme.c.tertiary
-                    font.pixelSize: 12
-                    font.weight: Font.Medium
+                    Layout.topMargin: 0
+                    label: "Pinned"
+                    foldKey: "pinned"
                 }
                 Repeater {
                     model: side.pinned
                     delegate: Row_ {
                         required property var modelData
+                        visible: !pinnedLabel.folded
                         icon: "pin"
                         iconSize: 15
                         label: modelData.title || "Untitled"
@@ -377,14 +402,16 @@ Rectangle {
                 }
 
                 GroupLabel {
+                    id: listsLabel
                     Layout.topMargin: side.pinned.length > 0 ? 20 : 0
                     label: "Lists"
+                    foldKey: "lists"
                     addTip: "New list"
                     onAddClicked: newListDialog.openFor()
                 }
                 Text {
                     textFormat: Text.PlainText
-                    visible: AppState.lists.length === 0
+                    visible: AppState.lists.length === 0 && !listsLabel.folded
                     Layout.leftMargin: 10
                     Layout.topMargin: 2
                     text: "No lists yet"
@@ -401,6 +428,7 @@ Rectangle {
                         readonly property var notes: expanded ? (side.listNotes[modelData.id] || []) : []
                         readonly property int limit: side.limitFor(modelData.id)
                         readonly property int total: modelData.note_count || 0
+                        visible: !listsLabel.folded
                         Layout.fillWidth: true
                         spacing: 1
 
@@ -450,14 +478,15 @@ Rectangle {
 
                 // Hidden lists fold into one quiet row.
                 Row_ {
-                    visible: AppState.hiddenLists.length > 0
+                    visible: AppState.hiddenLists.length > 0 && !listsLabel.folded
                     leftPad: 28
                     label: Fmt.plural(AppState.hiddenLists.length, "hidden list")
-                    onClicked: hiddenColumn.visible = !hiddenColumn.visible
+                    onClicked: hiddenColumn.open = !hiddenColumn.open
                 }
                 ColumnLayout {
                     id: hiddenColumn
-                    visible: false
+                    property bool open: false
+                    visible: open && !listsLabel.folded
                     Layout.fillWidth: true
                     spacing: 1
                     Repeater {
@@ -479,8 +508,10 @@ Rectangle {
 
                 // Files opened from disk; only while one is open.
                 GroupLabel {
+                    id: filesLabel
                     visible: Files.files.length > 0
                     label: "Files"
+                    foldKey: "files"
                     addTip: "Open a file"
                     onAddClicked: side.openFileRequested()
                 }
@@ -489,6 +520,7 @@ Rectangle {
                     delegate: Row_ {
                         required property var modelData
                         required property int index
+                        visible: !filesLabel.folded
                         icon: "file"
                         iconSize: 15
                         // Two open files with one name get their folder added.
@@ -502,14 +534,7 @@ Rectangle {
                         active: AppState.view === "note" && AppState.selectedNoteId === modelData.id
                         tabPlace: ["note", "", modelData.id]
                         onClicked: AppState.openNote(modelData.id)
-                        onContextRequested: (x, y) => menu.openAt(this, x, y, [
-                            { text: "Open", action: () => AppState.openNote(modelData.id) },
-                            { text: "Open in new tab", action: () => AppState.openNoteInNewTab(modelData.id) },
-                            { text: "Show in folder", action: () => App.revealFile(modelData.path) },
-                            { text: "Copy into notes", action: () => AppState.copyFileToNotes(modelData.id) },
-                            { separator: true },
-                            { text: "Close file", action: () => AppState.closeFile(modelData.id) }
-                        ])
+                        onContextRequested: (x, y) => menu.openAt(this, x, y, AppState.fileMenuItems(modelData))
                     }
                 }
             }

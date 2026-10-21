@@ -117,9 +117,11 @@ Item {
         function onSelectedNoteIdChanged() { pane.loadCurrent(false) }
         function onFocusTitleRequested(selectAll) { if (pane.active) Qt.callLater(() => header.focusTitle(selectAll)) }
         function onFocusEditorRequested() { pane.focusBody() }
+        // Leaving the note closes find: its highlights go with it.
+        function onFindOpenChanged() { if (!AppState.findOpen) { rich.controller.findQuery = ""; plain.finder.findQuery = "" } }
         function onFindInNoteRequested(query) {
-            if (!pane.active || !pane.hasNote || pane.isPlain || pane.locked) return
-            const ctl = rich.controller
+            if (!pane.active || !pane.hasNote || pane.locked) return
+            const ctl = pane.finder
             ctl.findQuery = query
             // A search for several words can match a note without the exact
             // phrase: fall back to its longest word.
@@ -156,6 +158,7 @@ Item {
     // The open note changed elsewhere: its new text in place, caret and
     // scroll kept. Anything more (a lock, a change of type) loads it afresh.
     readonly property alias editor: rich  // for --drive checks
+    readonly property alias plainEditor: plain
     function refreshCurrent() {
         const n = AppState.noteData(note.id)
         if (locked || loadedId !== n.id || (n.note_type === "plain") !== isPlain) { loadCurrent(true); return }
@@ -186,21 +189,24 @@ Item {
         else if (top + r.height > scroller.contentY + scroller.height - margin)
             scroller.contentY = Math.min(scroller.contentHeight - scroller.height, top + r.height - scroller.height + margin)
     }
+    // Find runs in whichever editor shows the note (both have the same API).
+    readonly property var finder: isPlain ? plain.finder : rich.controller
+    readonly property var activeEdit: isPlain ? plain.textEdit : rich.textEdit
     // The current find match, brought into view (a third of the way down)
     // when it's off screen. The caret stays put: focus is in the find field.
     function revealFind() {
-        const ctl = rich.controller
+        const ctl = finder
         const m = ctl.findMatches[ctl.findIndex]
         if (!m || !findBar.visible) return
-        const r = rich.textEdit.positionToRectangle(m.start)
-        const top = rich.textEdit.mapToItem(scroller.contentItem, 0, r.y).y
+        const r = activeEdit.positionToRectangle(m.start)
+        const top = activeEdit.mapToItem(scroller.contentItem, 0, r.y).y
         if (top >= scroller.contentY + 60 && top + r.height <= scroller.contentY + scroller.height - 60) return
         scroller.contentY = Math.max(0, Math.min(scroller.contentHeight - scroller.height, top - scroller.height / 3))
     }
     Connections {
-        target: rich.controller
+        target: pane.finder
         // Not while typing in the note: its edits rebuild the matches too.
-        function onFindChanged() { if (!rich.textEdit.activeFocus) Qt.callLater(pane.revealFind) }
+        function onFindChanged() { if (!pane.activeEdit.activeFocus) Qt.callLater(pane.revealFind) }
     }
     function scrollToBlock(block) {
         const g = rich.controller.blockGeometry(block, rich.controller.layoutTick)
@@ -348,7 +354,7 @@ Item {
                     textFormat: Text.PlainText
                     height: 20
                     verticalAlignment: Text.AlignVCenter
-                    text: "Saved " + Fmt.edited(pane.note.updated_at).toLowerCase().replace(/^yesterday$/, "yesterday")
+                    text: "Saved " + Fmt.edited(pane.note.updated_at, AppState.now).toLowerCase().replace(/^yesterday$/, "yesterday")
                     color: Theme.c.muted
                     font.pixelSize: 13
                 }
@@ -496,30 +502,21 @@ Item {
 
     FindBar {
         id: findBar
-        visible: pane.hasNote && AppState.findOpen && !pane.isPlain && !pane.locked
+        visible: pane.hasNote && AppState.findOpen && !pane.locked
         anchors.top: parent.top
         width: parent.width
-        editor: rich.controller
-        onClosed: { AppState.findOpen = false; rich.controller.findQuery = ""; rich.textEdit.forceActiveFocus() }
+        editor: pane.finder
+        onClosed: { AppState.findOpen = false; pane.finder.findQuery = ""; pane.activeEdit.forceActiveFocus() }
         onVisibleChanged: if (visible) Qt.callLater(focusFind)
     }
 
     // Selection toolbar, 10px above the selection.
     SelectionToolbar {
-        id: selBar
-        editor: rich.controller
-        readonly property var edit: rich.textEdit
-        readonly property bool hasSelection: edit.selectionStart !== edit.selectionEnd
-        readonly property rect a: { scroller.contentY; edit.width; return edit.positionToRectangle(edit.selectionStart) }
-        readonly property rect b: { scroller.contentY; edit.width; return edit.positionToRectangle(edit.selectionEnd) }
-        readonly property point selTop: { scroller.contentY; return edit.mapToItem(pane, a.x, a.y) }
-        readonly property point selBottom: { scroller.contentY; return edit.mapToItem(pane, b.x, b.y + b.height) }
-        visible: pane.hasNote && !pane.isPlain && !pane.locked && !pane.inTrash && hasSelection
-                 && (edit.activeFocus || menuOpen) && selTop.y > scroller.y - 20 && selTop.y < footer.y
-        x: Math.max(8, Math.min(pane.width - width - 8, (a.y === b.y ? (selTop.x + edit.mapToItem(pane, b.x, 0).x) / 2 : edit.mapToItem(pane, edit.width / 2, 0).x) - width / 2))
-        y: selTop.y - height - 10 < scroller.y + 4 ? selBottom.y + 10 : selTop.y - height - 10
-        z: 5
-        onLinkRequested: rich.openLinkDialog()
+        richEditor: rich
+        allowed: pane.hasNote && !pane.isPlain && !pane.locked && !pane.inTrash
+        topLimit: scroller.y
+        bottomLimit: footer.y
+        scrollY: scroller.contentY
     }
 
     // ── footer ───────────────────────────────────────────────────────
@@ -563,12 +560,12 @@ Item {
 
     Shortcut {
         sequences: ["Ctrl+F"]
-        enabled: pane.hasNote && !pane.isPlain && !pane.locked
+        enabled: pane.hasNote && !pane.locked
         onActivated: { AppState.replaceOpen = false; AppState.findOpen = true; findBar.focusFind() }
     }
     Shortcut {
         sequences: ["Ctrl+H"]
-        enabled: pane.hasNote && !pane.isPlain && !pane.locked
+        enabled: pane.hasNote && !pane.locked && !pane.inTrash
         onActivated: { AppState.replaceOpen = true; AppState.findOpen = true; findBar.focusFind() }
     }
 }

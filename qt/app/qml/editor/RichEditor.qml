@@ -447,6 +447,21 @@ Item {
             items.push({ text: "Remove link", icon: "x", action: () => ctl.setLink("") })
             items.push({ separator: true })
         }
+        if (!root.readOnly) {
+            items.push({ text: "Format", children: [
+                { text: "Bold", shortcut: "Ctrl+B", checked: ctl.bold, action: () => ctl.toggleBold() },
+                { text: "Italic", shortcut: "Ctrl+I", checked: ctl.italic, action: () => ctl.toggleItalic() },
+                { text: "Underline", shortcut: "Ctrl+U", checked: ctl.underline, action: () => ctl.toggleUnderline() },
+                { text: "Strikethrough", shortcut: "Ctrl+Shift+S", checked: ctl.strike, action: () => ctl.toggleStrike() },
+                { text: "Highlight", shortcut: "Ctrl+Shift+H", checked: ctl.highlight, action: () => ctl.toggleHighlight() },
+                { text: "Inline code", shortcut: "Ctrl+E", checked: ctl.code, action: () => ctl.toggleCode() },
+                { text: href !== "" ? "Edit link…" : "Link…", shortcut: "Ctrl+K", disabled: !hasSel && href === "", action: () => linkDialog.openFor() },
+                { separator: true },
+                { text: "Clear formatting", shortcut: "Ctrl+\\", action: () => ctl.clearFormatting() }
+            ] })
+            items.push({ text: "Turn into", children: turnIntoItems() })
+            items.push({ separator: true })
+        }
         items.push({ text: "Cut", icon: "scissors", shortcut: "Ctrl+X", disabled: !hasSel, action: () => ctl.cut() })
         items.push({ text: "Copy", icon: "copy", shortcut: "Ctrl+C", disabled: !hasSel, action: () => ctl.copy("rich") })
         items.push({ text: "Copy as Markdown", icon: "hash", disabled: !hasSel, action: () => ctl.copy("markdown") })
@@ -495,4 +510,36 @@ Item {
     }
 
     function openLinkDialog() { linkDialog.openFor() }
+
+    // What the caret's block is, for "Turn into" (selection toolbar and right-click).
+    readonly property string blockLabel: {
+        if (ctl.headingLevel === 1 || ctl.headingLevel === 2) return "Heading"
+        if (ctl.headingLevel === 3) return "Subheading"
+        if (ctl.listKind === 0) return "Bulleted list"
+        if (ctl.listKind === 1) return "Numbered list"
+        if (ctl.listKind === 2) return "To-do"
+        if (ctl.inQuote) return "Quote"
+        if (ctl.inCodeBlock) return "Code block"
+        return "Text"
+    }
+    function turnIntoItems() {
+        const e = ctl
+        const plainBlock = () => {
+            if (e.headingLevel > 0) e.setHeading(0)
+            if (e.listKind >= 0) e.toggleList(e.listKind)
+            if (e.inQuote) e.toggleQuote()
+            if (e.inCodeBlock) e.toggleCodeBlock()
+        }
+        const list = (k) => () => { if (e.listKind !== k) { plainBlock(); e.toggleList(k) } }
+        return [
+            { text: "Text", checked: blockLabel === "Text", action: plainBlock },
+            { text: "Heading", checked: blockLabel === "Heading", action: () => { plainBlock(); e.setHeading(2) } },
+            { text: "Subheading", checked: blockLabel === "Subheading", action: () => { plainBlock(); e.setHeading(3) } },
+            { text: "To-do", checked: blockLabel === "To-do", action: list(2) },
+            { text: "Bulleted list", checked: blockLabel === "Bulleted list", action: list(0) },
+            { text: "Numbered list", checked: blockLabel === "Numbered list", action: list(1) },
+            { text: "Quote", checked: blockLabel === "Quote", action: () => { if (!e.inQuote) { plainBlock(); e.toggleQuote() } } },
+            { text: "Code block", checked: blockLabel === "Code block", action: () => { if (!e.inCodeBlock) { plainBlock(); e.toggleCodeBlock() } } }
+        ]
+    }
 }

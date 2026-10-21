@@ -237,7 +237,7 @@ PageColumns {
                         font.weight: Font.Medium
                         elide: Text.ElideRight
                     }
-                    Text { textFormat: Text.PlainText; text: Fmt.edited(n.updated_at); color: Theme.c.muted; font.pointSize: Theme.pt(12.5); font.features: { "tnum": 1 } }
+                    Text { textFormat: Text.PlainText; text: Fmt.edited(n.updated_at, AppState.now); color: Theme.c.muted; font.pointSize: Theme.pt(12.5); font.features: { "tnum": 1 } }
                 }
                 RowLayout {
                     Layout.fillWidth: true
@@ -351,7 +351,7 @@ PageColumns {
                     Layout.fillWidth: true
                     spacing: 12
                     Text { Layout.fillWidth: true; text: page.hl(f.name); textFormat: Text.RichText; color: Theme.c.ink; font.pixelSize: 15; font.weight: Font.Medium; elide: Text.ElideRight }
-                    Text { textFormat: Text.PlainText; text: Fmt.edited(f.updated_at); color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
+                    Text { textFormat: Text.PlainText; text: Fmt.edited(f.updated_at, AppState.now); color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
                 }
                 Text {
                     Layout.fillWidth: true

@@ -5,7 +5,7 @@ import Noted
 // In-note find (Ctrl+F) and replace (Ctrl+H).
 Rectangle {
     id: bar
-    property EditorController editor
+    property var editor            // EditorController, or PlainEditor.finder
     property bool replaceMode: AppState.replaceOpen
     signal closed()
 

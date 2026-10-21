@@ -62,6 +62,8 @@ Source: "{#Source}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs cre
 ; noted.exe sits where Electron's noted.exe did, so pointing at the exe would
 ; keep showing the old logo.
 Source: "noted.ico"; DestDir: "{app}"; Flags: ignoreversion
+; What files that open in noted look like in Explorer: a white page with n.
+Source: "noted-file.ico"; DestDir: "{app}"; Flags: ignoreversion
 
 [Icons]
 Name: "{autoprograms}\noted"; Filename: "{app}\noted.exe"; IconFilename: "{app}\noted.ico"
@@ -78,6 +80,19 @@ Root: HKCU; Subkey: "Software\Classes\Applications\noted.exe\SupportedTypes"; Va
 Root: HKCU; Subkey: "Software\Classes\.md\OpenWithList\noted.exe"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\.markdown\OpenWithList\noted.exe"; Flags: uninsdeletekey
 Root: HKCU; Subkey: "Software\Classes\.txt\OpenWithList\noted.exe"; Flags: uninsdeletekey
+; The document icon, whichever way Windows remembers the choice: as the app
+; (Applications\noted.exe) or as one of noted's own file types below.
+Root: HKCU; Subkey: "Software\Classes\Applications\noted.exe\DefaultIcon"; ValueType: string; ValueData: "{app}\noted-file.ico"
+Root: HKCU; Subkey: "Software\Classes\noted.markdown"; ValueType: string; ValueData: "Markdown document"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\noted.markdown\DefaultIcon"; ValueType: string; ValueData: "{app}\noted-file.ico"
+Root: HKCU; Subkey: "Software\Classes\noted.markdown\shell\open\command"; ValueType: string; ValueData: """{app}\noted.exe"" ""%1"""
+Root: HKCU; Subkey: "Software\Classes\noted.text"; ValueType: string; ValueData: "Text document"; Flags: uninsdeletekey
+Root: HKCU; Subkey: "Software\Classes\noted.text\DefaultIcon"; ValueType: string; ValueData: "{app}\noted-file.ico"
+Root: HKCU; Subkey: "Software\Classes\noted.text\shell\open\command"; ValueType: string; ValueData: """{app}\noted.exe"" ""%1"""
+Root: HKCU; Subkey: "Software\Classes\.md\OpenWithProgids"; ValueType: string; ValueName: "noted.markdown"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\.markdown\OpenWithProgids"; ValueType: string; ValueName: "noted.markdown"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\.txt\OpenWithProgids"; ValueType: string; ValueName: "noted.text"; ValueData: ""; Flags: uninsdeletevalue
+Root: HKCU; Subkey: "Software\Classes\.text\OpenWithProgids"; ValueType: string; ValueName: "noted.text"; ValueData: ""; Flags: uninsdeletevalue
 
 [Run]
 Filename: "{app}\noted.exe"; Description: "Open noted"; Flags: nowait postinstall skipifsilent

@@ -5,6 +5,7 @@
 #include "noted/Database.h"
 #include "noted/NoteStore.h"
 #include "noted/NotesModel.h"
+#include "noted/Sqlite.h"
 
 using namespace noted;
 
@@ -16,6 +17,7 @@ private slots:
     void freshDatabaseIsAtLatestSchema();
     void notesListsTagsAndSearch();
     void dailyNoteIsReused();
+    void savingUnchangedNoteKeepsItsTime();
     void lockPin();
     void checklistProgressAndOpenTasks();
     void listGroupsAndSnippets();
@@ -72,6 +74,24 @@ void TestStore::dailyNoteIsReused()
     const QVariantMap b = store.dailyNote("2026-09-30");
     QCOMPARE(a.value("id"), b.value("id"));
     QCOMPARE(a.value("title").toString(), QStringLiteral("Wednesday, September 30, 2026"));
+}
+
+void TestStore::savingUnchangedNoteKeepsItsTime()
+{
+    QTemporaryDir dir;
+    Database db(dir.filePath("app.sqlite"));
+    NoteStore store(db);
+    const QString content = R"({"type":"doc","content":[{"type":"paragraph","content":[{"type":"text","text":"as it was"}]}]})";
+    const QString id = store.createNote({{"title", "Old note"}, {"content", content}}).value("id").toString();
+    db.conn().run(QStringLiteral("UPDATE notes SET updated_at = '2026-01-02 03:04:05' WHERE id = ?"), {id});
+
+    QSignalSpy changed(&store, &NoteStore::notesChanged);
+    store.updateNote(id, {{"content", content}, {"content_plain", "worded differently"}, {"title", "Old note"}});
+    QCOMPARE(store.note(id).value("updated_at").toString(), QStringLiteral("2026-01-02 03:04:05"));
+    QCOMPARE(changed.count(), 0);
+
+    store.updateNote(id, {{"title", "New title"}});
+    QVERIFY(store.note(id).value("updated_at").toString() != QStringLiteral("2026-01-02 03:04:05"));
 }
 
 void TestStore::lockPin()

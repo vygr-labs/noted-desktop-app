@@ -45,7 +45,7 @@ Popup {
 
     function metaOf(n) {
         const l = AppState.listById(n.list_id)
-        return (l ? l.name : (n.is_daily ? "Daily notes" : "Notes")) + " · " + Fmt.edited(n.updated_at)
+        return (l ? l.name : (n.is_daily ? "Daily notes" : "Notes")) + " · " + Fmt.edited(n.updated_at, AppState.now)
     }
     function commands() {
         const n = AppState.view === "note" ? AppState.currentNote : ({})

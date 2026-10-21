@@ -295,7 +295,7 @@ PageColumns {
                             Icon { visible: !!sheet.modelData.is_pinned; name: "pin"; size: 12; color: Theme.c.muted; anchors.verticalCenter: parent.verticalCenter }
                             Text {
                                 textFormat: Text.PlainText
-                                text: Fmt.edited(sheet.modelData.updated_at) + (sheet.openHere && !sheet.locked ? "  ·  " + sheet.openHere + " open" : "")
+                                text: Fmt.edited(sheet.modelData.updated_at, AppState.now) + (sheet.openHere && !sheet.locked ? "  ·  " + sheet.openHere + " open" : "")
                                 color: Theme.c.muted
                                 font.pointSize: Theme.pt(12.5)
                                 font.features: { "tnum": 1 }
@@ -360,7 +360,7 @@ PageColumns {
                                     Layout.topMargin: 2
                                     spacing: 6
                                     Icon { visible: !!noteRow.modelData.is_pinned; name: "pin"; size: 13; color: Theme.c.muted }
-                                    Text { textFormat: Text.PlainText; text: Fmt.edited(noteRow.modelData.updated_at); color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
+                                    Text { textFormat: Text.PlainText; text: Fmt.edited(noteRow.modelData.updated_at, AppState.now); color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
                                 }
                             }
                             Text {

@@ -37,8 +37,8 @@ function edited(ts, now) {
     return d.getFullYear() === now.getFullYear() ? md : md + ", " + d.getFullYear()
 }
 // "Edited 12m ago", "Edited yesterday", "Edited Wed".
-function editedPhrase(ts) {
-    const e = edited(ts)
+function editedPhrase(ts, now) {
+    const e = edited(ts, now)
     if (!e) return ""
     if (e === "Yesterday" || e === "Just now") return "Edited " + e.toLowerCase()
     if (/^\d+:\d\d$/.test(e)) return "Edited at " + e
