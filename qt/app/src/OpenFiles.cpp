@@ -10,6 +10,9 @@
 #include <QFileInfo>
 #include <QJsonArray>
 #include <QJsonDocument>
+#include <QJsonObject>
+
+#include <algorithm>
 #include <QCryptographicHash>
 #include <QSaveFile>
 #include <QStandardPaths>
@@ -19,6 +22,7 @@ namespace {
 
 const QString kPrefix = QStringLiteral("file:");
 const QString kSetting = QStringLiteral("qt.openFiles");
+const QString kOpenedSetting = QStringLiteral("qt.fileOpenedAt");
 
 bool isMarkdown(const QString& path)
 {
@@ -52,6 +56,9 @@ OpenFiles::OpenFiles(noted::NoteStore& store, QObject* parent)
         m_paths << path;
         m_watcher.addPath(path);
     }
+    const QJsonObject opened = QJsonDocument::fromJson(m_store.setting(kOpenedSetting, QStringLiteral("{}")).toUtf8()).object();
+    for (auto it = opened.begin(); it != opened.end(); ++it)
+        if (m_paths.contains(it.key())) m_opened.insert(it.key(), QDateTime::fromString(it.value().toString(), Qt::ISODateWithMs));
 }
 
 QVariantList OpenFiles::files() const
@@ -76,6 +83,8 @@ QString OpenFiles::open(const QString& pathOrUrl)
     Format f;
     if (!readFile(path, f)) return {};
     m_formats.insert(path, f);
+    m_opened.insert(path, QDateTime::currentDateTimeUtc());
+    persistOpened();
     if (!m_paths.contains(path)) {
         m_paths << path;
         m_watcher.addPath(path);
@@ -85,6 +94,45 @@ QString OpenFiles::open(const QString& pathOrUrl)
     return kPrefix + path;
 }
 
+void OpenFiles::touch(const QString& id)
+{
+    const QString path = pathOf(id);
+    if (!m_paths.contains(path)) return;
+    m_opened.insert(path, QDateTime::currentDateTimeUtc());
+    persistOpened();
+}
+
+QVariantList OpenFiles::recent(int limit) const
+{
+    QList<QPair<QDateTime, QVariantMap>> rows;
+    for (const QString& path : m_paths) {
+        const QFileInfo info(path);
+        if (!info.isFile()) continue;
+        const QDateTime opened = m_opened.value(path);
+        const QDateTime when = opened.isValid() && opened > info.lastModified() ? opened : info.lastModified();
+        // The start is enough for a preview: log files can be large.
+        QFile file(path);
+        QString preview;
+        if (file.open(QIODevice::ReadOnly)) preview = QString::fromUtf8(file.read(2048)).remove(QChar(0xFEFF)).left(400);
+        rows.append({when, QVariantMap{{"id", kPrefix + path},
+                                       {"title", info.fileName()},
+                                       {"is_file", true},
+                                       {"file_path", QDir::toNativeSeparators(path)},
+                                       {"folder", info.dir().dirName()},
+                                       {"updated_at", stamp(when)},
+                                       // Opened since it last changed: the desk says "Opened", not edited.
+                                       {"opened", when != info.lastModified()},
+                                       {"preview", preview}}});
+    }
+    std::sort(rows.begin(), rows.end(), [](const auto& a, const auto& b) { return a.first > b.first; });
+    QVariantList out;
+    for (const auto& r : rows) {
+        if (out.size() >= limit) break;
+        out << r.second;
+    }
+    return out;
+}
+
 void OpenFiles::close(const QString& id)
 {
     const QString path = pathOf(id);
@@ -92,7 +140,9 @@ void OpenFiles::close(const QString& id)
     QFile::remove(originalPath(path));
     m_watcher.removePath(path);
     m_formats.remove(path);
+    m_opened.remove(path);
     persist();
+    persistOpened();
     emit filesChanged();
 }
 
@@ -225,6 +275,13 @@ void OpenFiles::persist()
     QJsonArray a;
     for (const QString& p : m_paths) a.append(p);
     m_store.setSetting(kSetting, QString::fromUtf8(QJsonDocument(a).toJson(QJsonDocument::Compact)));
+}
+
+void OpenFiles::persistOpened()
+{
+    QJsonObject o;
+    for (auto it = m_opened.begin(); it != m_opened.end(); ++it) o.insert(it.key(), stamp(it.value()));
+    m_store.setSetting(kOpenedSetting, QString::fromUtf8(QJsonDocument(o).toJson(QJsonDocument::Compact)));
 }
 
 void OpenFiles::onDiskChange(const QString& path)

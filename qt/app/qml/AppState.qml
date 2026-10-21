@@ -51,6 +51,7 @@ QtObject {
     property bool spellcheckHint: true
     property string listLayout: "sheets"     // sheets | rows (list pages)
     property var expandedLists: ({})         // list id -> true while open in the sidebar tree
+    property var sidebarFolded: ({})         // "pinned" | "lists" | "files" -> true while folded in the sidebar
     property var foldedTodoGroups: ({})      // "tab:group" -> true while folded on the To-dos page
 
     // ── overlays ─────────────────────────────────────────────────────
@@ -73,13 +74,16 @@ QtObject {
     // isLocked() re-evaluate.
     property int lockTick: 0
 
-    // Local date, kept current across midnight.
+    // Local date, kept current across midnight, and the time that "5m ago"
+    // labels count from (pass it to Fmt.edited so they move on their own).
     property string todayIso: Store.todayIso()
+    property date now: new Date()
     property Timer _clock: Timer {
-        interval: 60000
+        interval: 30000
         running: true
         repeat: true
         onTriggered: {
+            state.now = new Date()
             const t = Store.todayIso()
             if (t !== state.todayIso) { state.todayIso = t; Notes.refresh() }
         }
@@ -137,6 +141,7 @@ QtObject {
         listLayout = Store.setting("qt.listLayout", "sheets")
         try { expandedLists = JSON.parse(Store.setting("qt.expandedLists", "{}")) } catch (e) { expandedLists = ({}) }
         try { foldedTodoGroups = JSON.parse(Store.setting("qt.foldedTodoGroups", "{}")) } catch (e) { foldedTodoGroups = ({}) }
+        try { sidebarFolded = JSON.parse(Store.setting("qt.sidebarFolded", "{}")) } catch (e) { sidebarFolded = ({}) }
         Theme.textScale = parseFloat(Store.setting("qt.textScale", "1")) || 1
         Notes.sort = noteSort
         refreshAll()
@@ -163,6 +168,14 @@ QtObject {
         else delete e[id]
         expandedLists = e
         save("qt.expandedLists", JSON.stringify(e))
+    }
+
+    function setSidebarFolded(key, folded) {
+        const f = Object.assign({}, sidebarFolded)
+        if (folded) f[key] = true
+        else delete f[key]
+        sidebarFolded = f
+        save("qt.sidebarFolded", JSON.stringify(f))
     }
 
     function setTodoGroupFolded(key, folded) {
@@ -230,6 +243,17 @@ QtObject {
         if (last) openNote(last)
         if (opened < paths.length) toast(paths.length > 1 ? (paths.length - opened) + " files couldn't be opened" : "Couldn't open that file")
         return opened
+    }
+    // An open file's right-click menu, wherever it's listed.
+    function fileMenuItems(f) {
+        return [
+            { text: "Open", action: () => openNote(f.id) },
+            { text: "Open in new tab", action: () => openNoteInNewTab(f.id) },
+            { text: "Show in folder", action: () => App.revealFile(f.path || f.file_path) },
+            { text: "Copy into notes", action: () => copyFileToNotes(f.id) },
+            { separator: true },
+            { text: "Close file", action: () => closeFile(f.id) }
+        ]
     }
     function closeFile(id) {
         // Leave the page first so the editor writes any pending change to the file.
@@ -421,7 +445,8 @@ QtObject {
         const n = noteData(id)
         if (!n.id) return
         if (n.is_daily && n.daily_date === todayIso && !n.is_trashed) { go("desk"); return }
-        if (n.id && !Files.isFile(id)) save("qt.lastNote", id)
+        if (Files.isFile(id)) Files.touch(id)
+        else save("qt.lastNote", id)
         go("note", "", id)
     }
     function openTag(tagId) {

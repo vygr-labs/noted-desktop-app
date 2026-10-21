@@ -15,9 +15,11 @@ Item {
         flush()
         noteId = id
         loading = true
+        search.findMatches = []   // their positions are for the old text
         edit.text = text || ""
         loading = false
         dirty = false
+        rebuildFind()
     }
     // New text from elsewhere, keeping the caret: before the change it stays,
     // after it moves with the text, inside it goes to the change's end.
@@ -34,10 +36,12 @@ Item {
         const caret = map(edit.cursorPosition)
         const anchor = map(edit.cursorPosition === edit.selectionEnd ? edit.selectionStart : edit.selectionEnd)
         loading = true
+        search.findMatches = []
         edit.text = text
         loading = false
         if (caret === anchor) edit.cursorPosition = caret
         else edit.select(anchor, caret)
+        rebuildFind()
     }
     function flush() {
         saveTimer.stop()
@@ -51,6 +55,69 @@ Item {
     }
     function focusEnd() { edit.forceActiveFocus(); edit.cursorPosition = edit.length }
     property bool loading: false
+
+    // Find and replace, shaped like EditorController's so one FindBar drives
+    // both editors. Matches ignore case, as in rich notes.
+    property alias finder: search
+    QtObject {
+        id: search
+        property string findQuery: ""
+        property var findMatches: []   // [{start, length}]
+        property int findIndex: -1
+        signal findChanged()
+        onFindQueryChanged: root.rebuildFind()
+        function findNext(backwards) {
+            const n = findMatches.length
+            if (n === 0) return -1
+            findIndex = findIndex < 0 ? 0 : (findIndex + (backwards ? n - 1 : 1)) % n
+            const m = findMatches[findIndex]
+            edit.select(m.start, m.start + m.length)
+            findChanged()
+            return m.start
+        }
+        function replaceCurrent(text) {
+            if (findIndex < 0 || findIndex >= findMatches.length) return
+            const at = findIndex
+            root.replacing = true
+            App.replaceRanges(edit.textDocument, [findMatches[findIndex]], text)
+            root.replacing = false
+            root.rebuildFind()
+            if (findMatches.length > 0) {
+                findIndex = Math.min(at, findMatches.length - 1) - 1
+                findNext(false)
+            }
+        }
+        function replaceAll(text) {
+            const all = findMatches
+            root.replacing = true
+            App.replaceRanges(edit.textDocument, all, text)
+            root.replacing = false
+            root.rebuildFind()
+            return all.length
+        }
+    }
+    property bool replacing: false
+    function rebuildFind() {
+        rebuildLater.stop()
+        const q = search.findQuery
+        const out = []
+        let at = -1
+        if (q !== "") {
+            // Case-insensitive on the text itself: lowercasing it first can
+            // change its length ("İ" is two characters lowered) and shift every
+            // later match.
+            const re = new RegExp(q.replace(/[.*+?^${}()|[\]\\\/]/g, "\\$&"), "gi")
+            const from = Math.min(edit.selectionStart, edit.cursorPosition)
+            for (let m = re.exec(edit.text); m && out.length <= 5000; m = re.exec(edit.text)) {
+                if (at < 0 && m.index >= from) at = out.length
+                out.push({ start: m.index, length: m[0].length })
+            }
+            if (at < 0 && out.length > 0) at = 0
+        }
+        search.findMatches = out
+        search.findIndex = at
+        search.findChanged()
+    }
     readonly property int wordCount: {
         const t = edit.text.trim()
         return t === "" ? 0 : t.split(/\s+/).length
@@ -70,11 +137,35 @@ Item {
         font.family: Theme.fontFamily
         font.pixelSize: Math.round(15 * Theme.textScale)
         onCursorRectangleChanged: root.caretMoved(cursorRectangle)
+        // Also raised when find selects a match, with the text unchanged.
+        property string lastText: ""
         onTextChanged: {
+            if (text === lastText) return
+            lastText = text
             if (root.loading) return
+            if (search.findQuery !== "" && !root.replacing) rebuildLater.restart()
             root.dirty = true
             saveTimer.restart()
             Notes.patch(root.noteId, root.noteId === AppState.currentNote.id ? (AppState.currentNote.title || "") : "", text.substring(0, 240))
+        }
+        // Find highlights, drawn under the text.
+        Repeater {
+            model: search.findMatches
+            delegate: Rectangle {
+                required property var modelData
+                required property int index
+                readonly property bool fits: modelData.start + modelData.length <= edit.length
+                readonly property rect a: { edit.width; edit.contentHeight; return fits ? edit.positionToRectangle(modelData.start) : Qt.rect(0, 0, 0, 0) }
+                readonly property rect b: { edit.width; edit.contentHeight; return fits ? edit.positionToRectangle(modelData.start + modelData.length) : Qt.rect(0, 0, 0, 0) }
+                visible: fits
+                z: -1
+                x: a.x - 1
+                y: a.y
+                width: b.y === a.y ? Math.max(4, b.x - a.x + 2) : edit.width - a.x
+                height: a.height
+                radius: 3
+                color: index === search.findIndex ? Qt.alpha(Theme.c.accent, 0.45) : Qt.alpha(Theme.c.accent, 0.16)
+            }
         }
         Text {
             textFormat: Text.PlainText
@@ -85,6 +176,11 @@ Item {
         }
     }
 
+    Timer {
+        id: rebuildLater
+        interval: 150
+        onTriggered: root.rebuildFind()
+    }
     Timer {
         id: saveTimer
         interval: 500

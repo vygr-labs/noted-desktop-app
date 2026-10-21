@@ -82,7 +82,7 @@ Flickable {
                         font.pointSize: Theme.pt(13.5)
                         elide: Text.ElideRight
                     }
-                    Text { textFormat: Text.PlainText; text: Fmt.editedPhrase(row.updatedAt).replace(/^Edited/, "Moved to the trash"); color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
+                    Text { textFormat: Text.PlainText; text: Fmt.editedPhrase(row.updatedAt, AppState.now).replace(/^Edited/, "Moved to the trash"); color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
                 }
             }
         }

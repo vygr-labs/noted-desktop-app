@@ -5,8 +5,9 @@ import Noted
 // In-note find (Ctrl+F) and replace (Ctrl+H).
 Rectangle {
     id: bar
-    property EditorController editor
-    property bool replaceMode: AppState.replaceOpen
+    property var editor            // EditorController, or PlainEditor.finder
+    property bool readOnly: false   // find only (a note in the trash)
+    property bool replaceMode: AppState.replaceOpen && !readOnly
     signal closed()
 
     implicitHeight: col.implicitHeight + 16
@@ -27,6 +28,7 @@ Rectangle {
         RowLayout {
             spacing: 6
             IconButton {
+                visible: !bar.readOnly
                 icon: "chevron-right"
                 size: 26
                 iconSize: 13

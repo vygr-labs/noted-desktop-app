@@ -149,7 +149,7 @@ ColumnLayout {
                 onClicked: header.openMove()
             }
         }
-        Meta { text: Fmt.editedPhrase(header.note.updated_at) }
+        Meta { text: Fmt.editedPhrase(header.note.updated_at, AppState.now) }
         Row {
             visible: !!header.note.is_shared
             height: 26

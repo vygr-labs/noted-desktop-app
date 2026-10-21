@@ -107,6 +107,7 @@ QVariantMap NoteStore::updateNote(const QString& id, const QVariantMap& data)
     auto& c = m_db.conn();
     QVariantMap cur = note(id);
     if (cur.isEmpty()) return {};
+    const QVariantMap before = cur;
 
     static const QStringList allowed = {QStringLiteral("title"),     QStringLiteral("content"),
                                         QStringLiteral("content_plain"), QStringLiteral("note_type"),
@@ -127,6 +128,26 @@ QVariantMap NoteStore::updateNote(const QString& id, const QVariantMap& data)
         const QString content = cur.value(QStringLiteral("content")).toString();
         cur.insert(QStringLiteral("content_plain"),
                    cur.value(QStringLiteral("note_type")).toString() == u"plain" ? content : plainFromContent(content));
+    }
+    // Saving what's already there isn't an edit: the note keeps its time, so
+    // a note that was only opened doesn't jump to the top of Recently edited.
+    // (content_plain is derived from content, and each build words it a little
+    // differently, so on its own it doesn't count as one.)
+    bool changed = false;
+    for (const QString& key : allowed)
+        if (key != u"content_plain" && cur.value(key).toString() != before.value(key).toString()) changed = true;
+    if (!changed) {
+        // Its plain text (and so search) may still be out of date: refresh
+        // that quietly, keeping the note's time.
+        const QString plain = cur.value("content_plain").toString();
+        if (plain != before.value("content_plain").toString()) {
+            Transaction tx(c);
+            c.run(QStringLiteral("UPDATE notes SET content_plain = ? WHERE id = ?"), {plain, id});
+            if (!cur.value(QStringLiteral("is_trashed")).toBool()) ftsReplace(id, cur.value("title").toString(), plain);
+            tx.commit();
+            return note(id);
+        }
+        return before;
     }
 
     Transaction tx(c);

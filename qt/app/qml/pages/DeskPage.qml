@@ -17,17 +17,20 @@ PageColumns {
     property var recent: []
     property var listCards: []
     property var pastDays: []       // daily notes you wrote in, before today
+    property var openFiles: []      // Files.recent: read on showing the desk or when files change, not on every save
     // To-dos ticked here stay on the page, struck through, until you leave.
     property var ticked: ({})
 
     function reload() {
-        recent = Store.recentEdited(6, false)
+        // Notes and the files open from disk, together, latest first.
+        const when = (n) => { const d = Fmt.parseTs(n.updated_at); return d ? d.getTime() : 0 }
+        recent = Store.recentEdited(6, false).concat(openFiles).sort((a, b) => when(b) - when(a)).slice(0, 6)
         pastDays = Store.pastDailyNotes(AppState.todayIso, 4)
         const latest = {}
         for (const s of Store.listSummaries()) latest[s.list_id] = s
         listCards = AppState.lists.map(l => {
             const n = latest[l.id]
-            return { list: l, count: l.note_count || 0, latest: n ? n.title : "No notes yet", edited: n ? Fmt.editedPhrase(n.updated_at) : "" }
+            return { list: l, count: l.note_count || 0, latest: n ? n.title : "No notes yet", editedAt: n ? n.updated_at : "" }
         })
     }
     function loadDaily() {
@@ -35,9 +38,13 @@ PageColumns {
         if (editor.controller.noteId !== daily.id) editor.load(daily.id, daily.content || "")
     }
     onActiveChanged: {
-        if (active) { loadDaily(); reload(); contentY = 0 }
+        if (active) { openFiles = Files.recent(6); loadDaily(); reload(); contentY = 0 }
         else { editor.controller.flush(); editor.controller.unload(); ticked = ({}) }
     }
+    // noted opens on the desk, so it's active from the start and the change
+    // above never comes: without this, today's note showed empty and what was
+    // typed into it had no note to be saved in.
+    Component.onCompleted: if (active) { openFiles = Files.recent(6); loadDaily(); reload() }
     Connections {
         target: Store
         function onNotesChanged() { if (desk.active) reloadLater.restart() }
@@ -48,6 +55,11 @@ PageColumns {
             desk.daily = Store.dailyNote(AppState.todayIso)
             editor.controller.refresh(desk.daily.id, desk.daily.content || "")
         }
+    }
+    Connections {
+        target: Files
+        function onFilesChanged() { if (desk.active) { desk.openFiles = Files.recent(6); reloadLater.restart() } }
+        function onExternallyChanged() { if (desk.active) { desk.openFiles = Files.recent(6); reloadLater.restart() } }
     }
     Connections {
         target: AppState
@@ -62,6 +74,7 @@ PageColumns {
     Timer { id: reloadLater; interval: 250; onTriggered: desk.reload() }
 
     function flush() { editor.controller.flush() }
+    readonly property alias dailyEditor: editor  // for --drive checks
 
     // Open to-dos, grouped by when they're due.
     readonly property var todoGroups: {
@@ -75,7 +88,7 @@ PageColumns {
     // ── today's note ─────────────────────────────────────────────────
     Text {
         textFormat: Text.PlainText
-        text: desk.daily.content_plain ? "Daily note · edited " + Fmt.edited(desk.daily.updated_at) : "Daily note"
+        text: desk.daily.content_plain ? "Daily note · edited " + Fmt.edited(desk.daily.updated_at, AppState.now) : "Daily note"
         color: Theme.c.muted
         font.pixelSize: 13
     }
@@ -98,6 +111,13 @@ PageColumns {
         width: parent.width
         minHeight: 26
         placeholder: "Write anything. This is today’s note, and tomorrow there’ll be a fresh one."
+    }
+    // On the page itself, not in the scrolling column.
+    SelectionToolbar {
+        parent: desk
+        richEditor: editor
+        allowed: desk.active
+        scrollY: desk.contentY
     }
 
     // ── recently edited ──────────────────────────────────────────────
@@ -154,7 +174,7 @@ PageColumns {
                                 textFormat: Text.PlainText
                                 Layout.alignment: Qt.AlignTop
                                 Layout.topMargin: 2
-                                text: Fmt.edited(card.modelData.updated_at)
+                                text: (card.modelData.opened ? "Opened " : "") + Fmt.edited(card.modelData.updated_at, AppState.now)
                                 color: Theme.c.muted
                                 font.pointSize: Theme.pt(12.5)
                             }
@@ -174,9 +194,18 @@ PageColumns {
                         }
                         Item { Layout.fillHeight: true }
                         RowLayout {
+                            visible: !card.modelData.is_file
                             spacing: 7
                             Rectangle { width: 7; height: 7; radius: 3.5; color: card.list ? Theme.swatch(card.list.color) : Theme.c.faint }
                             Text { textFormat: Text.PlainText; text: card.list ? card.list.name : "Notes"; color: Theme.c.muted; font.pointSize: Theme.pt(12.5) }
+                        }
+                        // A file from disk: its folder.
+                        RowLayout {
+                            visible: !!card.modelData.is_file
+                            Layout.fillWidth: true
+                            spacing: 6
+                            Icon { name: "file"; size: 13; color: Theme.c.muted }
+                            Text { textFormat: Text.PlainText; Layout.fillWidth: true; text: card.modelData.folder || "File"; color: Theme.c.muted; font.pointSize: Theme.pt(12.5); elide: Text.ElideRight }
                         }
                     }
                     MouseArea {
@@ -185,8 +214,9 @@ PageColumns {
                         hoverEnabled: true
                         cursorShape: Qt.PointingHandCursor
                         acceptedButtons: Qt.LeftButton | Qt.MiddleButton | Qt.RightButton
-                        onClicked: (e) => e.button === Qt.RightButton ? menu.openAt(cardArea, e.x, e.y, AppState.noteMenuItems(card.modelData))
-                                                                      : AppState.openNoteFrom(e, card.modelData.id)
+                        onClicked: (e) => e.button === Qt.RightButton
+                                         ? menu.openAt(cardArea, e.x, e.y, card.modelData.is_file ? AppState.fileMenuItems(card.modelData) : AppState.noteMenuItems(card.modelData))
+                                         : AppState.openNoteFrom(e, card.modelData.id)
                     }
                 }
             }
@@ -216,7 +246,7 @@ PageColumns {
                     list: modelData.list
                     count: modelData.count
                     latest: modelData.latest
-                    edited: modelData.edited
+                    edited: modelData.editedAt ? Fmt.editedPhrase(modelData.editedAt, AppState.now) : ""
                     onClicked: (e) => AppState.goFrom(e, "list", modelData.list.id)
                 }
             }
