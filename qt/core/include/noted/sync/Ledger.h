@@ -154,6 +154,7 @@ private:
     void setAlias(const QString& e, const QString& from, const QString& to);
     bool resolveTagName(const QString& id, const QString& name, Applied& out);
     void resolveDaily(const QString& id, Applied& out);
+    void resolveListName(const Space& s, const QString& id, Applied& out);
     void retryUnresolved(Applied& out);
     void refreshSearch(const QString& noteId);
     QString alias(const QString& e, const QString& id);

@@ -478,24 +478,27 @@ QVariantMap NoteStore::list(const QString& id)
     return m_db.conn().one(QStringLiteral("SELECT * FROM lists WHERE id = ?"), {id});
 }
 
+QString NoteStore::listNameKey(const QString& name)
+{
+    // In C++ rather than COLLATE NOCASE, which only folds ASCII. NFKC so an
+    // "é" typed and an "é" pasted as e + accent are the same name.
+    return name.normalized(QString::NormalizationForm_KC).simplified().toCaseFolded();
+}
+
 QVariantMap NoteStore::listNamed(const QString& name, const QString& exceptId)
 {
-    // In C++ rather than COLLATE NOCASE, which only folds ASCII.
-    const QString want = name.simplified();
+    const QString want = listNameKey(name);
     if (want.isEmpty()) return {};
-    for (const QVariant& v : m_db.conn().all(QStringLiteral("SELECT id, name FROM lists"))) {
+    for (const QVariant& v : m_db.conn().all(QStringLiteral("SELECT * FROM lists"))) {
         const QVariantMap l = v.toMap();
-        if (l.value("id").toString() != exceptId
-            && l.value("name").toString().simplified().compare(want, Qt::CaseInsensitive) == 0)
-            return list(l.value("id").toString());
+        if (l.value("id").toString() != exceptId && listNameKey(l.value("name").toString()) == want) return l;
     }
     return {};
 }
 
 QVariantMap NoteStore::createList(const QString& name, const QString& icon, const QString& color)
 {
-    const QVariantMap existing = listNamed(name);
-    if (!existing.isEmpty()) return existing;
+    if (name.simplified().isEmpty() || !listNamed(name).isEmpty()) return {};
     auto& c = m_db.conn();
     const QString id = Database::newId();
     const int order = c.scalar(QStringLiteral("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM lists")).toInt();
@@ -506,18 +509,15 @@ QVariantMap NoteStore::createList(const QString& name, const QString& icon, cons
     return list(id);
 }
 
-QVariantMap NoteStore::findOrCreateList(const QString& name)
-{
-    return createList(name);
-}
-
 QVariantMap NoteStore::updateList(const QString& id, const QVariantMap& data)
 {
     QVariantMap cur = list(id);
     if (cur.isEmpty()) return {};
-    if (data.contains("name")) {
-        const QString name = data.value("name").toString().simplified();
-        if (name.isEmpty() || !listNamed(name, id).isEmpty()) return {};
+    const QString name = data.value("name").toString().simplified();
+    if (!name.isEmpty()) {
+        // Respelling its own name is always fine, even where an older
+        // duplicate already shares it.
+        if (listNameKey(name) != listNameKey(cur.value("name").toString()) && !listNamed(name, id).isEmpty()) return {};
         cur.insert("name", name);
     }
     for (const char* k : {"icon", "color"})

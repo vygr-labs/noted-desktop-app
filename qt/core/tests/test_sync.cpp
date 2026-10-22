@@ -66,6 +66,7 @@ private slots:
     void joiningWithAnOlderCopy();
     void sideBySideEditsMerge();
     void sameTagAndDayFromBoth();
+    void sameListNameFromBoth();
     void wrongPassphrase();
     void sharedList();
     void compaction();
@@ -260,6 +261,31 @@ void TestSync::sameTagAndDayFromBoth()
         QCOMPARE(d->count("SELECT count(*) FROM notes WHERE is_daily = 1 AND daily_date = '2026-10-17'"), 1);
         const QString day = d->store.dailyNote("2026-10-17").value("content_plain").toString();
         QVERIFY2(day.contains("morning on a") && day.contains("evening on b"), qPrintable(day));
+    }
+}
+
+void TestSync::sameListNameFromBoth()
+{
+    QTemporaryDir dir;
+    QDir().mkpath(dir.filePath("cloud"));
+    Device a(dir.filePath("a.sqlite")), b(dir.filePath("b.sqlite"));
+    QVERIFY(setUp(a, dir.filePath("cloud"), "passphrase!"));
+    QVERIFY(setUp(b, dir.filePath("cloud"), "passphrase!"));
+    round({&a, &b});
+
+    const QString la = a.store.createList("Work").value("id").toString();
+    const QString lb = b.store.createList("work ").value("id").toString();
+    const QString na = a.store.createNote({{"title", "From a"}, {"list_id", la}}).value("id").toString();
+    round({&a, &b});
+    round({&a, &b});
+
+    // Both kept (not folded), the bigger id numbered, the same on each.
+    const QString kept = std::min(la, lb), numbered = std::max(la, lb);
+    for (Device* d : {&a, &b}) {
+        QCOMPARE(d->store.lists().size(), 2);
+        QVERIFY(d->store.sameListName(d->store.list(kept).value("name").toString(), "Work"));
+        QVERIFY(d->store.sameListName(d->store.list(numbered).value("name").toString(), "Work 2"));
+        QCOMPARE(d->store.note(na).value("list_id").toString(), la);
     }
 }
 

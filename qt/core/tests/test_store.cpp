@@ -105,9 +105,13 @@ void TestStore::listNamesAreUnique()
     NoteStore store(db);
     const QString work = store.createList("  Work   notes ").value("id").toString();
     QCOMPARE(store.list(work).value("name").toString(), QStringLiteral("Work notes"));
-    // Same name, other case and spacing: the existing list comes back.
-    QCOMPARE(store.createList("work NOTES").value("id").toString(), work);
+    // Same name, other case and spacing: refused.
+    QVERIFY(store.createList("work NOTES").isEmpty());
+    QCOMPARE(store.listNamed("work NOTES").value("id").toString(), work);
     QCOMPARE(store.lists().size(), 1);
+    // The same letters written two ways (é, and e + accent) are one name.
+    QVERIFY(!store.createList(QString::fromUtf8("Caf\xc3\xa9")).isEmpty());
+    QVERIFY(store.createList(QString::fromUtf8("cafe\xcc\x81")).isEmpty());
 
     const QString home = store.createList("Home").value("id").toString();
     QVERIFY(store.updateList(home, {{"name", " WORK notes"}}).isEmpty());
@@ -119,6 +123,11 @@ void TestStore::listNamesAreUnique()
     store.setListHidden(home, true);
     QCOMPARE(store.listNamed("home").value("id").toString(), home);
     QVERIFY(store.listNamed("Home", home).isEmpty());
+
+    // An older duplicate (from before this rule) can still be recoloured and
+    // keep its name.
+    db.conn().run(QStringLiteral("UPDATE lists SET name = 'Work notes' WHERE id = ?"), {home});
+    QCOMPARE(store.updateList(home, {{"name", "Work notes"}, {"color", "blue"}}).value("color").toString(), QStringLiteral("blue"));
 }
 
 void TestStore::lockPin()

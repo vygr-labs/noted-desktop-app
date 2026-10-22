@@ -653,7 +653,8 @@ Rectangle {
     ModalDialog {
         id: newListDialog
         title: "New list"
-        readonly property var taken: Store.listNamed(newListField.text)
+        // Re-read when lists change too (a sync can take the name meanwhile).
+        readonly property var taken: { AppState.lists; AppState.hiddenLists; return Store.listNamed(newListField.text) }
         function openFor() { newListField.text = ""; open(); newListField.forceActiveFocus() }
         Field {
             id: newListField
@@ -666,9 +667,10 @@ Rectangle {
         function commit() {
             const name = newListField.text.trim()
             if (taken.id) return
-            close()
-            if (name === "") return
+            if (name === "") { close(); return }
             const l = Store.createList(name, "folder", Theme.pickerSwatches[AppState.lists.length % 7].name)
+            if (!l.id) return
+            close()
             AppState.go("list", l.id)
         }
         footer: [
@@ -681,7 +683,12 @@ Rectangle {
         id: renameDialog
         property var list: ({})
         title: "Rename list"
-        readonly property var taken: Store.listNamed(renameField.text, list.id || "")
+        // Its own name (respelled or not) is never taken, even when an older
+        // duplicate shares it.
+        readonly property var taken: {
+            AppState.lists; AppState.hiddenLists
+            return Store.sameListName(renameField.text, list.name || "") ? ({}) : Store.listNamed(renameField.text, list.id || "")
+        }
         function openFor(l) { list = l; renameField.text = l.name; open(); renameField.selectAll(); renameField.forceActiveFocus() }
         Field {
             id: renameField
@@ -692,7 +699,7 @@ Rectangle {
         TakenNote { list: renameDialog.taken }
         function commit() {
             if (taken.id) return
-            if (renameField.text.trim() !== "") Store.updateList(list.id, { name: renameField.text })
+            if (renameField.text.trim() !== "" && !Store.updateList(list.id, { name: renameField.text }).id) return
             close()
         }
         footer: [
