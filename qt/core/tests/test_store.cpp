@@ -18,6 +18,7 @@ private slots:
     void notesListsTagsAndSearch();
     void dailyNoteIsReused();
     void savingUnchangedNoteKeepsItsTime();
+    void listNamesAreUnique();
     void lockPin();
     void checklistProgressAndOpenTasks();
     void listGroupsAndSnippets();
@@ -95,6 +96,29 @@ void TestStore::savingUnchangedNoteKeepsItsTime()
 
     store.updateNote(id, {{"title", "New title"}});
     QVERIFY(store.note(id).value("updated_at").toString() != QStringLiteral("2026-01-02 03:04:05"));
+}
+
+void TestStore::listNamesAreUnique()
+{
+    QTemporaryDir dir;
+    Database db(dir.filePath("app.sqlite"));
+    NoteStore store(db);
+    const QString work = store.createList("  Work   notes ").value("id").toString();
+    QCOMPARE(store.list(work).value("name").toString(), QStringLiteral("Work notes"));
+    // Same name, other case and spacing: the existing list comes back.
+    QCOMPARE(store.createList("work NOTES").value("id").toString(), work);
+    QCOMPARE(store.lists().size(), 1);
+
+    const QString home = store.createList("Home").value("id").toString();
+    QVERIFY(store.updateList(home, {{"name", " WORK notes"}}).isEmpty());
+    QCOMPARE(store.list(home).value("name").toString(), QStringLiteral("Home"));
+    // Renaming a list to itself (or its own spelling) is fine.
+    QCOMPARE(store.updateList(work, {{"name", "work notes"}}).value("name").toString(), QStringLiteral("work notes"));
+
+    // Hidden lists still hold their name.
+    store.setListHidden(home, true);
+    QCOMPARE(store.listNamed("home").value("id").toString(), home);
+    QVERIFY(store.listNamed("Home", home).isEmpty());
 }
 
 void TestStore::lockPin()

@@ -73,6 +73,11 @@ public:
     Q_INVOKABLE QVariantList lists();
     Q_INVOKABLE QVariantList hiddenLists();
     Q_INVOKABLE QVariantMap list(const QString& id);
+    // List names are unique, ignoring case and spacing ("Work " = "work").
+    // listNamed finds the list (hidden ones too) that already holds `name`,
+    // skipping `exceptId`. createList with a taken name returns that list;
+    // updateList refuses a rename onto one and returns {}.
+    Q_INVOKABLE QVariantMap listNamed(const QString& name, const QString& exceptId = {});
     Q_INVOKABLE QVariantMap createList(const QString& name, const QString& icon = {}, const QString& color = {});
     Q_INVOKABLE QVariantMap updateList(const QString& id, const QVariantMap& data);
     Q_INVOKABLE void deleteList(const QString& id);
