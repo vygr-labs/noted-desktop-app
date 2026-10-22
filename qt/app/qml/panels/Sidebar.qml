@@ -637,18 +637,35 @@ Rectangle {
         ])
     }
 
+    // Under a list-name field when another list already has that name.
+    component TakenNote: Text {
+        property var list: ({})
+        textFormat: Text.PlainText
+        visible: !!list.id
+        Layout.fillWidth: true
+        wrapMode: Text.Wrap
+        text: "There’s already a list called “" + (list.name || "") + "”" + (list.is_hidden ? " (hidden)." : ".")
+        color: Theme.c.red
+        font.pointSize: Theme.pt(13.5)
+        Accessible.role: Accessible.AlertMessage
+    }
+
     ModalDialog {
         id: newListDialog
         title: "New list"
+        readonly property var taken: Store.listNamed(newListField.text)
         function openFor() { newListField.text = ""; open(); newListField.forceActiveFocus() }
         Field {
             id: newListField
             Layout.fillWidth: true
             placeholderText: "Work, Church, Reading…"
+            error: !!newListDialog.taken.id
             onAccepted: newListDialog.commit()
         }
+        TakenNote { list: newListDialog.taken }
         function commit() {
             const name = newListField.text.trim()
+            if (taken.id) return
             close()
             if (name === "") return
             const l = Store.createList(name, "folder", Theme.pickerSwatches[AppState.lists.length % 7].name)
@@ -664,14 +681,18 @@ Rectangle {
         id: renameDialog
         property var list: ({})
         title: "Rename list"
+        readonly property var taken: Store.listNamed(renameField.text, list.id || "")
         function openFor(l) { list = l; renameField.text = l.name; open(); renameField.selectAll(); renameField.forceActiveFocus() }
         Field {
             id: renameField
             Layout.fillWidth: true
+            error: !!renameDialog.taken.id
             onAccepted: renameDialog.commit()
         }
+        TakenNote { list: renameDialog.taken }
         function commit() {
-            if (renameField.text.trim() !== "") Store.updateList(list.id, { name: renameField.text.trim() })
+            if (taken.id) return
+            if (renameField.text.trim() !== "") Store.updateList(list.id, { name: renameField.text })
             close()
         }
         footer: [

@@ -478,13 +478,29 @@ QVariantMap NoteStore::list(const QString& id)
     return m_db.conn().one(QStringLiteral("SELECT * FROM lists WHERE id = ?"), {id});
 }
 
+QVariantMap NoteStore::listNamed(const QString& name, const QString& exceptId)
+{
+    // In C++ rather than COLLATE NOCASE, which only folds ASCII.
+    const QString want = name.simplified();
+    if (want.isEmpty()) return {};
+    for (const QVariant& v : m_db.conn().all(QStringLiteral("SELECT id, name FROM lists"))) {
+        const QVariantMap l = v.toMap();
+        if (l.value("id").toString() != exceptId
+            && l.value("name").toString().simplified().compare(want, Qt::CaseInsensitive) == 0)
+            return list(l.value("id").toString());
+    }
+    return {};
+}
+
 QVariantMap NoteStore::createList(const QString& name, const QString& icon, const QString& color)
 {
+    const QVariantMap existing = listNamed(name);
+    if (!existing.isEmpty()) return existing;
     auto& c = m_db.conn();
     const QString id = Database::newId();
     const int order = c.scalar(QStringLiteral("SELECT COALESCE(MAX(sort_order), -1) + 1 FROM lists")).toInt();
     c.run(QStringLiteral("INSERT INTO lists (id, name, icon, color, sort_order) VALUES (?, ?, ?, ?, ?)"),
-          {id, name.trimmed(), icon.isEmpty() ? QStringLiteral("folder") : icon,
+          {id, name.simplified(), icon.isEmpty() ? QStringLiteral("folder") : icon,
            color.isEmpty() ? QStringLiteral("gray") : color, order});
     emit listsChanged();
     return list(id);
@@ -492,15 +508,19 @@ QVariantMap NoteStore::createList(const QString& name, const QString& icon, cons
 
 QVariantMap NoteStore::findOrCreateList(const QString& name)
 {
-    const QVariantMap existing = m_db.conn().one(QStringLiteral("SELECT * FROM lists WHERE name = ? COLLATE NOCASE"), {name});
-    return existing.isEmpty() ? createList(name) : existing;
+    return createList(name);
 }
 
 QVariantMap NoteStore::updateList(const QString& id, const QVariantMap& data)
 {
     QVariantMap cur = list(id);
     if (cur.isEmpty()) return {};
-    for (const char* k : {"name", "icon", "color"})
+    if (data.contains("name")) {
+        const QString name = data.value("name").toString().simplified();
+        if (name.isEmpty() || !listNamed(name, id).isEmpty()) return {};
+        cur.insert("name", name);
+    }
+    for (const char* k : {"icon", "color"})
         if (data.contains(k)) cur.insert(k, data.value(k));
     m_db.conn().run(QStringLiteral("UPDATE lists SET name = ?, icon = ?, color = ?, updated_at = CURRENT_TIMESTAMP WHERE id = ?"),
                     {cur.value("name"), cur.value("icon"), cur.value("color"), id});
