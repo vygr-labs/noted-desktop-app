@@ -12,6 +12,7 @@
 #include <algorithm>
 
 #include "noted/Database.h"
+#include "noted/NoteStore.h"
 #include "noted/Sqlite.h"
 #include "noted/sync/Merge.h"
 
@@ -742,6 +743,39 @@ bool Ledger::resolveTagName(const QString& id, const QString& name, Applied& out
     return true;  // the caller writes `id`; finishTag moves the notes over
 }
 
+// Two lists can't share a name either (NoteStore::listNamed), but they aren't
+// folded together like tags: one may be a shared list, and folding would
+// carry private notes into it. One takes a number instead ("Work 2"): the one
+// that isn't shared, else the bigger id, so every computer picks the same
+// one. The new name goes out as an edit made here.
+void Ledger::resolveListName(const Space& s, const QString& id, Applied& out)
+{
+    auto& c = m_db.conn();
+    const QVariantList all = c.all(QStringLiteral("SELECT id, name, COALESCE(is_shared, 0) AS is_shared FROM lists"));
+    QHash<QString, QString> names;  // id → name
+    QSet<QString> keys, shared;
+    for (const QVariant& v : all) {
+        const QVariantMap l = v.toMap();
+        names.insert(l.value("id").toString(), l.value("name").toString());
+        keys << NoteStore::listNameKey(l.value("name").toString());
+        if (l.value("is_shared").toInt()) shared << l.value("id").toString();
+    }
+    if (s.kind == u"list") shared << s.listId;  // may not be marked yet on joining
+    const QString key = NoteStore::listNameKey(names.value(id));
+    QString other;
+    for (auto it = names.cbegin(); it != names.cend() && !key.isEmpty(); ++it)
+        if (it.key() != id && NoteStore::listNameKey(it.value()) == key) { other = it.key(); break; }
+    if (other.isEmpty()) return;
+    const bool a = shared.contains(id), b = shared.contains(other);
+    const QString loser = a != b ? (a ? other : id) : std::max(id, other);
+    const QString base = names.value(loser).simplified();
+    int n = 2;
+    while (keys.contains(NoteStore::listNameKey(base + QLatin1Char(' ') + QString::number(n)))) ++n;
+    c.run(QStringLiteral("UPDATE lists SET name = ? WHERE id = ?"), {base + QLatin1Char(' ') + QString::number(n), loser});
+    markDirty(QStringLiteral("list"), loser);
+    out.lists = true;
+}
+
 // Two notes for the same day (one made here, one on another computer before
 // they'd synced): the smaller id stays, with both days' text.
 void Ledger::resolveDaily(const QString& id, Applied& out)
@@ -1019,6 +1053,7 @@ Ledger::Applied Ledger::apply(const Space& s, QList<Incoming> records, const QSe
             if (win.contains(QStringLiteral("is_daily")) || win.contains(QStringLiteral("daily_date")) || win.contains(QStringLiteral("is_trashed")))
                 resolveDaily(id, out);
         }
+        if (e == u"list" && (insert || win.contains(QStringLiteral("name")))) resolveListName(s, id, out);
         touched(e, id);
         ++out.records;
     }

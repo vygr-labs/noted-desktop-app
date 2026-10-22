@@ -75,15 +75,16 @@ public:
     Q_INVOKABLE QVariantMap list(const QString& id);
     // List names are unique, ignoring case and spacing ("Work " = "work").
     // listNamed finds the list (hidden ones too) that already holds `name`,
-    // skipping `exceptId`. createList with a taken name returns that list;
-    // updateList refuses a rename onto one and returns {}.
+    // skipping `exceptId`. createList and updateList refuse a taken name and
+    // return {}. Lists arriving by sync are renamed instead (Ledger).
+    static QString listNameKey(const QString& name);
+    Q_INVOKABLE bool sameListName(const QString& a, const QString& b) const { return listNameKey(a) == listNameKey(b); }
     Q_INVOKABLE QVariantMap listNamed(const QString& name, const QString& exceptId = {});
     Q_INVOKABLE QVariantMap createList(const QString& name, const QString& icon = {}, const QString& color = {});
     Q_INVOKABLE QVariantMap updateList(const QString& id, const QVariantMap& data);
     Q_INVOKABLE void deleteList(const QString& id);
     Q_INVOKABLE void setListHidden(const QString& id, bool hidden);
     Q_INVOKABLE void reorderLists(const QStringList& ids);
-    Q_INVOKABLE QVariantMap findOrCreateList(const QString& name);
 
     // ── tags ─────────────────────────────────────────────────────────
     Q_INVOKABLE QVariantList tags();
